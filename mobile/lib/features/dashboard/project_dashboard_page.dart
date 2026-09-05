@@ -4,11 +4,9 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/application/daily_log_application.dart';
 import 'package:chief_site_engineer/application/material_request_application.dart';
+import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
-import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
-import 'package:chief_site_engineer/domain/daily_log_models.dart';
-import 'package:chief_site_engineer/domain/material_request_models.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
 import 'package:flutter/material.dart';
 
@@ -66,45 +64,29 @@ class ProjectDashboardPage extends StatefulWidget {
 
 DateTime _systemUtcClock() => DateTime.now().toUtc();
 
-enum _ProjectLoadStatus { loading, ready, error }
-
-enum _SectionStatus { idle, loading, ready, error, disabled }
-
-class _SectionState<T> {
-  const _SectionState._(this.status, {this.value});
-
-  const _SectionState.idle() : this._(_SectionStatus.idle);
-  const _SectionState.loading() : this._(_SectionStatus.loading);
-  const _SectionState.ready(T value)
-    : this._(_SectionStatus.ready, value: value);
-  const _SectionState.error() : this._(_SectionStatus.error);
-  const _SectionState.disabled() : this._(_SectionStatus.disabled);
-
-  final _SectionStatus status;
-  final T? value;
-}
+enum _LoadStatus { loading, ready, error }
 
 class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   StreamSubscription<void>? _projectSubscription;
   List<MobileProject> _projects = const [];
-  _ProjectLoadStatus _projectStatus = _ProjectLoadStatus.loading;
-  _SectionState<DailyLogDay> _today = const _SectionState.idle();
-  _SectionState<List<ConstructionLivingPlanWindowItem>> _plan =
-      const _SectionState.idle();
-  _SectionState<List<MaterialRequest>> _materials = const _SectionState.idle();
+  ProjectProfile? _profile;
+  _LoadStatus _projectStatus = _LoadStatus.loading;
+  _LoadStatus _profileStatus = _LoadStatus.loading;
   int _projectGeneration = 0;
-  int _todayGeneration = 0;
-  int _planGeneration = 0;
-  int _materialGeneration = 0;
-  int _loadAllGeneration = 0;
-  Future<void> _dashboardReadTail = Future<void>.value();
+  int _profileGeneration = 0;
+  bool _mutating = false;
+
+  ProjectProfileApplication? get _profileApplication =>
+      widget.agenda is ProjectProfileApplication
+      ? widget.agenda as ProjectProfileApplication
+      : null;
 
   @override
   void initState() {
     super.initState();
     widget.session.addListener(_handleActiveProjectChanged);
     _projectSubscription = widget.agenda.projectChanges.listen(
-      (_) => unawaited(_loadProjects()),
+      (_) => unawaited(_loadProjects(showLoading: false)),
     );
     unawaited(_loadProjects());
   }
@@ -116,16 +98,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     super.dispose();
   }
 
-  void _handleActiveProjectChanged() {
-    if (!mounted || _projectStatus != _ProjectLoadStatus.ready) return;
-    final selected = widget.session.selectedProject(_projects);
-    if (selected == null) {
-      _clearSections();
-      return;
-    }
-    _loadAll(selected.id);
-  }
-
   String get _localDay {
     final local = CseTimeCodec.toIstanbul(
       CseTimeCodec.encodeUtc(widget.clock().toUtc()),
@@ -135,9 +107,11 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         '${local.day.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _loadProjects() async {
+  Future<void> _loadProjects({bool showLoading = true}) async {
     final generation = ++_projectGeneration;
-    if (mounted) setState(() => _projectStatus = _ProjectLoadStatus.loading);
+    if (mounted && showLoading) {
+      setState(() => _projectStatus = _LoadStatus.loading);
+    }
     try {
       final projects = (await widget.agenda.listProjects())
           .where((project) => !project.isArchived)
@@ -146,240 +120,469 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
       widget.session.reconcile(projects);
       setState(() {
         _projects = projects;
-        _projectStatus = _ProjectLoadStatus.ready;
+        _projectStatus = _LoadStatus.ready;
       });
-      if (widget.session.selectedProject(projects) case final project?) {
-        _loadAll(project.id);
+      final selected = widget.session.selectedProject(projects);
+      if (selected == null) {
+        _clearProfile();
       } else {
-        _clearSections();
+        unawaited(_loadProfile(selected.id, showLoading: showLoading));
       }
     } on Object {
       if (!mounted || generation != _projectGeneration) return;
       widget.session.clear();
       setState(() {
         _projects = const [];
-        _projectStatus = _ProjectLoadStatus.error;
+        _projectStatus = _LoadStatus.error;
       });
-      _clearSections();
+      _clearProfile();
     }
   }
 
-  void _clearSections() {
-    _loadAllGeneration += 1;
-    _todayGeneration += 1;
-    _planGeneration += 1;
-    _materialGeneration += 1;
-    if (!mounted) return;
-    setState(() {
-      _today = widget.dailyLog == null
-          ? const _SectionState.disabled()
-          : const _SectionState.idle();
-      _plan = const _SectionState.idle();
-      _materials = widget.materialRequests == null
-          ? const _SectionState.disabled()
-          : const _SectionState.idle();
-    });
-  }
-
-  void _loadAll(String projectId) {
-    final generation = ++_loadAllGeneration;
-    _todayGeneration += 1;
-    _planGeneration += 1;
-    _materialGeneration += 1;
-    if (!mounted) return;
-    setState(() {
-      _today = widget.dailyLog == null
-          ? const _SectionState.disabled()
-          : const _SectionState.loading();
-      _plan = const _SectionState.loading();
-      _materials = widget.materialRequests == null
-          ? const _SectionState.disabled()
-          : const _SectionState.loading();
-    });
-    unawaited(_loadAllInOrder(projectId, generation));
-  }
-
-  Future<void> _loadAllInOrder(String projectId, int generation) async {
-    await _loadPipelineSection(
-      projectId,
-      generation,
-      () => _loadToday(projectId),
-    );
-    if (!_acceptLoadAll(projectId, generation)) return;
-    await _loadPipelineSection(
-      projectId,
-      generation,
-      () => _loadPlan(projectId),
-    );
-    if (!_acceptLoadAll(projectId, generation)) return;
-    await _loadPipelineSection(
-      projectId,
-      generation,
-      () => _loadMaterials(projectId),
-    );
-  }
-
-  Future<void> _loadPipelineSection(
-    String projectId,
-    int generation,
-    Future<void> Function() operation,
-  ) => _enqueueDashboardRead(() async {
-    if (!_acceptLoadAll(projectId, generation)) return;
-    await operation();
-  });
-
-  Future<void> _enqueueDashboardRead(Future<void> Function() operation) {
-    final completer = Completer<void>();
-    _dashboardReadTail = _dashboardReadTail.then((_) async {
-      try {
-        await operation();
-        completer.complete();
-      } on Object catch (error, stackTrace) {
-        completer.completeError(error, stackTrace);
-      }
-    });
-    return completer.future;
-  }
-
-  // The local pipeline orders Dashboard sections only. Today and Living Plan
-  // open independent SQLite connections, so they must also share Agenda's
-  // queue with the reloads triggered by projectChanges. Materials already owns
-  // that queue and must not be wrapped here (which would wait on itself).
-  Future<T> _readWithAgenda<T>(Future<T> Function() operation) {
-    final agenda = widget.agenda;
-    if (agenda is CoordinatedAgendaApplication) {
-      return (agenda as CoordinatedAgendaApplication).coordinator.run(
-        operation,
-      );
-    }
-    return operation();
-  }
-
-  Future<void> _loadToday(String projectId) async {
-    final application = widget.dailyLog;
-    if (application == null) {
-      if (mounted) setState(() => _today = const _SectionState.disabled());
+  void _handleActiveProjectChanged() {
+    if (!mounted || _projectStatus != _LoadStatus.ready) return;
+    final selected = widget.session.selectedProject(_projects);
+    if (selected == null) {
+      _clearProfile();
       return;
     }
-    final generation = ++_todayGeneration;
-    setState(() => _today = const _SectionState.loading());
+    unawaited(_loadProfile(selected.id));
+  }
+
+  void _clearProfile() {
+    _profileGeneration += 1;
+    if (!mounted) return;
+    setState(() {
+      _profile = null;
+      _profileStatus = _LoadStatus.loading;
+    });
+  }
+
+  Future<void> _loadProfile(String projectId, {bool showLoading = true}) async {
+    final generation = ++_profileGeneration;
+    if (mounted && showLoading) {
+      setState(() {
+        _profile = null;
+        _profileStatus = _LoadStatus.loading;
+      });
+    }
+    final application = _profileApplication;
+    if (application == null) {
+      if (mounted && generation == _profileGeneration) {
+        setState(() => _profileStatus = _LoadStatus.error);
+      }
+      return;
+    }
     try {
-      final value = await _readWithAgenda(
-        () => application.loadDay(projectId: projectId, localDay: _localDay),
-      );
-      if (!_acceptSectionResult(projectId, generation, _todayGeneration)) {
+      final profile = await application.getProjectProfile(projectId);
+      if (!mounted ||
+          generation != _profileGeneration ||
+          widget.session.selectedProjectId != projectId) {
         return;
       }
-      setState(() => _today = _SectionState.ready(value));
+      setState(() {
+        _profile = profile;
+        _profileStatus = _LoadStatus.ready;
+      });
     } on Object {
-      if (!_acceptSectionResult(projectId, generation, _todayGeneration)) {
+      if (!mounted ||
+          generation != _profileGeneration ||
+          widget.session.selectedProjectId != projectId) {
         return;
       }
-      setState(() => _today = const _SectionState.error());
+      setState(() => _profileStatus = _LoadStatus.error);
     }
   }
 
-  Future<void> _loadPlan(String projectId) async {
-    final generation = ++_planGeneration;
-    setState(() => _plan = const _SectionState.loading());
-    final day = DateTime.parse(_localDay);
+  Future<void> _runMutation(Future<void> Function() operation) async {
+    if (_mutating) return;
+    setState(() => _mutating = true);
     try {
-      final value = await _readWithAgenda(
-        () => widget.livingPlan.loadSevenDayPlan(
-          projectId: projectId,
-          windowStart: DateTime(day.year, day.month, day.day),
+      await operation();
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_messageFor(error))));
+      final projectId = widget.session.selectedProjectId;
+      if (projectId != null) unawaited(_loadProfile(projectId));
+    } finally {
+      if (mounted) setState(() => _mutating = false);
+    }
+  }
+
+  String _messageFor(Object error) => switch (error) {
+    AgendaValidationFailure() => error.message,
+    _ => 'Proje profili güncellenemedi. Kayıtlar korunuyor.',
+  };
+
+  Future<void> _editField(ProjectProfileField field) async {
+    var label = field.label;
+    var value = field.value;
+    final result = await showDialog<(String, String)>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(field.isBuiltIn ? field.label : 'Alanı düzenle'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!field.isBuiltIn)
+              TextFormField(
+                key: const Key('project-profile-edit-label'),
+                initialValue: label,
+                onChanged: (next) => label = next,
+                autofocus: true,
+                maxLength: 120,
+                decoration: const InputDecoration(labelText: 'Alan adı'),
+              ),
+            TextFormField(
+              key: const Key('project-profile-edit-value'),
+              initialValue: value,
+              onChanged: (next) => value = next,
+              autofocus: field.isBuiltIn,
+              maxLength: 4000,
+              decoration: const InputDecoration(labelText: 'Değer'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            key: const Key('project-profile-save-field'),
+            onPressed: () {
+              final normalizedLabel = label.trim();
+              if (normalizedLabel.isEmpty) return;
+              Navigator.pop(context, (normalizedLabel, value));
+            },
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+    if (result == null || !mounted) return;
+    final application = _profileApplication;
+    if (application == null) return;
+    await _runMutation(() async {
+      await application.updateProjectProfileField(
+        UpdateProjectProfileFieldCommand(
+          fieldId: field.id,
+          eventId: RecordId.randomUuid(),
+          projectId: field.projectId,
+          expectedRevision: field.revision,
+          label: result.$1,
+          value: result.$2,
         ),
       );
-      if (!_acceptSectionResult(projectId, generation, _planGeneration)) {
-        return;
-      }
-      setState(() => _plan = _SectionState.ready(value));
-    } on Object {
-      if (!_acceptSectionResult(projectId, generation, _planGeneration)) {
-        return;
-      }
-      setState(() => _plan = const _SectionState.error());
-    }
+    });
   }
 
-  Future<void> _loadMaterials(String projectId) async {
-    final application = widget.materialRequests;
-    if (application == null) {
-      if (mounted) {
-        setState(() => _materials = const _SectionState.disabled());
-      }
-      return;
-    }
-    final generation = ++_materialGeneration;
-    setState(() => _materials = const _SectionState.loading());
-    try {
-      final value = await application.listMaterialRequests(
-        projectId: projectId,
-        kind: MaterialRequestListKind.open,
-      );
-      if (!_acceptSectionResult(projectId, generation, _materialGeneration)) {
-        return;
-      }
-      setState(() => _materials = _SectionState.ready(value));
-    } on Object {
-      if (!_acceptSectionResult(projectId, generation, _materialGeneration)) {
-        return;
-      }
-      setState(() => _materials = const _SectionState.error());
-    }
-  }
-
-  bool _acceptSectionResult(
-    String projectId,
-    int generation,
-    int currentGeneration,
-  ) =>
-      mounted &&
-      generation == currentGeneration &&
-      widget.session.selectedProjectId == projectId;
-
-  bool _acceptLoadAll(String projectId, int generation) =>
-      mounted &&
-      generation == _loadAllGeneration &&
-      widget.session.selectedProjectId == projectId;
-
-  void _reloadSection(String projectId, Future<void> Function() operation) {
-    unawaited(
-      _enqueueDashboardRead(() async {
-        if (!mounted || widget.session.selectedProjectId != projectId) return;
-        await operation();
-      }),
+  Future<void> _addField(MobileProject project) async {
+    var label = '';
+    var value = '';
+    final result = await showDialog<(String, String)>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Özel alan ekle'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              key: const Key('project-profile-new-label'),
+              onChanged: (next) => label = next,
+              autofocus: true,
+              maxLength: 120,
+              decoration: const InputDecoration(labelText: 'Alan adı'),
+            ),
+            TextFormField(
+              key: const Key('project-profile-new-value'),
+              onChanged: (next) => value = next,
+              maxLength: 4000,
+              decoration: const InputDecoration(labelText: 'Değer'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            key: const Key('project-profile-create-field'),
+            onPressed: () {
+              final normalizedLabel = label.trim();
+              if (normalizedLabel.isEmpty) return;
+              Navigator.pop(context, (normalizedLabel, value));
+            },
+            child: const Text('Ekle'),
+          ),
+        ],
+      ),
     );
+    if (result == null || !mounted) return;
+    final application = _profileApplication;
+    if (application == null) return;
+    await _runMutation(() async {
+      await application.createProjectProfileField(
+        CreateProjectProfileFieldCommand(
+          id: RecordId.randomUuid(),
+          eventId: RecordId.randomUuid(),
+          projectId: project.id,
+          label: result.$1,
+          value: result.$2,
+        ),
+      );
+    });
+  }
+
+  Future<void> _archiveField(ProjectProfileField field) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Özel alanı arşivle'),
+        content: Text('${field.label} profil görünümünden kaldırılacak.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            key: const Key('project-profile-confirm-archive'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Arşivle'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final application = _profileApplication;
+    if (application == null) return;
+    await _runMutation(() async {
+      await application.mutateProjectProfileFieldArchive(
+        MutateProjectProfileFieldArchiveCommand(
+          fieldId: field.id,
+          eventId: RecordId.randomUuid(),
+          projectId: field.projectId,
+          expectedRevision: field.revision,
+          archive: true,
+        ),
+      );
+    });
+  }
+
+  Future<void> _reorderFields(int oldIndex, int newIndex) async {
+    final profile = _profile;
+    final application = _profileApplication;
+    if (profile == null || application == null || _mutating) return;
+    final fields = [...profile.fields];
+    final moved = fields.removeAt(oldIndex);
+    fields.insert(newIndex, moved);
+    setState(
+      () => _profile = ProjectProfile(project: profile.project, fields: fields),
+    );
+    await _runMutation(() async {
+      await application.reorderProjectProfileFields(
+        ReorderProjectProfileFieldsCommand(
+          eventId: RecordId.randomUuid(),
+          projectId: profile.project.id,
+          fields: [
+            for (final field in fields)
+              ProjectProfileFieldOrder(
+                fieldId: field.id,
+                expectedRevision: field.revision,
+              ),
+          ],
+        ),
+      );
+    });
   }
 
   Future<void> _runCapture(DashboardCaptureAction? action) async {
     final projectId = widget.session.selectedProjectId;
     if (action == null || projectId == null) return;
-    final changed = await action(projectId, _localDay);
-    if (changed && mounted && widget.session.selectedProjectId == projectId) {
-      _reloadSection(projectId, () => _loadToday(projectId));
-    }
+    await action(projectId, _localDay);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return switch (_projectStatus) {
-      _ProjectLoadStatus.loading => const Center(
-        key: Key('dashboard-loading-projects'),
-        child: CircularProgressIndicator(),
-      ),
-      _ProjectLoadStatus.error => _ProjectStateSurface(
-        key: const Key('dashboard-project-error'),
-        icon: Icons.warning_amber_rounded,
-        title: 'Projeler güvenli biçimde okunamadı.',
-        body: 'Hiçbir proje kaydı değiştirilmedi.',
-        actionIcon: Icons.refresh_rounded,
-        actionLabel: 'Tekrar dene',
-        onAction: _loadProjects,
-      ),
-      _ProjectLoadStatus.ready => _buildReady(),
-    };
+  void _openProjectAction(DashboardProjectAction? action, String projectId) {
+    if (action != null) action(projectId);
   }
+
+  Future<void> _openTools(MobileProject project) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          key: const Key('project-profile-tools-sheet'),
+          shrinkWrap: true,
+          padding: const EdgeInsets.only(bottom: 12),
+          children: [
+            ListTile(
+              title: const Text('Araçlar'),
+              subtitle: Text(project.name),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-create-project'),
+              icon: Icons.add_business_rounded,
+              title: 'Yeni proje',
+              action: widget.onCreateProject,
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-quick-reminder'),
+              icon: Icons.notifications_active_outlined,
+              title: 'Hatırlatıcı ekle',
+              action: widget.onAddReminder == null
+                  ? null
+                  : () => _runCapture(widget.onAddReminder),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-quick-agenda'),
+              icon: Icons.edit_note_outlined,
+              title: 'Ajanda kaydı ekle',
+              action: widget.onAddAgenda == null
+                  ? null
+                  : () => _runCapture(widget.onAddAgenda),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-open-today'),
+              icon: Icons.today_outlined,
+              title: 'Günlük Log',
+              action: widget.onOpenToday == null
+                  ? null
+                  : () => _openProjectAction(widget.onOpenToday, project.id),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-open-plan'),
+              icon: Icons.calendar_view_week_outlined,
+              title: '7 Günlük Plan',
+              action: widget.onOpenPlan == null
+                  ? null
+                  : () => _openProjectAction(widget.onOpenPlan, project.id),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-open-materials'),
+              icon: Icons.inventory_2_outlined,
+              title: 'İstenecek Malzemeler',
+              action: widget.onOpenMaterials == null
+                  ? null
+                  : () =>
+                        _openProjectAction(widget.onOpenMaterials, project.id),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-concrete-package'),
+              icon: Icons.foundation_outlined,
+              title: 'Beton Paketi',
+              action: widget.onOpenConcrete == null
+                  ? null
+                  : () => _openProjectAction(widget.onOpenConcrete, project.id),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-project-album'),
+              icon: Icons.photo_library_outlined,
+              title: 'Proje Albümü',
+              action: widget.onOpenProjectAlbum == null
+                  ? null
+                  : () => _openProjectAction(
+                      widget.onOpenProjectAlbum,
+                      project.id,
+                    ),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-workforce-directory'),
+              icon: Icons.contacts_outlined,
+              title: 'Saha Rehberi',
+              action: widget.onOpenWorkforce == null
+                  ? null
+                  : () =>
+                        _openProjectAction(widget.onOpenWorkforce, project.id),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-phone-call-result'),
+              icon: Icons.phone_in_talk_outlined,
+              title: 'Görüşme sonucu',
+              action: widget.onOpenPhoneCall == null
+                  ? null
+                  : () =>
+                        _openProjectAction(widget.onOpenPhoneCall, project.id),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-memory-backup'),
+              icon: Icons.settings_backup_restore_rounded,
+              title: 'Hafıza ve Yedekleme',
+              action: widget.onOpenBackup,
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-attachment-catalog'),
+              icon: Icons.folder_copy_outlined,
+              title: 'Dosya Kataloğu',
+              action: widget.onOpenCatalog == null
+                  ? null
+                  : () => _openProjectAction(widget.onOpenCatalog, project.id),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-attachment-health'),
+              icon: Icons.health_and_safety_outlined,
+              title: 'Dosya sağlığı',
+              action: widget.onOpenAttachmentHealth,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _toolTile(
+    BuildContext sheetContext, {
+    required Key key,
+    required IconData icon,
+    required String title,
+    required FutureOr<void> Function()? action,
+  }) => ListTile(
+    key: key,
+    leading: Icon(icon),
+    title: Text(title),
+    enabled: action != null,
+    onTap: action == null
+        ? null
+        : () {
+            Navigator.pop(sheetContext);
+            Future<void>.sync(action);
+          },
+  );
+
+  @override
+  Widget build(BuildContext context) => switch (_projectStatus) {
+    _LoadStatus.loading => const Center(
+      key: Key('dashboard-loading-projects'),
+      child: CircularProgressIndicator(),
+    ),
+    _LoadStatus.error => _ProjectStateSurface(
+      key: const Key('dashboard-project-error'),
+      icon: Icons.warning_amber_rounded,
+      title: 'Projeler güvenli biçimde okunamadı.',
+      body: 'Hiçbir proje kaydı değiştirilmedi.',
+      actionIcon: Icons.refresh_rounded,
+      actionLabel: 'Tekrar dene',
+      onAction: _loadProjects,
+    ),
+    _LoadStatus.ready => _buildReady(),
+  };
 
   Widget _buildReady() {
     if (_projects.isEmpty) {
@@ -387,12 +590,10 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         key: const Key('dashboard-no-project'),
         icon: Icons.apartment_rounded,
         title: 'İlk projenizi oluşturun',
-        body:
-            'Dashboard günlük saha kayıtlarını bir proje bağlamında gösterir.',
+        body: 'Proje profili, saha bilgileriniz için tek başlangıç noktasıdır.',
         actionIcon: Icons.add_business_rounded,
         actionLabel: 'Yeni proje oluştur',
         actionKey: const Key('dashboard-create-project'),
-        showActionLabel: true,
         onAction: widget.onCreateProject,
       );
     }
@@ -406,327 +607,127 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         actionIcon: Icons.add_business_rounded,
         actionLabel: 'Yeni proje',
         actionKey: const Key('dashboard-create-project'),
-        showActionLabel: true,
         onAction: widget.onCreateProject,
       );
     }
-    return _buildDashboard(selected);
+    return _buildProfile(selected);
   }
 
-  Widget _buildDashboard(MobileProject project) {
-    final day = DateTime.parse(_localDay);
-    final dateLabel = MaterialLocalizations.of(context).formatFullDate(day);
+  Widget _buildProfile(MobileProject project) {
+    final profile = _profile;
     return ListView(
-      key: const Key('project-dashboard-list'),
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+      key: const Key('project-profile-home'),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
       children: [
         Card(
-          key: const Key('dashboard-project-header'),
+          key: const Key('project-profile-header'),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.apartment_rounded, size: 28),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Semantics(
-                        container: true,
-                        label: 'Aktif proje ${project.name}, bugün $dateLabel',
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Aktif proje',
-                              style: Theme.of(context).textTheme.labelLarge,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              project.name,
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(dateLabel, key: const Key('dashboard-date')),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(
+                  'Proje Profili',
+                  style: Theme.of(context).textTheme.labelLarge,
                 ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.tonalIcon(
-                    key: const Key('dashboard-create-project'),
-                    onPressed: widget.onCreateProject,
-                    icon: const Icon(Icons.add_business_rounded),
-                    label: const Text('Yeni proje'),
-                  ),
+                const SizedBox(height: 4),
+                Text(
+                  project.name,
+                  key: const Key('project-profile-name'),
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 8),
-        _QuickActions(
-          onReminder: widget.onAddReminder == null
-              ? null
-              : () => _runCapture(widget.onAddReminder),
-          onAgenda: widget.onAddAgenda == null
-              ? null
-              : () => _runCapture(widget.onAddAgenda),
-        ),
-        const SizedBox(height: 12),
-        Text('Bugün', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        _DashboardSummaryCard(
-          key: const Key('dashboard-today-card'),
-          icon: Icons.today_outlined,
-          status: _today.status,
-          readyText: _today.value == null ? null : _todaySummary(_today.value!),
-          emptyText: null,
-          errorText: 'Bugünün özeti okunamadı. Diğer bölümler korunuyor.',
-          disabledText: 'Bugün özeti bu kurulumda hazır değil.',
-          retryKey: const Key('dashboard-today-retry'),
-          onRetry: () =>
-              _reloadSection(project.id, () => _loadToday(project.id)),
-          actionKey: const Key('dashboard-open-today'),
-          actionLabel: 'Günlük Log’u aç',
-          onAction: widget.onOpenToday == null
-              ? null
-              : () => widget.onOpenToday!(project.id),
-        ),
-        _DashboardSummaryCard(
-          key: const Key('dashboard-plan-card'),
-          icon: Icons.calendar_view_week_outlined,
-          title: '7 Günlük Plan',
-          status: _plan.status,
-          readyText: _plan.value == null || _plan.value!.isEmpty
-              ? null
-              : _planSummary(_plan.value!),
-          emptyText: 'Plan penceresinde kayıt yok.',
-          errorText: '7 günlük plan okunamadı. Diğer bölümler korunuyor.',
-          disabledText: '7 günlük plan bu kurulumda hazır değil.',
-          retryKey: const Key('dashboard-plan-retry'),
-          onRetry: () =>
-              _reloadSection(project.id, () => _loadPlan(project.id)),
-          actionKey: const Key('dashboard-open-plan'),
-          actionLabel: '7 Günlük Planı aç',
-          onAction: widget.onOpenPlan == null
-              ? null
-              : () => widget.onOpenPlan!(project.id),
-        ),
-        _DashboardSummaryCard(
-          key: const Key('dashboard-materials-card'),
-          icon: Icons.inventory_2_outlined,
-          title: 'İstenecek Malzemeler',
-          status: _materials.status,
-          readyText: _materials.value == null || _materials.value!.isEmpty
-              ? null
-              : '${_materials.value!.length} açık malzeme ihtiyacı var.',
-          emptyText: 'Açık malzeme ihtiyacı yok.',
-          errorText: 'Malzeme ihtiyaçları okunamadı. Diğer bölümler korunuyor.',
-          disabledText: 'Malzeme takibi bu kurulumda hazır değil.',
-          retryKey: const Key('dashboard-materials-retry'),
-          onRetry: () =>
-              _reloadSection(project.id, () => _loadMaterials(project.id)),
-          actionKey: const Key('dashboard-open-materials'),
-          actionLabel: 'Malzemeleri aç',
-          onAction: widget.onOpenMaterials == null
-              ? null
-              : () => widget.onOpenMaterials!(project.id),
-        ),
+        if (_profileStatus == _LoadStatus.loading ||
+            profile == null && _profileStatus == _LoadStatus.ready)
+          const Center(
+            key: Key('project-profile-loading'),
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_profileStatus == _LoadStatus.error)
+          _ProjectStateSurface(
+            key: const Key('project-profile-error'),
+            icon: Icons.warning_amber_rounded,
+            title: 'Proje profili okunamadı.',
+            body: 'Kayıtlar değiştirilmedi.',
+            actionIcon: Icons.refresh_rounded,
+            actionLabel: 'Tekrar dene',
+            onAction: () => _loadProfile(project.id),
+          )
+        else if (profile != null && profile.project.id == project.id) ...[
+          ReorderableListView.builder(
+            key: const Key('project-profile-fields'),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: profile.fields.length,
+            onReorderItem: _reorderFields,
+            itemBuilder: (context, index) {
+              final field = profile.fields[index];
+              return Card(
+                key: ValueKey('project-profile-field-${field.id}'),
+                child: ListTile(
+                  onTap: _mutating ? null : () => _editField(field),
+                  title: Text(field.label),
+                  subtitle: Text(
+                    field.value.isEmpty ? 'Henüz girilmedi' : field.value,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!field.isBuiltIn)
+                        IconButton(
+                          key: ValueKey('project-profile-archive-${field.id}'),
+                          tooltip: 'Alanı arşivle',
+                          onPressed: _mutating
+                              ? null
+                              : () => _archiveField(field),
+                          icon: const Icon(Icons.archive_outlined),
+                        ),
+                      ReorderableDragStartListener(
+                        key: ValueKey('project-profile-drag-${field.id}'),
+                        index: index,
+                        enabled: !_mutating,
+                        child: const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Icon(Icons.drag_handle_rounded),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('project-profile-add-field'),
+              onPressed: _mutating ? null : () => _addField(project),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Özel alan ekle'),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
-        Text('Proje araçları', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        _DashboardActionTile(
-          key: const Key('dashboard-concrete-package'),
-          icon: Icons.foundation_outlined,
-          title: 'Beton Paketi',
-          enabledSubtitle: 'Beton dökümü kayıtlarını aç.',
-          onTap: widget.onOpenConcrete == null
-              ? null
-              : () => widget.onOpenConcrete!(project.id),
-        ),
-        _DashboardActionTile(
-          key: const Key('dashboard-project-album'),
-          icon: Icons.photo_library_outlined,
-          title: 'Proje Albümü',
-          enabledSubtitle: 'Fotoğraf ve videoları kaynaklarıyla görüntüle.',
-          onTap: widget.onOpenProjectAlbum == null
-              ? null
-              : () => widget.onOpenProjectAlbum!(project.id),
-        ),
-        _DashboardActionTile(
-          key: const Key('dashboard-workforce-directory'),
-          icon: Icons.contacts_outlined,
-          title: 'Saha Rehberi',
-          enabledSubtitle: 'Projenin kişi ve firma kayıtlarını aç.',
-          onTap: widget.onOpenWorkforce == null
-              ? null
-              : () => widget.onOpenWorkforce!(project.id),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Tüm araçlar ve güvenlik',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 4),
-        _DashboardActionTile(
-          key: const Key('dashboard-phone-call-result'),
-          icon: Icons.phone_in_talk_outlined,
-          title: 'Görüşme sonucu',
-          enabledSubtitle: 'Telefon görüşmesinin sonucunu Ajanda’ya kaydet.',
-          onTap: widget.onOpenPhoneCall == null
-              ? null
-              : () => widget.onOpenPhoneCall!(project.id),
-        ),
-        _DashboardActionTile(
-          key: const Key('dashboard-memory-backup'),
-          icon: Icons.settings_backup_restore_rounded,
-          title: 'Hafıza ve Yedekleme',
-          enabledSubtitle: 'Mobil hafızayı yedekle veya geri yükle.',
-          onTap: widget.onOpenBackup,
-        ),
-        _DashboardActionTile(
-          key: const Key('dashboard-attachment-catalog'),
-          icon: Icons.folder_copy_outlined,
-          title: 'Dosya Kataloğu',
-          enabledSubtitle: 'Projenin dosya kayıtlarını görüntüle.',
-          onTap: widget.onOpenCatalog == null
-              ? null
-              : () => widget.onOpenCatalog!(project.id),
-        ),
-        _DashboardActionTile(
-          key: const Key('dashboard-attachment-health'),
-          icon: Icons.health_and_safety_outlined,
-          title: 'Dosya sağlığı',
-          enabledSubtitle: 'Dosya bütünlüğünü salt-okunur denetle.',
-          onTap: widget.onOpenAttachmentHealth,
+        Card(
+          child: ListTile(
+            key: const Key('project-profile-tools'),
+            leading: const Icon(Icons.widgets_outlined),
+            title: const Text('Araçlar'),
+            subtitle: const Text('Saha akışları ve güvenli yardımcı işlemler'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => _openTools(project),
+          ),
         ),
       ],
     );
-  }
-}
-
-String _todaySummary(DailyLogDay day) {
-  final parts = <String>[];
-  final summary = day.section(DailyLogSectionKind.summary).summaryText;
-  if (summary != null) parts.add(summary);
-  for (final kind in DailyLogSectionKind.values.skip(1)) {
-    final section = day.section(kind);
-    if (!section.isAvailable) {
-      parts.add('${kind.title}: kullanılamıyor');
-    } else if (section.entries.isEmpty) {
-      parts.add('${kind.title}: kayıt yok');
-    } else {
-      parts.add('${kind.title}: ${section.entries.length}');
-    }
-  }
-  return parts.join('\n');
-}
-
-String _planSummary(List<ConstructionLivingPlanWindowItem> items) {
-  final overdue = items.where((item) => item.isOverdue).length;
-  return overdue == 0
-      ? '${items.length} plan işi var; geciken iş yok.'
-      : '${items.length} plan işi • $overdue geciken';
-}
-
-enum _DashboardIconActionKind { standard, filled, tonal, outlined }
-
-class _DashboardIconAction extends StatelessWidget {
-  const _DashboardIconAction({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    this.actionKey,
-    this.kind = _DashboardIconActionKind.standard,
-  });
-
-  final Key? actionKey;
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
-  final _DashboardIconActionKind kind;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = IconButton.styleFrom(
-      minimumSize: const Size.square(48),
-      fixedSize: const Size.square(48),
-      maximumSize: const Size.square(48),
-      iconSize: 20,
-      padding: EdgeInsets.zero,
-      visualDensity: VisualDensity.standard,
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    );
-    final button = switch (kind) {
-      _DashboardIconActionKind.standard => IconButton(
-        key: actionKey,
-        tooltip: label,
-        style: style,
-        onPressed: onPressed,
-        icon: Icon(icon),
-      ),
-      _DashboardIconActionKind.filled => IconButton.filled(
-        key: actionKey,
-        tooltip: label,
-        style: style,
-        onPressed: onPressed,
-        icon: Icon(icon),
-      ),
-      _DashboardIconActionKind.tonal => IconButton.filledTonal(
-        key: actionKey,
-        tooltip: label,
-        style: style,
-        onPressed: onPressed,
-        icon: Icon(icon),
-      ),
-      _DashboardIconActionKind.outlined => IconButton.outlined(
-        key: actionKey,
-        tooltip: label,
-        style: style,
-        onPressed: onPressed,
-        icon: Icon(icon),
-      ),
-    };
-    return Semantics(
-      label: label,
-      button: true,
-      enabled: onPressed != null,
-      excludeSemantics: true,
-      child: button,
-    );
-  }
-}
-
-class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.onReminder, required this.onAgenda});
-
-  final VoidCallback? onReminder;
-  final VoidCallback? onAgenda;
-
-  @override
-  Widget build(BuildContext context) {
-    final reminder = _DashboardIconAction(
-      actionKey: const Key('dashboard-quick-reminder'),
-      icon: Icons.add_alert_outlined,
-      label: 'Unutma ekle',
-      kind: _DashboardIconActionKind.filled,
-      onPressed: onReminder,
-    );
-    final agenda = _DashboardIconAction(
-      actionKey: const Key('dashboard-quick-agenda'),
-      icon: Icons.note_add_outlined,
-      label: 'Ajanda kaydı ekle',
-      kind: _DashboardIconActionKind.tonal,
-      onPressed: onAgenda,
-    );
-    return Wrap(spacing: 8, runSpacing: 8, children: [reminder, agenda]);
   }
 }
 
@@ -739,7 +740,6 @@ class _ProjectStateSurface extends StatelessWidget {
     required this.actionLabel,
     required this.onAction,
     this.actionKey,
-    this.showActionLabel = false,
     super.key,
   });
 
@@ -750,174 +750,28 @@ class _ProjectStateSurface extends StatelessWidget {
   final String actionLabel;
   final VoidCallback onAction;
   final Key? actionKey;
-  final bool showActionLabel;
 
   @override
-  Widget build(BuildContext context) {
-    final Widget primaryAction = showActionLabel
-        ? FilledButton.icon(
+  Widget build(BuildContext context) => Center(
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 48),
+          const SizedBox(height: 12),
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(body, textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          FilledButton.tonalIcon(
             key: actionKey,
             onPressed: onAction,
             icon: Icon(actionIcon),
             label: Text(actionLabel),
-          )
-        : _DashboardIconAction(
-            actionKey: actionKey,
-            icon: actionIcon,
-            label: actionLabel,
-            kind: _DashboardIconActionKind.filled,
-            onPressed: onAction,
-          );
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 40),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 6),
-              Text(body, textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              primaryAction,
-            ],
           ),
-        ),
+        ],
       ),
-    );
-  }
-}
-
-class _DashboardSummaryCard extends StatelessWidget {
-  const _DashboardSummaryCard({
-    required this.icon,
-    required this.status,
-    required this.readyText,
-    required this.emptyText,
-    required this.errorText,
-    required this.disabledText,
-    required this.retryKey,
-    required this.onRetry,
-    required this.actionKey,
-    required this.actionLabel,
-    required this.onAction,
-    this.title,
-    super.key,
-  });
-
-  final IconData icon;
-  final String? title;
-  final _SectionStatus status;
-  final String? readyText;
-  final String? emptyText;
-  final String errorText;
-  final String disabledText;
-  final Key retryKey;
-  final VoidCallback onRetry;
-  final Key actionKey;
-  final String actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    final resolvedTitle = title ?? 'Bugün';
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 22),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    resolvedTitle,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                _DashboardIconAction(
-                  actionKey: actionKey,
-                  icon: Icons.open_in_new_rounded,
-                  label: actionLabel,
-                  onPressed: onAction,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            switch (status) {
-              _SectionStatus.loading => const LinearProgressIndicator(),
-              _SectionStatus.error => Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(errorText),
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _DashboardIconAction(
-                      actionKey: retryKey,
-                      icon: Icons.refresh_rounded,
-                      label: 'Tekrar dene',
-                      kind: _DashboardIconActionKind.outlined,
-                      onPressed: onRetry,
-                    ),
-                  ),
-                ],
-              ),
-              _SectionStatus.disabled => Text(disabledText),
-              _SectionStatus.ready => Text(
-                readyText ?? emptyText ?? 'Bu bölümde kayıt yok.',
-              ),
-              _SectionStatus.idle => const Text('Proje seçimi bekleniyor.'),
-            },
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DashboardActionTile extends StatelessWidget {
-  const _DashboardActionTile({
-    required this.icon,
-    required this.title,
-    required this.enabledSubtitle,
-    required this.onTap,
-    super.key,
-  });
-
-  final IconData icon;
-  final String title;
-  final String enabledSubtitle;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        dense: true,
-        visualDensity: const VisualDensity(horizontal: -1, vertical: -2),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-        minVerticalPadding: 4,
-        horizontalTitleGap: 8,
-        leading: Icon(icon, size: 22),
-        title: Text(title),
-        subtitle: Text(
-          onTap == null ? 'Bu kurulumda hazır değil.' : enabledSubtitle,
-        ),
-        trailing: onTap == null
-            ? const Icon(Icons.block_outlined, size: 20)
-            : const Icon(Icons.chevron_right_rounded, size: 20),
-        onTap: onTap,
-      ),
-    );
-  }
+    ),
+  );
 }

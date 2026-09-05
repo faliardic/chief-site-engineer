@@ -426,6 +426,263 @@ void main() {
   );
 
   test(
+    'Project Profile default read is side-effect free and keeps project name',
+    () async {
+      final profile = await agenda.getProjectProfile(project1);
+
+      expect(profile.project.name, 'Kuzey Şantiyesi');
+      expect(profile.fields.map((field) => field.label), [
+        'Toplam kat',
+        'Toplam alan',
+        'YİBF No',
+      ]);
+      expect(profile.fields.every((field) => field.revision == 0), isTrue);
+      expect(
+        await _countRows(directories.databaseFile, 'project_profile_fields'),
+        0,
+      );
+      expect(
+        await _countRows(directories.databaseFile, 'project_profile_events'),
+        0,
+      );
+      expect((await agenda.listProjects()).single.name, 'Kuzey Şantiyesi');
+    },
+  );
+
+  test(
+    'Project Profile edit and custom add archive restore preserve identity and events',
+    () async {
+      final initial = await agenda.getProjectProfile(project1);
+      final floors = initial.fields.singleWhere(
+        (field) => field.builtinField == ProjectProfileBuiltinField.totalFloors,
+      );
+      final edited = await agenda.updateProjectProfileField(
+        UpdateProjectProfileFieldCommand(
+          fieldId: floors.id,
+          eventId: eventId(301),
+          projectId: project1,
+          expectedRevision: floors.revision,
+          label: floors.label,
+          value: '14',
+        ),
+      );
+      expect(edited.value, '14');
+      expect(edited.revision, 1);
+      expect(
+        await _countRows(directories.databaseFile, 'project_profile_fields'),
+        3,
+      );
+
+      final created = await agenda.createProjectProfileField(
+        CreateProjectProfileFieldCommand(
+          id: log1,
+          eventId: eventId(302),
+          projectId: project1,
+          label: '  Yapı sınıfı  ',
+          value: '  4A  ',
+        ),
+      );
+      expect(created.label, 'Yapı sınıfı');
+      expect(created.value, '4A');
+      final renamed = await agenda.updateProjectProfileField(
+        UpdateProjectProfileFieldCommand(
+          fieldId: created.id,
+          eventId: eventId(303),
+          projectId: project1,
+          expectedRevision: created.revision,
+          label: 'Ruhsat sınıfı',
+          value: '4B',
+        ),
+      );
+      final archived = await agenda.mutateProjectProfileFieldArchive(
+        MutateProjectProfileFieldArchiveCommand(
+          fieldId: renamed.id,
+          eventId: eventId(304),
+          projectId: project1,
+          expectedRevision: renamed.revision,
+          archive: true,
+        ),
+      );
+      expect(archived.id, created.id);
+      expect(archived.isArchived, isTrue);
+      expect(
+        (await agenda.getProjectProfile(
+          project1,
+        )).fields.map((field) => field.id),
+        isNot(contains(created.id)),
+      );
+      final restored = await agenda.mutateProjectProfileFieldArchive(
+        MutateProjectProfileFieldArchiveCommand(
+          fieldId: archived.id,
+          eventId: eventId(305),
+          projectId: project1,
+          expectedRevision: archived.revision,
+          archive: false,
+        ),
+      );
+      expect(restored.id, created.id);
+      expect(restored.isArchived, isFalse);
+      expect(restored.revision, 4);
+      expect((await agenda.listProjects()).single.name, 'Kuzey Şantiyesi');
+      expect(
+        (await agenda.listProjectProfileEvents(
+          project1,
+        )).map((event) => event.eventType),
+        [
+          ProjectProfileEventType.fieldUpdated,
+          ProjectProfileEventType.fieldCreated,
+          ProjectProfileEventType.fieldUpdated,
+          ProjectProfileEventType.fieldArchived,
+          ProjectProfileEventType.fieldRestored,
+        ],
+      );
+    },
+  );
+
+  test(
+    'Project Profile reorder is atomic deterministic revisioned and project isolated',
+    () async {
+      await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: 'Güney Şantiyesi'),
+      );
+      final first = await agenda.getProjectProfile(project1);
+      final order = first.fields.reversed
+          .map(
+            (field) => ProjectProfileFieldOrder(
+              fieldId: field.id,
+              expectedRevision: field.revision,
+            ),
+          )
+          .toList();
+      final reordered = await agenda.reorderProjectProfileFields(
+        ReorderProjectProfileFieldsCommand(
+          eventId: eventId(310),
+          projectId: project1,
+          fields: order,
+        ),
+      );
+      expect(reordered.fields.map((field) => field.builtinField), [
+        ProjectProfileBuiltinField.yibfNumber,
+        ProjectProfileBuiltinField.totalArea,
+        ProjectProfileBuiltinField.totalFloors,
+      ]);
+      expect(reordered.fields.map((field) => field.sortOrder), [0, 1, 2]);
+      expect(reordered.fields.every((field) => field.revision == 1), isTrue);
+      await expectLater(
+        agenda.reorderProjectProfileFields(
+          ReorderProjectProfileFieldsCommand(
+            eventId: eventId(311),
+            projectId: project1,
+            fields: order,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(
+        (await agenda.getProjectProfile(
+          project1,
+        )).fields.map((field) => field.id),
+        reordered.fields.map((field) => field.id),
+      );
+      final other = await agenda.getProjectProfile(project2);
+      expect(other.fields.map((field) => field.builtinField), [
+        ProjectProfileBuiltinField.totalFloors,
+        ProjectProfileBuiltinField.totalArea,
+        ProjectProfileBuiltinField.yibfNumber,
+      ]);
+      expect(await agenda.listProjectProfileEvents(project2), isEmpty);
+    },
+  );
+
+  test(
+    'Project Profile event failure rolls back field materialization',
+    () async {
+      final failing = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        beforeProjectProfileEventInsert: (_) async {
+          throw StateError('forced profile event failure');
+        },
+      );
+      final floors = (await failing.getProjectProfile(project1)).fields.first;
+
+      await expectLater(
+        failing.updateProjectProfileField(
+          UpdateProjectProfileFieldCommand(
+            fieldId: floors.id,
+            eventId: eventId(320),
+            projectId: project1,
+            expectedRevision: floors.revision,
+            label: floors.label,
+            value: '18',
+          ),
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        await _countRows(directories.databaseFile, 'project_profile_fields'),
+        0,
+      );
+      expect(
+        await _countRows(directories.databaseFile, 'project_profile_events'),
+        0,
+      );
+      final after = await agenda.getProjectProfile(project1);
+      expect(after.fields.first.value, isEmpty);
+      expect(after.fields.first.revision, 0);
+
+      final materialized = await agenda.reorderProjectProfileFields(
+        ReorderProjectProfileFieldsCommand(
+          eventId: eventId(321),
+          projectId: project1,
+          fields: [
+            for (final field in after.fields.reversed)
+              ProjectProfileFieldOrder(
+                fieldId: field.id,
+                expectedRevision: field.revision,
+              ),
+          ],
+        ),
+      );
+      final eventsBefore = await agenda.listProjectProfileEvents(project1);
+      await expectLater(
+        failing.reorderProjectProfileFields(
+          ReorderProjectProfileFieldsCommand(
+            eventId: eventId(322),
+            projectId: project1,
+            fields: [
+              for (final field in materialized.fields.reversed)
+                ProjectProfileFieldOrder(
+                  fieldId: field.id,
+                  expectedRevision: field.revision,
+                ),
+            ],
+          ),
+        ),
+        throwsA(isA<StateError>()),
+      );
+      final afterFailedReorder = await agenda.getProjectProfile(project1);
+      expect(
+        afterFailedReorder.fields.map(
+          (field) => (field.id, field.sortOrder, field.revision),
+        ),
+        materialized.fields.map(
+          (field) => (field.id, field.sortOrder, field.revision),
+        ),
+      );
+      expect(
+        (await agenda.listProjectProfileEvents(
+          project1,
+        )).map((event) => (event.id, event.sequence, event.payloadJson)),
+        eventsBefore.map(
+          (event) => (event.id, event.sequence, event.payloadJson),
+        ),
+      );
+    },
+  );
+
+  test(
     'past log keeps observed and created times separate and filters literally',
     () async {
       await agenda.createProject(

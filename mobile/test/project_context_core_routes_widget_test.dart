@@ -39,7 +39,7 @@ void main() {
   );
 
   testWidgets(
-    'Dashboard forwards its exact project to all production core routes',
+    'Profile tools forward the exact project to all production core routes',
     (tester) async {
       final agenda = FakeAgendaApplication(
         projects: const [projectA, projectB],
@@ -65,10 +65,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Proje seç'));
+      await tester.tap(
+        find.byKey(const Key('active-project-indicator')).hitTestable(),
+      );
       await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(ValueKey('dashboard-project-${projectB.id}')),
+        find.byKey(ValueKey('active-project-option-${projectB.id}')),
       );
       await tester.pumpAndSettle();
 
@@ -438,13 +440,24 @@ Future<void> _chooseProject(
 }
 
 Future<void> _openDashboardAction(WidgetTester tester, Key key) async {
+  final tools = find.byKey(const Key('project-profile-tools'));
+  await tester.ensureVisible(tools);
+  await tester.pumpAndSettle();
+  expect(tools.hitTestable(), findsOneWidget);
+  await tester.tap(tools.hitTestable());
+  await tester.pumpAndSettle();
   final action = find.byKey(key);
   await tester.scrollUntilVisible(
     action,
     300,
-    scrollable: find.byType(Scrollable).first,
+    scrollable: find.descendant(
+      of: find.byKey(const Key('project-profile-tools-sheet')),
+      matching: find.byType(Scrollable),
+    ),
   );
-  await tester.tap(action);
+  await tester.pumpAndSettle();
+  expect(action.hitTestable(), findsOneWidget);
+  await tester.tap(action.hitTestable());
   await tester.pumpAndSettle();
 }
 

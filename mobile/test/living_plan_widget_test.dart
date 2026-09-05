@@ -18,7 +18,7 @@ import 'support/fake_agenda_application.dart';
 import 'support/fake_living_plan_application.dart';
 
 void main() {
-  testWidgets('home card opens the project-local seven-day plan', (
+  testWidgets('Profile tools open the project-local seven-day plan', (
     tester,
   ) async {
     final agenda = FakeAgendaApplication(
@@ -40,6 +40,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final tools = find.byKey(const Key('project-profile-tools'));
+    await tester.ensureVisible(tools);
+    await tester.pumpAndSettle();
+    expect(tools.hitTestable(), findsOneWidget);
+    await tester.tap(tools.hitTestable());
+    await tester.pumpAndSettle();
     final entry = find.byKey(const Key('dashboard-open-plan'));
     expect(entry, findsOneWidget);
     final dashboardScrollable = find.ancestor(

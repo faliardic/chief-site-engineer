@@ -211,6 +211,8 @@ void main() {
 
       await _openTab(tester, 'Ajanda');
       _expectIndicator('Proje seçilmedi');
+      await tester.tap(find.byKey(const Key('agenda-filter-action')));
+      await tester.pumpAndSettle();
       expect(
         tester
             .widget<DropdownButtonFormField<String?>>(
@@ -219,6 +221,8 @@ void main() {
             .initialValue,
         isNull,
       );
+      await tester.tap(find.byKey(const Key('agenda-filter-cancel')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('create-agenda-log')));
       await tester.pumpAndSettle();
       expect(find.byType(LogFormPage), findsNothing);
@@ -286,6 +290,8 @@ void main() {
 
       await _openTab(tester, 'Ajanda');
       _expectIndicator(_projectB.name);
+      await tester.tap(find.byKey(const Key('agenda-filter-action')));
+      await tester.pumpAndSettle();
       expect(
         tester
             .widget<DropdownButtonFormField<String?>>(
@@ -294,6 +300,8 @@ void main() {
             .initialValue,
         isNull,
       );
+      await tester.tap(find.byKey(const Key('agenda-filter-cancel')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('create-agenda-log')));
       await tester.pumpAndSettle();
       expect(
@@ -308,9 +316,13 @@ void main() {
       await tester.pumpAndSettle();
       _expectIndicator(_projectB.name);
 
+      await tester.tap(find.byKey(const Key('agenda-filter-action')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('agenda-project-filter')));
       await tester.pumpAndSettle();
       await tester.tap(find.text(_projectA.name).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('agenda-filter-apply')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('create-agenda-log')));
       await tester.pumpAndSettle();
@@ -520,7 +532,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.descendant(
-          of: find.byKey(const Key('dashboard-project-header')),
+          of: find.byKey(const Key('project-profile-header')),
           matching: find.text(_projectA.name),
         ),
         findsOneWidget,
@@ -594,7 +606,13 @@ Future<void> _openTab(WidgetTester tester, String label) async {
 }
 
 Future<void> _openDashboardTool(WidgetTester tester, Key key) async {
-  final list = find.byKey(const Key('project-dashboard-list'));
+  final tools = find.byKey(const Key('project-profile-tools'));
+  expect(tools, findsOneWidget);
+  await tester.ensureVisible(tools);
+  await tester.tap(tools);
+  await tester.pumpAndSettle();
+  final list = find.byKey(const Key('project-profile-tools-sheet'));
+  expect(list, findsOneWidget);
   final scrollable = find.descendant(
     of: list,
     matching: find.byType(Scrollable),

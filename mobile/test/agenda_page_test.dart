@@ -31,13 +31,25 @@ void main() {
         return const SafeDiagnosticPanel(code: 'widget_render_error');
       };
 
-      DropdownButton<String?> projectDropdown() {
-        return tester.widget<DropdownButton<String?>>(
+      Future<DropdownButton<String?>> projectDropdown() async {
+        // Let the preceding dialog finish closing while project reads remain
+        // deliberately pending, then use the current filter-panel surface.
+        await tester.pump(const Duration(milliseconds: 300));
+        final filters = find.byKey(const Key('agenda-filter-action'));
+        expect(filters.hitTestable(), findsOneWidget);
+        await tester.tap(filters.hitTestable());
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        final dropdown = tester.widget<DropdownButton<String?>>(
           find.descendant(
             of: find.byKey(const Key('agenda-project-filter')),
             matching: find.byType(DropdownButton<String?>),
           ),
         );
+        await tester.tap(find.byKey(const Key('agenda-filter-cancel')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        return dropdown;
       }
 
       try {
@@ -59,7 +71,7 @@ void main() {
         expect(agenda.listProjectsCalls, 3);
         expect(agenda.projects, hasLength(1));
         final createdProject = agenda.projects.single;
-        var dropdown = projectDropdown();
+        var dropdown = await projectDropdown();
         expect(dropdown.value, isNull);
         expect(
           dropdown.items!.where((item) => item.value == createdProject.id),
@@ -72,11 +84,11 @@ void main() {
         freshProjectReload.complete(List.unmodifiable(agenda.projects));
         for (var index = 0; index < 10; index += 1) {
           await tester.pump();
-          dropdown = projectDropdown();
+          dropdown = await projectDropdown();
           if (dropdown.value == createdProject.id) break;
         }
 
-        dropdown = projectDropdown();
+        dropdown = await projectDropdown();
         expect(dropdown.value, createdProject.id);
         expect(
           dropdown.items!.where((item) => item.value == createdProject.id),
@@ -96,7 +108,7 @@ void main() {
         staleProjectReload.complete(const []);
         await tester.pumpAndSettle();
 
-        dropdown = projectDropdown();
+        dropdown = await projectDropdown();
         expect(dropdown.value, createdProject.id);
         expect(
           dropdown.items!.where((item) => item.value == createdProject.id),

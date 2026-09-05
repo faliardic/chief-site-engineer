@@ -78,7 +78,220 @@ void main() {
       {'version': 16, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 17, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 18, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 19, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 20, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 21, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 22, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 23, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
+  });
+
+  test(
+    'schema 22 to 23 additively preserves projects and enforces profile integrity',
+    () async {
+      const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const otherProjectId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+      final schemaTwentyTwo = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(22).toList(),
+      );
+      await schemaTwentyTwo.open();
+      for (final entry in const [
+        (projectId, 'Korunan Proje', null),
+        (otherProjectId, 'Arşivli Proje', '2026-07-19T08:30:00Z'),
+      ]) {
+        await schemaTwentyTwo.database.insert('projects', {
+          'id': entry.$1,
+          'name': entry.$2,
+          'created_at': '2026-07-19T08:00:00Z',
+          'updated_at': '2026-07-19T08:00:00Z',
+          'revision': 4,
+          'archived_at': entry.$3,
+        });
+      }
+      await schemaTwentyTwo.database.insert('smoke_records', {
+        'id': 'profile-migration-smoke',
+        'value': 'preserve-exactly',
+        'created_at': '2026-07-19T08:00:00Z',
+      });
+      final projectsBefore = await schemaTwentyTwo.database.query(
+        'projects',
+        orderBy: 'id ASC',
+      );
+      final smokeBefore = await schemaTwentyTwo.database.query('smoke_records');
+      await schemaTwentyTwo.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      final db = upgraded.database;
+      expect(
+        sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
+        23,
+      );
+      expect(await db.query('projects', orderBy: 'id ASC'), projectsBefore);
+      expect(await db.query('smoke_records'), smokeBefore);
+      expect(await db.query('project_profile_fields'), isEmpty);
+      expect(await db.query('project_profile_events'), isEmpty);
+      expect(
+        (await db.rawQuery(
+          'PRAGMA table_info(project_profile_fields)',
+        )).map((row) => row['name']),
+        isNot(contains('name')),
+      );
+
+      final builtinId = 'project-profile:$projectId:total_floors';
+      await db.insert('project_profile_fields', {
+        'id': builtinId,
+        'project_id': projectId,
+        'field_kind': 'builtin',
+        'builtin_key': 'total_floors',
+        'label': 'Toplam kat',
+        'value': '9',
+        'sort_order': 0,
+        'revision': 1,
+        'created_at': '2026-07-19T09:00:00Z',
+        'updated_at': '2026-07-19T09:00:00Z',
+      });
+      await expectLater(
+        db.insert('project_profile_fields', {
+          'id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          'project_id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          'field_kind': 'custom',
+          'builtin_key': null,
+          'label': 'Ruhsat',
+          'value': 'Var',
+          'sort_order': 1,
+          'revision': 1,
+          'created_at': '2026-07-19T09:00:00Z',
+          'updated_at': '2026-07-19T09:00:00Z',
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await db.insert('project_profile_events', {
+        'id': 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        'project_id': projectId,
+        'field_id': builtinId,
+        'sequence': 1,
+        'event_type': 'profile.field_updated',
+        'occurred_at': '2026-07-19T09:00:00Z',
+        'payload_json': '{}',
+      });
+      await expectLater(
+        db.insert('project_profile_events', {
+          'id': 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+          'project_id': otherProjectId,
+          'field_id': builtinId,
+          'sequence': 1,
+          'event_type': 'profile.field_updated',
+          'occurred_at': '2026-07-19T09:00:00Z',
+          'payload_json': '{}',
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.delete(
+          'project_profile_fields',
+          where: 'id = ?',
+          whereArgs: [builtinId],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'project_profile_fields',
+          {'id': 'project-profile:$projectId:changed'},
+          where: 'id = ?',
+          whereArgs: [builtinId],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'project_profile_events',
+          {'payload_json': '{"changed":true}'},
+          where: 'id = ?',
+          whereArgs: ['eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      expect(
+        (await db.rawQuery('PRAGMA integrity_check')).single['integrity_check'],
+        'ok',
+      );
+      await upgraded.close();
+    },
+  );
+
+  test('failed schema 23 migration rolls back intact schema 22 data', () async {
+    const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    final schemaTwentyTwo = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(22).toList(),
+    );
+    await schemaTwentyTwo.open();
+    await schemaTwentyTwo.database.insert('projects', {
+      'id': projectId,
+      'name': 'Rollback V22',
+      'created_at': '2026-07-19T08:00:00Z',
+      'updated_at': '2026-07-19T08:00:00Z',
+      'revision': 7,
+    });
+    final projectBefore = (await schemaTwentyTwo.database.query(
+      'projects',
+    )).single;
+    await schemaTwentyTwo.close();
+
+    final failing = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 19, 9),
+      migrations: [
+        ...AppDatabase.foundationMigrations.take(22),
+        DatabaseMigration(
+          version: 23,
+          apply: (transaction) async {
+            await AppDatabase.foundationMigrations[22].apply(transaction);
+            throw StateError('intentional schema 23 rollback');
+          },
+        ),
+      ],
+    );
+    await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+    final raw = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: sqflite.OpenDatabaseOptions(singleInstance: false),
+    );
+    expect(
+      sqflite.Sqflite.firstIntValue(await raw.rawQuery('PRAGMA user_version')),
+      22,
+    );
+    expect((await raw.query('projects')).single, projectBefore);
+    expect(
+      await raw.rawQuery(
+        "SELECT name FROM sqlite_master "
+        "WHERE name IN ('project_profile_fields', 'project_profile_events')",
+      ),
+      isEmpty,
+    );
+    expect(
+      await raw.query('schema_versions', where: 'version = ?', whereArgs: [23]),
+      isEmpty,
+    );
+    expect(await raw.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+    expect(
+      (await raw.rawQuery('PRAGMA integrity_check')).single['integrity_check'],
+      'ok',
+    );
+    await raw.close();
   });
 
   test(
@@ -1344,6 +1557,7 @@ void main() {
         path: directories.databaseFile,
         factory: databaseFactoryFfi,
         clock: () => DateTime.utc(2026, 7, 19, 9),
+        migrations: AppDatabase.foundationMigrations.take(17).toList(),
       );
       await upgraded.open();
       final db = upgraded.database;
@@ -1742,6 +1956,8 @@ void main() {
       containsAll([
         'projects',
         'project_events',
+        'project_profile_fields',
+        'project_profile_events',
         'project_locations',
         'project_location_events',
         'field_observations',

@@ -156,29 +156,203 @@ void main() {
   });
 
   test(
-    'current database smoke requires every schema 22 Inventory table',
+    'format 1 backup round-trips Project Profile fields order archive and events',
     () async {
-      final raw = await _openRaw(directories);
-      await raw.execute('DROP TABLE inventory_events');
-      await raw.close();
-      final application = _application(directories, gateway: gateway);
-
-      await expectLater(
-        application.createBackup(
-          const CreateMobileBackupCommand(
-            password: _password,
-            passwordConfirmation: _password,
-          ),
-        ),
-        _failureCode('corrupt_database'),
+      const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const customA = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+      const customB = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+      String profileEvent(int value) =>
+          'dddddddd-dddd-4ddd-8ddd-${value.toString().padLeft(12, '0')}';
+      final agenda = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
       );
+      await agenda.createProject(
+        const CreateProjectCommand(id: projectId, name: 'Profil Projesi'),
+      );
+      final initial = await agenda.getProjectProfile(projectId);
+      final floors = initial.fields.singleWhere(
+        (field) => field.builtinField == ProjectProfileBuiltinField.totalFloors,
+      );
+      await agenda.updateProjectProfileField(
+        UpdateProjectProfileFieldCommand(
+          fieldId: floors.id,
+          eventId: profileEvent(1),
+          projectId: projectId,
+          expectedRevision: floors.revision,
+          label: floors.label,
+          value: '17',
+        ),
+      );
+      await agenda.createProjectProfileField(
+        CreateProjectProfileFieldCommand(
+          id: customA,
+          eventId: profileEvent(2),
+          projectId: projectId,
+          label: 'Yapı sınıfı',
+          value: '4A',
+        ),
+      );
+      final archivedCandidate = await agenda.createProjectProfileField(
+        CreateProjectProfileFieldCommand(
+          id: customB,
+          eventId: profileEvent(3),
+          projectId: projectId,
+          label: 'Arşivli alan',
+          value: 'Korunur',
+        ),
+      );
+      await agenda.mutateProjectProfileFieldArchive(
+        MutateProjectProfileFieldArchiveCommand(
+          fieldId: customB,
+          eventId: profileEvent(4),
+          projectId: projectId,
+          expectedRevision: archivedCandidate.revision,
+          archive: true,
+        ),
+      );
+      final beforeReorder = await agenda.getProjectProfile(projectId);
+      final requested = [
+        beforeReorder.fields.singleWhere((field) => field.id == customA),
+        ...beforeReorder.fields
+            .where((field) => field.id != customA)
+            .toList()
+            .reversed,
+      ];
+      await agenda.reorderProjectProfileFields(
+        ReorderProjectProfileFieldsCommand(
+          eventId: profileEvent(5),
+          projectId: projectId,
+          fields: [
+            for (final field in requested)
+              ProjectProfileFieldOrder(
+                fieldId: field.id,
+                expectedRevision: field.revision,
+              ),
+          ],
+        ),
+      );
+
+      final source = await _openRaw(directories);
+      final sourceFields = await source.query(
+        'project_profile_fields',
+        orderBy: 'id ASC',
+      );
+      final sourceEvents = await source.query(
+        'project_profile_events',
+        orderBy: 'sequence ASC',
+      );
+      await source.close();
+      expect(sourceFields, hasLength(5));
+      expect(
+        sourceFields.singleWhere((row) => row['id'] == customB)['archived_at'],
+        isNotNull,
+      );
+
+      final backup = _application(directories, gateway: gateway);
+      final created = await backup.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      final preflight = await backup.preflightBackup(
+        created.package,
+        _password,
+      );
+      expect(preflight.manifest.formatVersion, 1);
+      final currentFloors = (await agenda.getProjectProfile(projectId)).fields
+          .singleWhere(
+            (field) =>
+                field.builtinField == ProjectProfileBuiltinField.totalFloors,
+          );
+      await agenda.updateProjectProfileField(
+        UpdateProjectProfileFieldCommand(
+          fieldId: currentFloors.id,
+          eventId: profileEvent(99),
+          projectId: projectId,
+          expectedRevision: currentFloors.revision,
+          label: currentFloors.label,
+          value: '99',
+        ),
+      );
+      final restored = await backup.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: created.package,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+      expect(restored.restoredManifest.formatVersion, 1);
+      expect(restored.activeSchemaVersion, AppDatabase.schemaVersion);
+
+      final restoredAgenda = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      final restoredProfile = await restoredAgenda.getProjectProfile(projectId);
+      expect(restoredProfile.project.name, 'Profil Projesi');
+      expect(restoredProfile.fields.map((field) => field.label), [
+        'Yapı sınıfı',
+        'YİBF No',
+        'Toplam alan',
+        'Toplam kat',
+      ]);
+      expect(
+        restoredProfile.fields
+            .singleWhere(
+              (field) =>
+                  field.builtinField == ProjectProfileBuiltinField.totalFloors,
+            )
+            .value,
+        '17',
+      );
+      final restoredRaw = await _openRaw(directories);
+      expect(
+        await restoredRaw.query('project_profile_fields', orderBy: 'id ASC'),
+        sourceFields,
+      );
+      expect(
+        await restoredRaw.query(
+          'project_profile_events',
+          orderBy: 'sequence ASC',
+        ),
+        sourceEvents,
+      );
+      expect(await restoredRaw.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      expect(
+        (await restoredRaw.rawQuery(
+          'PRAGMA integrity_check',
+        )).single['integrity_check'],
+        'ok',
+      );
+      await restoredRaw.close();
     },
   );
+
+  test('current database smoke requires every schema 23 table', () async {
+    final raw = await _openRaw(directories);
+    await raw.execute('DROP TABLE inventory_events');
+    await raw.close();
+    final application = _application(directories, gateway: gateway);
+
+    await expectLater(
+      application.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      ),
+      _failureCode('corrupt_database'),
+    );
+  });
 
   test(
     'format 1 backup restores populated Inventory with exact replayable truth',
     () async {
-      expect(AppDatabase.schemaVersion, 22);
+      expect(AppDatabase.schemaVersion, 23);
       final fixture = await _seedPopulatedInventory(
         directories,
         attachmentGateway: _inventoryPhotoGateway(directories),
@@ -1247,6 +1421,8 @@ void main() {
         'DROP TRIGGER agenda_phone_call_contexts_source_category_update',
       );
       for (final table in const [
+        'project_profile_events',
+        'project_profile_fields',
         'inventory_sketch_revision_spatial_drafts',
         'inventory_sketch_revision_block_polygons',
         'inventory_floors',

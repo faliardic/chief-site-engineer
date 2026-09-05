@@ -299,12 +299,27 @@ void main() {
         MaterialApp(home: MemoryBackupPage(backup: backup)),
       );
 
-      await tester.tap(find.byKey(const Key('pick-backup')));
+      final picker = find.byKey(const Key('pick-backup'));
+      await tester.scrollUntilVisible(
+        picker,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(picker.hitTestable(), findsOneWidget);
+      await tester.tap(picker.hitTestable());
       await tester.pumpAndSettle();
       expect(find.text('Bir .csebackup dosyası seçildi.'), findsOneWidget);
 
       backup.pickedPackage = null;
-      await tester.tap(find.byKey(const Key('pick-backup')));
+      await tester.scrollUntilVisible(
+        picker,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(picker.hitTestable(), findsOneWidget);
+      await tester.tap(picker.hitTestable());
       await tester.pumpAndSettle();
       expect(find.text('Bir .csebackup dosyası seçildi.'), findsOneWidget);
       expect(backup.discarded, isEmpty);

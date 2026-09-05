@@ -7,6 +7,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 class FakeAgendaApplication
     implements
         AgendaApplication,
+        ProjectProfileApplication,
         ReminderTodayApplication,
         ReminderSourceAgendaMediaApplication {
   FakeAgendaApplication({
@@ -23,12 +24,20 @@ class FakeAgendaApplication
     this.agendaPhotoContents = const {},
     this.initialNotificationReminderId,
     this.notificationTapStream = const Stream<String>.empty(),
+    Map<String, List<ProjectProfileField>> projectProfileFields = const {},
     DateTime? asOfUtc,
-  }) : asOfUtc = asOfUtc ?? DateTime.utc(2026, 7, 20, 5);
+  }) : projectProfileFields = {
+         for (final entry in projectProfileFields.entries)
+           entry.key: [...entry.value],
+       },
+       asOfUtc = asOfUtc ?? DateTime.utc(2026, 7, 20, 5);
 
   List<MobileProject> projects;
   List<AgendaLog> logs;
   List<MobileReminder> reminders;
+  final Map<String, List<ProjectProfileField>> projectProfileFields;
+  final Map<String, List<Future<ProjectProfile>>> projectProfileResponses = {};
+  final List<ProjectProfileEvent> projectProfileEvents = [];
   ReminderTodayOverview? todayOverview;
   final DateTime asOfUtc;
   AgendaLogDetail? logDetail;
@@ -462,6 +471,225 @@ class FakeAgendaApplication
     final gate = listProjectsGate;
     if (gate != null) await gate.future;
     return List.unmodifiable(projects);
+  }
+
+  @override
+  Future<ProjectProfile> getProjectProfile(String projectId) async {
+    final responses = projectProfileResponses[projectId];
+    if (responses != null && responses.isNotEmpty) {
+      return responses.removeAt(0);
+    }
+    return _fakeProjectProfile(projectId);
+  }
+
+  @override
+  Future<ProjectProfileField> createProjectProfileField(
+    CreateProjectProfileFieldCommand command,
+  ) async {
+    final profile = _fakeProjectProfile(command.projectId);
+    if (profile.fields.any((field) => field.id == command.id)) {
+      throw const AgendaValidationFailure('duplicate profile field');
+    }
+    final now = '2026-07-19T08:01:00Z';
+    final field = ProjectProfileField(
+      id: command.id,
+      projectId: command.projectId,
+      label: command.label.trim(),
+      value: command.value.trim(),
+      sortOrder: profile.fields.length,
+      revision: 1,
+      createdAt: now,
+      updatedAt: now,
+    );
+    projectProfileFields[command.projectId] = [...profile.fields, field];
+    _appendFakeProfileEvent(
+      id: command.eventId,
+      projectId: command.projectId,
+      fieldId: field.id,
+      eventType: ProjectProfileEventType.fieldCreated,
+    );
+    _projectChanges.add(null);
+    return field;
+  }
+
+  @override
+  Future<ProjectProfileField> updateProjectProfileField(
+    UpdateProjectProfileFieldCommand command,
+  ) async {
+    final profile = _fakeProjectProfile(command.projectId);
+    final index = profile.fields.indexWhere(
+      (field) => field.id == command.fieldId,
+    );
+    if (index < 0 ||
+        profile.fields[index].revision != command.expectedRevision) {
+      throw const AgendaValidationFailure('stale profile field');
+    }
+    final current = profile.fields[index];
+    final updated = ProjectProfileField(
+      id: current.id,
+      projectId: current.projectId,
+      builtinField: current.builtinField,
+      label: current.isBuiltIn ? current.label : command.label.trim(),
+      value: command.value.trim(),
+      sortOrder: current.sortOrder,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-07-19T08:01:00Z',
+      archivedAt: current.archivedAt,
+    );
+    projectProfileFields[command.projectId] = [...profile.fields]
+      ..[index] = updated;
+    _appendFakeProfileEvent(
+      id: command.eventId,
+      projectId: command.projectId,
+      fieldId: updated.id,
+      eventType: ProjectProfileEventType.fieldUpdated,
+    );
+    _projectChanges.add(null);
+    return updated;
+  }
+
+  @override
+  Future<ProjectProfileField> mutateProjectProfileFieldArchive(
+    MutateProjectProfileFieldArchiveCommand command,
+  ) async {
+    final fields =
+        projectProfileFields[command.projectId] ??
+        _fakeProjectProfile(command.projectId).fields;
+    final index = fields.indexWhere((field) => field.id == command.fieldId);
+    if (index < 0 || fields[index].revision != command.expectedRevision) {
+      throw const AgendaValidationFailure('stale profile field');
+    }
+    final current = fields[index];
+    if (current.isBuiltIn) {
+      throw const AgendaValidationFailure('builtin profile field');
+    }
+    final updated = ProjectProfileField(
+      id: current.id,
+      projectId: current.projectId,
+      label: current.label,
+      value: current.value,
+      sortOrder: current.sortOrder,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-07-19T08:01:00Z',
+      archivedAt: command.archive ? '2026-07-19T08:01:00Z' : null,
+    );
+    projectProfileFields[command.projectId] = [...fields]..[index] = updated;
+    _appendFakeProfileEvent(
+      id: command.eventId,
+      projectId: command.projectId,
+      fieldId: updated.id,
+      eventType: command.archive
+          ? ProjectProfileEventType.fieldArchived
+          : ProjectProfileEventType.fieldRestored,
+    );
+    _projectChanges.add(null);
+    return updated;
+  }
+
+  @override
+  Future<ProjectProfile> reorderProjectProfileFields(
+    ReorderProjectProfileFieldsCommand command,
+  ) async {
+    final profile = _fakeProjectProfile(command.projectId);
+    final current = {for (final field in profile.fields) field.id: field};
+    if (current.length != command.fields.length) {
+      throw const AgendaValidationFailure('incomplete profile order');
+    }
+    final reordered = <ProjectProfileField>[];
+    for (var index = 0; index < command.fields.length; index += 1) {
+      final requested = command.fields[index];
+      final field = current[requested.fieldId];
+      if (field == null || field.revision != requested.expectedRevision) {
+        throw const AgendaValidationFailure('stale profile order');
+      }
+      reordered.add(
+        ProjectProfileField(
+          id: field.id,
+          projectId: field.projectId,
+          builtinField: field.builtinField,
+          label: field.label,
+          value: field.value,
+          sortOrder: index,
+          revision: field.sortOrder == index
+              ? field.revision
+              : field.revision + 1,
+          createdAt: field.createdAt,
+          updatedAt: field.sortOrder == index
+              ? field.updatedAt
+              : '2026-07-19T08:01:00Z',
+        ),
+      );
+    }
+    projectProfileFields[command.projectId] = reordered;
+    _appendFakeProfileEvent(
+      id: command.eventId,
+      projectId: command.projectId,
+      eventType: ProjectProfileEventType.fieldsReordered,
+    );
+    _projectChanges.add(null);
+    return _fakeProjectProfile(command.projectId);
+  }
+
+  @override
+  Future<List<ProjectProfileEvent>> listProjectProfileEvents(
+    String projectId,
+  ) async => List.unmodifiable(
+    projectProfileEvents.where((event) => event.projectId == projectId),
+  );
+
+  ProjectProfile _fakeProjectProfile(String projectId) {
+    final project = projects.singleWhere((item) => item.id == projectId);
+    final allFields = projectProfileFields.putIfAbsent(
+      projectId,
+      () => [
+        for (
+          var index = 0;
+          index < ProjectProfileBuiltinField.values.length;
+          index += 1
+        )
+          ProjectProfileField(
+            id:
+                'project-profile:$projectId:'
+                '${ProjectProfileBuiltinField.values[index].storageValue}',
+            projectId: projectId,
+            builtinField: ProjectProfileBuiltinField.values[index],
+            label: ProjectProfileBuiltinField.values[index].label,
+            value: '',
+            sortOrder: index,
+            revision: 0,
+            createdAt: project.createdAt,
+            updatedAt: project.updatedAt,
+          ),
+      ],
+    );
+    final active = allFields.where((field) => !field.isArchived).toList()
+      ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
+    return ProjectProfile(project: project, fields: List.unmodifiable(active));
+  }
+
+  void _appendFakeProfileEvent({
+    required String id,
+    required String projectId,
+    required ProjectProfileEventType eventType,
+    String? fieldId,
+  }) {
+    projectProfileEvents.add(
+      ProjectProfileEvent(
+        id: id,
+        projectId: projectId,
+        fieldId: fieldId,
+        sequence:
+            projectProfileEvents
+                .where((event) => event.projectId == projectId)
+                .length +
+            1,
+        eventType: eventType,
+        occurredAt: '2026-07-19T08:01:00Z',
+        payloadJson: '{}',
+      ),
+    );
   }
 
   @override

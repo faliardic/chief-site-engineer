@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 22;
+  static const schemaVersion = 23;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2906,6 +2906,7 @@ class AppDatabase {
       version: 22,
       apply: _applyInventoryCompatibilityMigration,
     ),
+    DatabaseMigration(version: 23, apply: _applyProjectProfileMigration),
   ];
 
   final String path;
@@ -3003,6 +3004,118 @@ class AppDatabase {
       CseTimeCodec.decodeCanonicalUtc(history[index]['applied_at']! as String);
     }
   }
+}
+
+Future<void> _applyProjectProfileMigration(Transaction transaction) async {
+  await transaction.execute('''
+    CREATE TABLE project_profile_fields (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      field_kind TEXT NOT NULL CHECK (field_kind IN ('builtin', 'custom')),
+      builtin_key TEXT CHECK (
+        builtin_key IS NULL OR builtin_key IN (
+          'total_floors', 'total_area', 'yibf_number'
+        )
+      ),
+      label TEXT NOT NULL CHECK (length(trim(label)) > 0),
+      value TEXT NOT NULL,
+      sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+      revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE (id, project_id),
+      UNIQUE (project_id, builtin_key),
+      CHECK (
+        (
+          field_kind = 'builtin'
+          AND builtin_key IS NOT NULL
+          AND archived_at IS NULL
+          AND id = 'project-profile:' || project_id || ':' || builtin_key
+          AND label = CASE builtin_key
+            WHEN 'total_floors' THEN 'Toplam kat'
+            WHEN 'total_area' THEN 'Toplam alan'
+            WHEN 'yibf_number' THEN 'YİBF No'
+          END
+        )
+        OR (
+          field_kind = 'custom'
+          AND builtin_key IS NULL
+        )
+      )
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_profile_events (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      field_id TEXT,
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (event_type IN (
+        'profile.field_created',
+        'profile.field_updated',
+        'profile.field_archived',
+        'profile.field_restored',
+        'profile.fields_reordered'
+      )),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      UNIQUE (project_id, sequence),
+      FOREIGN KEY (field_id, project_id)
+        REFERENCES project_profile_fields(id, project_id),
+      CHECK (
+        (event_type = 'profile.fields_reordered' AND field_id IS NULL)
+        OR (event_type != 'profile.fields_reordered' AND field_id IS NOT NULL)
+      )
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_project_profile_fields_project_order
+    ON project_profile_fields(project_id, archived_at, sort_order, id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_project_profile_events_project
+    ON project_profile_events(project_id, sequence, id)
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_profile_fields_project_immutable
+    BEFORE UPDATE OF project_id ON project_profile_fields
+    WHEN NEW.project_id != OLD.project_id
+    BEGIN
+      SELECT RAISE(ABORT, 'profile field project is immutable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_profile_fields_identity_immutable
+    BEFORE UPDATE OF id, field_kind, builtin_key ON project_profile_fields
+    WHEN NEW.id != OLD.id
+      OR NEW.field_kind != OLD.field_kind
+      OR NEW.builtin_key IS NOT OLD.builtin_key
+    BEGIN
+      SELECT RAISE(ABORT, 'profile field identity is immutable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_profile_fields_no_physical_delete
+    BEFORE DELETE ON project_profile_fields
+    BEGIN
+      SELECT RAISE(ABORT, 'physical delete is not allowed');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_profile_events_append_only_update
+    BEFORE UPDATE ON project_profile_events
+    BEGIN
+      SELECT RAISE(ABORT, 'append-only event history');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_profile_events_append_only_delete
+    BEFORE DELETE ON project_profile_events
+    BEGIN
+      SELECT RAISE(ABORT, 'append-only event history');
+    END
+  ''');
 }
 
 Future<void> _applyConstructionScheduleSnapshotMigration(

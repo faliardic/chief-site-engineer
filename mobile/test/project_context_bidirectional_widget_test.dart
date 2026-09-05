@@ -660,14 +660,23 @@ void main() {
 
       expect(
         find.descendant(
-          of: find.byKey(const Key('dashboard-project-header')),
+          of: find.byKey(const Key('project-profile-header')),
           matching: find.text(_projectA.name),
         ),
         findsOneWidget,
       );
+      await _openDashboardTool(tester, const Key('dashboard-open-today'));
       expect(daily.calls.last, _projectA.id);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      await _openDashboardTool(tester, const Key('dashboard-open-plan'));
       expect(plan.calls.last, _projectA.id);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      await _openDashboardTool(tester, const Key('dashboard-open-materials'));
       expect(materials.calls.last, _projectA.id);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
       expect(attendance.ensureDayCalls, baselineEnsureDay);
       expect(attendance.rollingCalls, baselineRolling);
       expect(agenda.captureCalls, 0);
@@ -971,7 +980,13 @@ Future<void> _chooseProject(
 }
 
 Future<void> _openDashboardTool(WidgetTester tester, Key key) async {
-  final list = find.byKey(const Key('project-dashboard-list'));
+  final tools = find.byKey(const Key('project-profile-tools'));
+  expect(tools, findsOneWidget);
+  await tester.ensureVisible(tools);
+  await tester.tap(tools);
+  await tester.pumpAndSettle();
+  final list = find.byKey(const Key('project-profile-tools-sheet'));
+  expect(list, findsOneWidget);
   final scrollable = find.descendant(
     of: list,
     matching: find.byType(Scrollable),
@@ -990,7 +1005,9 @@ Future<void> _openDashboardTool(WidgetTester tester, Key key) async {
   }
   expect(target, findsOneWidget);
   await tester.ensureVisible(target);
-  await tester.tap(target);
+  await tester.pumpAndSettle();
+  expect(target.hitTestable(), findsOneWidget);
+  await tester.tap(target.hitTestable());
   await tester.pumpAndSettle();
 }
 

@@ -91,7 +91,7 @@ void main() {
   });
 
   test(
-    'fresh database creates exact schema 22 Inventory tables and indices',
+    'fresh database creates exact schema 23 Inventory tables and indices',
     () async {
       final database = _database(databasePath);
       await database.open();
@@ -99,7 +99,7 @@ void main() {
 
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        22,
+        23,
       );
       expect(
         (await db.query(
@@ -107,7 +107,7 @@ void main() {
           columns: ['version'],
           orderBy: 'version ASC',
         )).map((row) => row['version']),
-        List.generate(22, (index) => index + 1),
+        List.generate(23, (index) => index + 1),
       );
       expect(
         await _objectNames(db, type: 'table', prefix: 'inventory_'),
@@ -146,14 +146,40 @@ void main() {
       final upgraded = _database(upgradePath);
       await upgraded.open();
       final db = upgraded.database;
-      final afterObjects = await _existingObjects(db);
+      final currentObjects = await _existingObjects(db);
+      const profileTables = {
+        'project_profile_fields',
+        'project_profile_events',
+      };
+      final profileObjects = currentObjects
+          .where((object) => profileTables.contains(object['tbl_name']))
+          .toList();
+      final afterObjects = currentObjects
+          .where((object) => !profileTables.contains(object['tbl_name']))
+          .toList();
       final afterRows = await _representativeRows(db);
 
+      // Schema 23 adds only these profile objects outside Inventory. Every
+      // pre-existing object's SQL and every representative row stay exact.
+      expect(
+        profileObjects.map((object) => object['name']),
+        unorderedEquals(const [
+          'project_profile_fields',
+          'project_profile_events',
+          'ix_project_profile_fields_project_order',
+          'ix_project_profile_events_project',
+          'project_profile_fields_project_immutable',
+          'project_profile_fields_identity_immutable',
+          'project_profile_fields_no_physical_delete',
+          'project_profile_events_append_only_update',
+          'project_profile_events_append_only_delete',
+        ]),
+      );
       expect(afterObjects, beforeObjects);
       expect(afterRows, beforeRows);
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        22,
+        23,
       );
       for (final table in _inventoryTables) {
         expect(await db.query(table), isEmpty, reason: table);
@@ -209,7 +235,7 @@ void main() {
   );
 
   test(
-    'schema 20 through revised 21 to 22 preserves the exact Inventory graph',
+    'schema 20 through revised 21 to 23 preserves the exact Inventory graph',
     () async {
       final legacy = await _openSeededSchemaTwenty(databasePath);
       final before = await _inventoryV20Snapshot(legacy.database);
@@ -222,7 +248,7 @@ void main() {
       expect(await _inventoryV20Snapshot(db), before);
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        22,
+        23,
       );
       final blocks = await db.query('inventory_blocks');
       final floors = await db.query('inventory_floors');
@@ -279,7 +305,7 @@ void main() {
   );
 
   test(
-    'revised schema 21 to 22 is structural no-op with integrity validation',
+    'revised schema 21 to 23 preserves Inventory structure with integrity validation',
     () async {
       final schemaTwenty = await _openSeededSchemaTwenty(databasePath);
       await schemaTwenty.close();
@@ -302,7 +328,7 @@ void main() {
         sqflite.Sqflite.firstIntValue(
           await upgraded.database.rawQuery('PRAGMA user_version'),
         ),
-        22,
+        23,
       );
       expect(await _finalInventorySnapshot(upgraded.database), rowsBefore);
       expect(await _inventorySchemaObjects(upgraded.database), objectsBefore);
@@ -325,7 +351,7 @@ void main() {
   );
 
   test(
-    'superseded schema 21 to 22 preserves floors placement history and evidence',
+    'superseded schema 21 to 23 preserves floors placement history and evidence',
     () async {
       final superseded = await _openSeededSupersededSchemaTwentyOne(
         databasePath,
@@ -348,7 +374,7 @@ void main() {
       final db = upgraded.database;
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        22,
+        23,
       );
       expect(await _supersededPreservedSnapshot(db), preservedBefore);
       expect(
@@ -600,7 +626,7 @@ void main() {
   );
 
   test(
-    'schema 22 fails closed and retains one valid populated graph',
+    'schema 23 fails closed and retains one valid populated graph',
     () async {
       final database = _database(databasePath);
       await database.open();
