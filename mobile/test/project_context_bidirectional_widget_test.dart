@@ -142,7 +142,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(sharedChanges, [_projectA.id]);
       expect(session.selectedProjectId, _projectA.id);
-      await tester.tap(find.byKey(const Key('quick-reminder')));
+      await tester.tap(find.byKey(const Key('new-reminder')));
       await tester.pumpAndSettle();
       expect(
         tester
@@ -160,6 +160,153 @@ void main() {
       expect(inventory.unexpectedCalls, isEmpty);
       expect(tester.takeException(), isNull);
       session.removeListener(observe);
+    },
+  );
+
+  testWidgets(
+    'Living Plan adopts A only after its exact target read succeeds',
+    (tester) async {
+      final callbacks = <String>[];
+      final agenda = FakeAgendaApplication(
+        projects: const [_projectA, _projectB],
+      );
+      final plan = _OrderedPlanFake();
+      await _pumpPage(
+        tester,
+        LivingPlanPage(
+          agenda: agenda,
+          livingPlan: plan,
+          initialProjectId: _projectB.id,
+          onProjectSelected: (projectId) {
+            callbacks.add(projectId);
+            plan.events.add('callback:$projectId');
+          },
+          clock: () => DateTime.utc(2026, 8, 31, 9),
+        ),
+      );
+
+      expect(plan.planCalls, [_projectB.id]);
+      expect(callbacks, isEmpty);
+      final targetRead = Completer<List<ConstructionLivingPlanWindowItem>>();
+      plan.nextPlanRead = targetRead;
+      await _startProjectSelection(
+        tester,
+        find.byKey(const Key('living-plan-project-selector')),
+        _projectA.name,
+      );
+
+      expect(plan.planCalls, [_projectB.id, _projectA.id]);
+      expect(plan.events.last, 'plan:${_projectA.id}:start');
+      expect(callbacks, isEmpty);
+      targetRead.complete(const []);
+      await tester.pumpAndSettle();
+
+      expect(callbacks, [_projectA.id]);
+      expect(
+        plan.events.indexOf('plan:${_projectA.id}:success'),
+        lessThan(plan.events.indexOf('callback:${_projectA.id}')),
+      );
+      expect(
+        plan.events.indexOf('suggestions:${_projectA.id}:success'),
+        lessThan(plan.events.indexOf('callback:${_projectA.id}')),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Living Plan failed target and non-selection reads never adopt a project',
+    (tester) async {
+      final callbacks = <String>[];
+      final agenda = FakeAgendaApplication(
+        projects: const [_projectA, _projectB],
+      );
+      final plan = _OrderedPlanFake();
+      await _pumpPage(
+        tester,
+        LivingPlanPage(
+          agenda: agenda,
+          livingPlan: plan,
+          initialProjectId: _projectB.id,
+          onProjectSelected: callbacks.add,
+          clock: () => DateTime.utc(2026, 8, 31, 9),
+        ),
+      );
+      expect(callbacks, isEmpty);
+
+      final failedRead = Completer<List<ConstructionLivingPlanWindowItem>>();
+      plan.nextPlanRead = failedRead;
+      await _startProjectSelection(
+        tester,
+        find.byKey(const Key('living-plan-project-selector')),
+        _projectA.name,
+      );
+      expect(callbacks, isEmpty);
+      failedRead.completeError(
+        const ConstructionLivingPlanFailure('target_read_failed'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(callbacks, isEmpty);
+      expect(
+        find.text('Plan güvenli biçimde okunamadı. Kayıtlar değiştirilmedi.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('living-plan-read-error-retry')));
+      await tester.pumpAndSettle();
+      expect(callbacks, isEmpty);
+
+      await tester.tap(find.byKey(const Key('living-plan-refresh')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('living-plan-next-window')));
+      await tester.pumpAndSettle();
+      final callsBeforeSameProject = plan.planCalls.length;
+      await _chooseProject(
+        tester,
+        find.byKey(const Key('living-plan-project-selector')),
+        _projectA.name,
+      );
+      expect(plan.planCalls, hasLength(callsBeforeSameProject));
+      expect(callbacks, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Living Plan adopts a missing-snapshot target but keeps add gated',
+    (tester) async {
+      final callbacks = <String>[];
+      final agenda = FakeAgendaApplication(
+        projects: const [_projectA, _projectB],
+      );
+      final plan = _OrderedPlanFake(missingSnapshotProjects: {_projectA.id});
+      await _pumpPage(
+        tester,
+        LivingPlanPage(
+          agenda: agenda,
+          livingPlan: plan,
+          initialProjectId: _projectB.id,
+          onProjectSelected: callbacks.add,
+          clock: () => DateTime.utc(2026, 8, 31, 9),
+        ),
+      );
+
+      await _chooseProject(
+        tester,
+        find.byKey(const Key('living-plan-project-selector')),
+        _projectA.name,
+      );
+      expect(callbacks, [_projectA.id]);
+      expect(plan.planCalls, [_projectB.id, _projectA.id]);
+      expect(
+        tester
+            .widget<FloatingActionButton>(
+              find.byKey(const Key('add-living-plan-item')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -522,7 +669,32 @@ void main() {
       );
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Takipte'));
+      await tester.tap(find.byKey(const Key('concrete-tool-filters')));
+      await tester.pumpAndSettle();
+      final concreteFilterSheet = find.byKey(
+        const Key('concrete-filter-sheet'),
+      );
+      final followUpFilter = find.byKey(const Key('concrete-group-followUp'));
+      final filterScroll = find
+          .descendant(
+            of: concreteFilterSheet,
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        followUpFilter,
+        100,
+        scrollable: filterScroll,
+      );
+      await tester.tap(followUpFilter);
+      await tester.pumpAndSettle();
+      final applyFilters = find.byKey(const Key('concrete-apply-filters'));
+      await tester.scrollUntilVisible(
+        applyFilters,
+        100,
+        scrollable: filterScroll,
+      );
+      await tester.tap(applyFilters);
       await tester.pumpAndSettle();
       final concreteDay = concrete.queries.last.istanbulDay;
       await _chooseSharedProject(tester, _projectA.id);
@@ -586,8 +758,15 @@ void main() {
         find.byKey(const Key('workforce-directory-search')),
         'korunan rehber araması',
       );
+      await tester.tap(
+        find.byKey(const Key('workforce-directory-filter-action')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Arşiv'));
-      await tester.pump();
+      await tester.tap(
+        find.byKey(const Key('workforce-directory-filter-apply')),
+      );
+      await tester.pumpAndSettle();
       await _chooseSharedProject(tester, _projectB.id);
       expect(session.selectedProjectId, _projectB.id);
       expect(attendance.memberProjectCalls.last, _projectB.id);
@@ -979,6 +1158,17 @@ Future<void> _chooseProject(
   await tester.pumpAndSettle();
 }
 
+Future<void> _startProjectSelection(
+  WidgetTester tester,
+  Finder dropdown,
+  String projectName,
+) async {
+  await tester.tap(dropdown);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(projectName).last);
+  await tester.pump();
+}
+
 Future<void> _openDashboardTool(WidgetTester tester, Key key) async {
   final tools = find.byKey(const Key('project-profile-tools'));
   expect(tools, findsOneWidget);
@@ -1064,6 +1254,47 @@ class _PlanFake extends UnavailableConstructionLivingPlanApplication {
     required String projectId,
     required DateTime windowStart,
   }) async => const [];
+}
+
+class _OrderedPlanFake extends UnavailableConstructionLivingPlanApplication {
+  _OrderedPlanFake({this.missingSnapshotProjects = const {}});
+
+  final Set<String> missingSnapshotProjects;
+  final List<String> planCalls = [];
+  final List<String> events = [];
+  Completer<List<ConstructionLivingPlanWindowItem>>? nextPlanRead;
+
+  @override
+  Future<List<ConstructionLivingPlanWindowItem>> loadSevenDayPlan({
+    required String projectId,
+    required DateTime windowStart,
+  }) async {
+    planCalls.add(projectId);
+    events.add('plan:$projectId:start');
+    final pending = nextPlanRead;
+    nextPlanRead = null;
+    final result = pending == null
+        ? const <ConstructionLivingPlanWindowItem>[]
+        : await pending.future;
+    events.add('plan:$projectId:success');
+    return result;
+  }
+
+  @override
+  Future<List<ConstructionLivingPlanReferenceCandidate>>
+  loadSevenDayReferenceSuggestions({
+    required String projectId,
+    required DateTime windowStart,
+  }) async {
+    if (missingSnapshotProjects.contains(projectId)) {
+      events.add('suggestions:$projectId:missing');
+      throw const ConstructionLivingPlanFailure(
+        'living_plan_reference_snapshot_missing',
+      );
+    }
+    events.add('suggestions:$projectId:success');
+    return const [];
+  }
 }
 
 class _MaterialFake implements MaterialRequestApplicationPort {
