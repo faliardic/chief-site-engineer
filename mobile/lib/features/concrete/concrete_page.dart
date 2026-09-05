@@ -8,6 +8,7 @@ import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_form_page.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
+import 'package:chief_site_engineer/features/screen_tool_rail.dart';
 import 'package:flutter/material.dart';
 
 class ConcretePage extends StatefulWidget {
@@ -37,6 +38,8 @@ class ConcretePage extends StatefulWidget {
 class ConcretePageState extends State<ConcretePage> {
   final ScrollController _scrollController = ScrollController();
   final _search = TextEditingController();
+  final _searchFocus = FocusNode();
+  final _searchFieldKey = GlobalKey();
   List<MobileProject> _projects = const [];
   List<ConcretePour> _pours = const [];
   String? _projectIdToValidate;
@@ -65,6 +68,7 @@ class ConcretePageState extends State<ConcretePage> {
     _projectSubscription?.cancel();
     _scrollController.dispose();
     _search.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -233,144 +237,263 @@ class ConcretePageState extends State<ConcretePage> {
     });
   }
 
+  Future<void> _revealSearch() async {
+    if (_scrollController.hasClients) {
+      await _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
+    if (!mounted) return;
+    _searchFocus.requestFocus();
+    await WidgetsBinding.instance.endOfFrame;
+    final fieldContext = _searchFieldKey.currentContext;
+    if (mounted && fieldContext != null && fieldContext.mounted) {
+      await Scrollable.ensureVisible(
+        fieldContext,
+        duration: const Duration(milliseconds: 200),
+      );
+    }
+  }
+
+  Future<void> _showFilters() async {
+    var draft = _group;
+    final projectId = _project?.id;
+    final selected = await showModalBottomSheet<ConcretePourGroup>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: ListView(
+            key: const Key('concrete-filter-sheet'),
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text('Filtreler', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              for (final group in ConcretePourGroup.values)
+                ListTile(
+                  key: Key('concrete-group-${group.name}'),
+                  leading: Icon(
+                    draft == group
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                  ),
+                  title: Text(_groupLabel(group)),
+                  selected: draft == group,
+                  onTap: () => setSheetState(() => draft = group),
+                ),
+              TextButton(
+                key: const Key('concrete-clear-filters'),
+                onPressed: () =>
+                    setSheetState(() => draft = ConcretePourGroup.today),
+                child: const Text('Tüm filtreleri temizle'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Vazgeç'),
+              ),
+              FilledButton(
+                key: const Key('concrete-apply-filters'),
+                onPressed: () => Navigator.pop(context, draft),
+                child: const Text('Uygula'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted ||
+        selected == null ||
+        selected == _group ||
+        projectId != _project?.id) {
+      return;
+    }
+    setState(() => _group = selected);
+    await _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _loadProjects,
-      child: ListView(
-        key: const Key('concrete-page'),
-        controller: _scrollController,
-        padding: const EdgeInsets.all(16),
+    return SafeArea(
+      top: false,
+      child: Column(
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: const Key('concrete-day-filter'),
-              onPressed: _pickDate,
-              icon: const Icon(Icons.calendar_today_outlined),
-              label: Text(_day),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _search,
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              labelText: 'Kod, mahal, blok, kat veya aks ara',
-              border: const OutlineInputBorder(),
-              suffixIcon: IconButton(
-                onPressed: _reload,
-                icon: const Icon(Icons.search),
-              ),
-            ),
-            onSubmitted: (_) => _reload(),
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SegmentedButton<ConcretePourGroup>(
-              key: const Key('concrete-group-filter'),
-              segments: const [
-                ButtonSegment(
-                  value: ConcretePourGroup.today,
-                  label: Text('Bugün'),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _loadProjects,
+                    child: ListView(
+                      key: const Key('concrete-page'),
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            key: const Key('concrete-day-filter'),
+                            onPressed: _pickDate,
+                            icon: const Icon(Icons.calendar_today_outlined),
+                            label: Text(_day),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        KeyedSubtree(
+                          key: _searchFieldKey,
+                          child: TextField(
+                            key: const Key('concrete-search'),
+                            focusNode: _searchFocus,
+                            controller: _search,
+                            textInputAction: TextInputAction.search,
+                            decoration: const InputDecoration(
+                              labelText: 'Kod, mahal, blok, kat veya aks ara',
+                              border: OutlineInputBorder(),
+                            ),
+                            onSubmitted: (_) => _reload(),
+                          ),
+                        ),
+                        if (_group != ConcretePourGroup.today) ...[
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: InputChip(
+                              key: const Key('concrete-group-summary'),
+                              tooltip: _groupLabel(_group),
+                              label: Text(
+                                _groupLabel(_group),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onDeleted: () {
+                                setState(
+                                  () => _group = ConcretePourGroup.today,
+                                );
+                                _reload();
+                              },
+                            ),
+                          ),
+                        ],
+                        if (_error case final error?) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            error,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                          if (_projectDiscoveryFailed)
+                            OutlinedButton.icon(
+                              key: const Key('concrete-project-retry'),
+                              onPressed: _loadProjects,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Projeleri yeniden dene'),
+                            ),
+                        ],
+                        if (_loading)
+                          const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                        if (!_loading && _projects.isEmpty)
+                          const Card(
+                            key: Key('concrete-no-projects'),
+                            child: Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text('Önce aktif bir proje oluşturun.'),
+                            ),
+                          )
+                        else if (!_loading && _project == null)
+                          const Card(
+                            key: Key('concrete-project-context-unavailable'),
+                            child: Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text(
+                                'Başlangıç projesi artık kullanılamıyor. Aktif projeyi üst çubuktan seçin.',
+                              ),
+                            ),
+                          )
+                        else if (!_loading && _pours.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 32),
+                            child: Center(
+                              child: Text('Bu görünümde Beton paketi yok.'),
+                            ),
+                          ),
+                        for (final pour in _pours)
+                          Card(
+                            key: Key('concrete-pour-${pour.id}'),
+                            child: ListTile(
+                              minVerticalPadding: 12,
+                              leading: const Icon(Icons.foundation_outlined),
+                              title: Text(
+                                '${pour.pourCode} • ${pour.elementLocation}',
+                              ),
+                              subtitle: Text(
+                                '${CseTimeCodec.formatIstanbul(pour.plannedAt)}\n'
+                                '${pour.stableLocationName == null ? '' : '${pour.stableLocationName}${pour.stableLocationArchivedAt == null ? '' : ' (Arşivli)'} • '}'
+                                '${pour.concreteClass} • ${pour.plannedVolumeM3.toStringAsFixed(2)} m³ • ${pour.status.label}\n'
+                                '${pour.pendingCheckCount} checklist • '
+                                '${pour.missingEvidenceTruckCount} kanıt • '
+                                '${pour.openFollowUpCount} takip açık',
+                              ),
+                              isThreeLine: true,
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => _open(pour.id),
+                            ),
+                          ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
                 ),
-                ButtonSegment(
-                  value: ConcretePourGroup.upcoming,
-                  label: Text('Yaklaşan'),
-                ),
-                ButtonSegment(
-                  value: ConcretePourGroup.inProgress,
-                  label: Text('Dökümde'),
-                ),
-                ButtonSegment(
-                  value: ConcretePourGroup.followUp,
-                  label: Text('Takipte'),
-                ),
-                ButtonSegment(
-                  value: ConcretePourGroup.closed,
-                  label: Text('Kapalı'),
+                ScreenToolRail(
+                  actions: [
+                    ScreenToolAction(
+                      key: const Key('concrete-tool-search'),
+                      label: 'Ara',
+                      icon: Icons.search,
+                      onPressed: _revealSearch,
+                    ),
+                    ScreenToolAction(
+                      key: const Key('concrete-tool-filters'),
+                      label: 'Filtreler',
+                      icon: Icons.filter_list,
+                      onPressed: _showFilters,
+                    ),
+                  ],
                 ),
               ],
-              selected: {_group},
-              onSelectionChanged: (values) {
-                setState(() => _group = values.single);
-                _reload();
-              },
             ),
           ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.icon(
-              onPressed: _project == null ? null : _create,
-              icon: const Icon(Icons.add),
-              label: const Text('Yeni döküm'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                key: const Key('create-concrete-pour'),
+                style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: _project == null ? null : _create,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add),
+                      SizedBox(width: 8),
+                      Flexible(
+                        child: Text('Yeni döküm', textAlign: TextAlign.center),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-          if (_error case final error?) ...[
-            const SizedBox(height: 12),
-            Text(
-              error,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-            if (_projectDiscoveryFailed)
-              OutlinedButton.icon(
-                key: const Key('concrete-project-retry'),
-                onPressed: _loadProjects,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Projeleri yeniden dene'),
-              ),
-          ],
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          if (!_loading && _projects.isEmpty)
-            const Card(
-              key: Key('concrete-no-projects'),
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('Önce aktif bir proje oluşturun.'),
-              ),
-            )
-          else if (!_loading && _project == null)
-            const Card(
-              key: Key('concrete-project-context-unavailable'),
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  'Başlangıç projesi artık kullanılamıyor. Aktif projeyi üst çubuktan seçin.',
-                ),
-              ),
-            )
-          else if (!_loading && _pours.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 32),
-              child: Center(child: Text('Bu görünümde Beton paketi yok.')),
-            ),
-          for (final pour in _pours)
-            Card(
-              key: Key('concrete-pour-${pour.id}'),
-              child: ListTile(
-                minVerticalPadding: 12,
-                leading: const Icon(Icons.foundation_outlined),
-                title: Text('${pour.pourCode} • ${pour.elementLocation}'),
-                subtitle: Text(
-                  '${CseTimeCodec.formatIstanbul(pour.plannedAt)}\n'
-                  '${pour.stableLocationName == null ? '' : '${pour.stableLocationName}${pour.stableLocationArchivedAt == null ? '' : ' (Arşivli)'} • '}'
-                  '${pour.concreteClass} • ${pour.plannedVolumeM3.toStringAsFixed(2)} m³ • ${pour.status.label}\n'
-                  '${pour.pendingCheckCount} checklist • '
-                  '${pour.missingEvidenceTruckCount} kanıt • '
-                  '${pour.openFollowUpCount} takip açık',
-                ),
-                isThreeLine: true,
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _open(pour.id),
-              ),
-            ),
-          const SizedBox(height: 88),
         ],
       ),
     );
@@ -390,3 +513,11 @@ String _safeInitialDay(String? value) {
     CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
   );
 }
+
+String _groupLabel(ConcretePourGroup group) => switch (group) {
+  ConcretePourGroup.today => 'Bugün',
+  ConcretePourGroup.upcoming => 'Yaklaşan',
+  ConcretePourGroup.inProgress => 'Dökümde',
+  ConcretePourGroup.followUp => 'Takipte',
+  ConcretePourGroup.closed => 'Kapalı',
+};

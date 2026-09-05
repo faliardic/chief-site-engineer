@@ -106,6 +106,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Yeni döküm'), findsOneWidget);
       expect(find.textContaining('BT-001'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('concrete-tool-filters')));
+      await tester.pumpAndSettle();
       expect(find.text('Bugün'), findsOneWidget);
       expect(find.byKey(const Key('concrete-project-filter')), findsNothing);
       expect(tester.takeException(), isNull);
@@ -139,7 +141,10 @@ void main() {
     );
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('concrete-tool-filters')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Dökümde'));
+    await tester.tap(find.byKey(const Key('concrete-apply-filters')));
     await tester.pumpAndSettle();
     final state = tester.state<ConcretePageState>(find.byType(ConcretePage));
 
@@ -180,7 +185,10 @@ void main() {
       await tester.enterText(find.byType(TextField).first, 'CSE264 arama');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('concrete-tool-filters')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Dökümde'));
+      await tester.tap(find.byKey(const Key('concrete-apply-filters')));
       await tester.pumpAndSettle();
 
       final target = pours[18];
@@ -265,6 +273,68 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('primary create opens form then detail and reloads on return', (
+    tester,
+  ) async {
+    final concrete = _FakeConcrete();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ConcretePage(
+            concrete: concrete,
+            agenda: _FakeAgenda(),
+            attachments: _picker(),
+            initialProjectId: projectId,
+            initialIstanbulDay: '2026-07-19',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(concrete.listCalls, 1);
+    await tester.tap(find.byKey(const Key('create-concrete-pour')));
+    await tester.pumpAndSettle();
+    expect(find.byType(ConcretePourFormPage), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Eleman / yer tarifi'),
+      'KOLON A1',
+    );
+    await tester.tap(find.byKey(const Key('concrete-class-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('C30/37').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Planlanan metraj (m³)'),
+      '20',
+    );
+    tester.testTextInput.hide();
+    await tester.pump();
+    final save = find.widgetWithText(FilledButton, 'Beton paketini oluştur');
+    await tester.scrollUntilVisible(
+      save,
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView).first,
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(concrete.createCalls, 1);
+    expect(concrete.lastCreateCommand!.projectId, projectId);
+    expect(find.byType(ConcretePourDetailPage), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(ConcretePage), findsOneWidget);
+    expect(concrete.listCalls, 3);
+    expect(concrete.lastListQuery!.projectId, projectId);
+    expect(concrete.lastListQuery!.istanbulDay, '2026-07-19');
+    expect(concrete.lastListQuery!.group, ConcretePourGroup.today);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'oluşturma formu validation girdisini korur ve çift dokunma tek komuttur',
@@ -1002,6 +1072,7 @@ class _FakeConcrete implements ConcreteApplication {
   Completer<void>? _fieldCompleter;
   int revision = 1;
   int createCalls = 0;
+  int listCalls = 0;
   int createClassCalls = 0;
   int saveTruckCalls = 0;
   int bulkCompleteCalls = 0;
@@ -1087,6 +1158,7 @@ class _FakeConcrete implements ConcreteApplication {
 
   @override
   Future<List<ConcretePour>> listPours(ConcretePourQuery query) async {
+    listCalls += 1;
     lastListQuery = query;
     final delayed = delayedListReload;
     if (delayed != null) {
