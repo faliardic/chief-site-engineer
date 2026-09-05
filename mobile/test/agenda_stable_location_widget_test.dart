@@ -53,6 +53,8 @@ void main() {
     );
     await _pumpForm(tester, agenda: agenda, locations: locations);
 
+    await tester.ensureVisible(find.byKey(const Key('log-location-selector')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('log-location-selector')));
     await tester.pumpAndSettle();
     expect(find.text('A Blok › 1. Kat'), findsOneWidget);
@@ -96,6 +98,9 @@ void main() {
         find.byKey(const Key('log-location-selector')),
       );
       expect(selector.initialValue, isNull);
+      await tester.ensureVisible(
+        find.byKey(const Key('log-location-selector')),
+      );
       await tester.tap(find.byKey(const Key('log-location-selector')));
       await tester.pumpAndSettle();
       expect(find.text('Güney Blok'), findsOneWidget);
@@ -116,6 +121,8 @@ void main() {
     expect(find.textContaining('raw location failure'), findsNothing);
 
     locations.listFailure = null;
+    await tester.ensureVisible(find.byKey(const Key('retry-log-locations')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('retry-log-locations')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('log-location-empty')), findsOneWidget);
@@ -132,6 +139,10 @@ void main() {
       'Korunan taslak',
     );
 
+    await tester.ensureVisible(
+      find.byKey(const Key('open-location-catalog-from-log')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('open-location-catalog-from-log')));
     await tester.pumpAndSettle();
     expect(find.byType(ProjectLocationCatalogPage), findsOneWidget);
@@ -143,6 +154,8 @@ void main() {
       find.byKey(const Key('log-description')),
     );
     expect(description.controller?.text, 'Korunan taslak');
+    await tester.ensureVisible(find.byKey(const Key('log-location-selector')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('log-location-selector')));
     await tester.pumpAndSettle();
     expect(find.text('Yeni Mahal'), findsOneWidget);
@@ -307,6 +320,8 @@ void main() {
     await _pumpForm(tester, agenda: agenda, locations: locations);
     expect(tester.takeException(), isNull);
     await tester.ensureVisible(find.byKey(const Key('log-location-selector')));
+    await tester.ensureVisible(find.byKey(const Key('log-location-selector')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('log-location-selector')));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -329,6 +344,10 @@ Future<void> _pumpForm(
     ),
   );
   await tester.pumpAndSettle();
+  final optional = find.byKey(const Key('log-optional-details'));
+  await tester.ensureVisible(optional);
+  await tester.tap(optional);
+  await tester.pumpAndSettle();
 }
 
 Future<void> _selectDropdownText(
@@ -336,6 +355,8 @@ Future<void> _selectDropdownText(
   Key key,
   String text,
 ) async {
+  await tester.ensureVisible(find.byKey(key));
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(key));
   await tester.pumpAndSettle();
   await tester.tap(find.text(text).last);
