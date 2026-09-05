@@ -497,216 +497,329 @@ class _LogFormPageState extends State<LogFormPage> {
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (_error != null)
-              Card(
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(_error!, key: const Key('log-form-error')),
-                ),
-              ),
-            if (_loadingProjects)
-              const LinearProgressIndicator()
-            else ...[
-              DropdownButtonFormField<String>(
-                key: const Key('log-project'),
-                initialValue: _projectId,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Proje',
-                  border: OutlineInputBorder(),
-                ),
-                items: _projects
-                    .map(
-                      (project) => DropdownMenuItem(
-                        value: project.id,
-                        child: Text(
-                          project.name,
-                          overflow: TextOverflow.ellipsis,
+        child: SafeArea(
+          key: const Key('log-form-viewport'),
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 640),
+                    child: ListView(
+                      key: const Key('log-form-scroll'),
+                      padding: const EdgeInsets.all(24),
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Material(
+                              key: const Key('log-capture-group'),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text(
+                                      'Ajanda kaydı',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleLarge,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    if (_error != null)
+                                      Card(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.errorContainer,
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: Text(
+                                            _error!,
+                                            key: const Key('log-form-error'),
+                                          ),
+                                        ),
+                                      ),
+                                    if (_loadingProjects)
+                                      const LinearProgressIndicator()
+                                    else ...[
+                                      DropdownButtonFormField<String>(
+                                        key: const Key('log-project'),
+                                        initialValue: _projectId,
+                                        isExpanded: true,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Proje',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        items: _projects
+                                            .map(
+                                              (project) => DropdownMenuItem(
+                                                value: project.id,
+                                                child: Text(
+                                                  project.name,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                        onChanged: _selectProject,
+                                        validator: (value) => value == null
+                                            ? 'Proje zorunludur.'
+                                            : null,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _formIconAction(
+                                        key: const Key('create-project'),
+                                        onPressed: _createProject,
+                                        icon: const Icon(
+                                          Icons.add_business_outlined,
+                                        ),
+                                        label: 'Yeni proje oluştur',
+                                      ),
+                                    ],
+                                    TextFormField(
+                                      key: const Key('log-description'),
+                                      controller: _description,
+                                      maxLength: 500,
+                                      minLines: 2,
+                                      maxLines: 5,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Kısa açıklama',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      validator: (value) =>
+                                          value == null || value.trim().isEmpty
+                                          ? 'Kısa açıklama zorunludur.'
+                                          : null,
+                                    ),
+                                    if (widget.existing == null &&
+                                        widget.attachments != null) ...[
+                                      const SizedBox(height: 8),
+                                      _formIconAction(
+                                        key: const Key('log-add-photo'),
+                                        onPressed: _submitting
+                                            ? null
+                                            : _pickPhoto,
+                                        icon: const Icon(
+                                          Icons.add_a_photo_outlined,
+                                        ),
+                                        label: 'Fotoğraf ekle',
+                                      ),
+                                      for (
+                                        var index = 0;
+                                        index < _pendingPhotos.length;
+                                        index += 1
+                                      )
+                                        ListTile(
+                                          key: Key('pending-log-photo-$index'),
+                                          leading: const Icon(
+                                            Icons.photo_outlined,
+                                          ),
+                                          title: Text(
+                                            _pendingPhotos[index].$1.name,
+                                          ),
+                                          subtitle: const Text(
+                                            'Log kaydıyla birlikte eklenecek',
+                                          ),
+                                          trailing: _formIconAction(
+                                            label: 'Seçimden kaldır',
+                                            onPressed: () => setState(
+                                              () => _pendingPhotos.removeAt(
+                                                index,
+                                              ),
+                                            ),
+                                            icon: const Icon(Icons.close),
+                                          ),
+                                        ),
+                                    ],
+                                    if (widget.existing == null &&
+                                        _hasConcreteSignal) ...[
+                                      const SizedBox(height: 12),
+                                      AgendaConcreteSuggestionCard(
+                                        key: const Key(
+                                          'agenda-concrete-form-suggestion',
+                                        ),
+                                        message:
+                                            'Bu kayıt Beton işiyle ilgili görünüyor.',
+                                        onSelectConcreteCategory:
+                                            _category == AgendaCategory.concrete
+                                            ? null
+                                            : _selectConcreteCategory,
+                                        onOpenConcrete: _canOpenConcrete
+                                            ? _openConcrete
+                                            : null,
+                                        selectCategoryKey: const Key(
+                                          'agenda-concrete-select-category',
+                                        ),
+                                        openConcreteKey: const Key(
+                                          'agenda-concrete-form-open',
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            ExpansionTile(
+                              key: const Key('log-time-details'),
+                              title: const Text('Zaman ve tür'),
+                              tilePadding: EdgeInsets.zero,
+                              children: [
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      key: const Key('log-date'),
+                                      onPressed: () async {
+                                        final value = await showDatePicker(
+                                          context: context,
+                                          initialDate: _date,
+                                          firstDate: DateTime(2000),
+                                          lastDate: DateTime(2100),
+                                        );
+                                        if (value != null) {
+                                          setState(() => _date = value);
+                                        }
+                                      },
+                                      icon: const Icon(
+                                        Icons.calendar_today_outlined,
+                                      ),
+                                      label: Text(
+                                        '${_date.day.toString().padLeft(2, '0')}.'
+                                        '${_date.month.toString().padLeft(2, '0')}.${_date.year}',
+                                      ),
+                                    ),
+                                    OutlinedButton.icon(
+                                      key: const Key('log-time'),
+                                      onPressed: () async {
+                                        final value = await showTimePicker(
+                                          context: context,
+                                          initialTime: _time,
+                                        );
+                                        if (value != null) {
+                                          setState(() => _time = value);
+                                        }
+                                      },
+                                      icon: const Icon(Icons.schedule),
+                                      label: Text(_time.format(context)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                KeyedSubtree(
+                                  key: const Key('log-category'),
+                                  child:
+                                      DropdownButtonFormField<AgendaCategory>(
+                                        key: _categoryFieldKey,
+                                        initialValue: _category,
+                                        isExpanded: true,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Kayıt türü',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        items: AgendaCategory.values
+                                            .map(
+                                              (category) => DropdownMenuItem(
+                                                value: category,
+                                                child: Text(category.label),
+                                              ),
+                                            )
+                                            .toList(),
+                                        onChanged: (value) =>
+                                            setState(() => _category = value!),
+                                      ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            ExpansionTile(
+                              key: const Key('log-optional-details'),
+                              title: const Text('İsteğe bağlı ayrıntılar'),
+                              tilePadding: EdgeInsets.zero,
+                              children: [
+                                if (widget.projectLocations == null)
+                                  TextFormField(
+                                    key: const Key('log-location'),
+                                    controller: _location,
+                                    maxLength: 200,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Mahal (opsiyonel)',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    onChanged: _rebuildForUserEdit,
+                                  )
+                                else
+                                  _buildStableLocationField(),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  key: const Key('log-notes'),
+                                  controller: _notes,
+                                  maxLength: 4000,
+                                  minLines: 3,
+                                  maxLines: 8,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Ayrıntılı not (opsiyonel)',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: _selectProject,
-                validator: (value) =>
-                    value == null ? 'Proje zorunludur.' : null,
-              ),
-              const SizedBox(height: 8),
-              _formIconAction(
-                key: const Key('create-project'),
-                onPressed: _createProject,
-                icon: const Icon(Icons.add_business_outlined),
-                label: 'Yeni proje oluştur',
-              ),
-            ],
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  key: const Key('log-date'),
-                  onPressed: () async {
-                    final value = await showDatePicker(
-                      context: context,
-                      initialDate: _date,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (value != null) {
-                      setState(() => _date = value);
-                    }
-                  },
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  label: Text(
-                    '${_date.day.toString().padLeft(2, '0')}.'
-                    '${_date.month.toString().padLeft(2, '0')}.${_date.year}',
-                  ),
-                ),
-                OutlinedButton.icon(
-                  key: const Key('log-time'),
-                  onPressed: () async {
-                    final value = await showTimePicker(
-                      context: context,
-                      initialTime: _time,
-                    );
-                    if (value != null) setState(() => _time = value);
-                  },
-                  icon: const Icon(Icons.schedule),
-                  label: Text(_time.format(context)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            KeyedSubtree(
-              key: const Key('log-category'),
-              child: DropdownButtonFormField<AgendaCategory>(
-                key: _categoryFieldKey,
-                initialValue: _category,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Kayıt türü',
-                  border: OutlineInputBorder(),
-                ),
-                items: AgendaCategory.values
-                    .map(
-                      (category) => DropdownMenuItem(
-                        value: category,
-                        child: Text(category.label),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() => _category = value!),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              key: const Key('log-description'),
-              controller: _description,
-              maxLength: 500,
-              minLines: 2,
-              maxLines: 5,
-              decoration: const InputDecoration(
-                labelText: 'Kısa açıklama',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Kısa açıklama zorunludur.'
-                  : null,
-            ),
-            if (widget.existing == null && widget.attachments != null) ...[
-              const SizedBox(height: 8),
-              _formIconAction(
-                key: const Key('log-add-photo'),
-                onPressed: _submitting ? null : _pickPhoto,
-                icon: const Icon(Icons.add_a_photo_outlined),
-                label: 'Fotoğraf ekle',
-              ),
-              for (var index = 0; index < _pendingPhotos.length; index += 1)
-                ListTile(
-                  key: Key('pending-log-photo-$index'),
-                  leading: const Icon(Icons.photo_outlined),
-                  title: Text(_pendingPhotos[index].$1.name),
-                  subtitle: const Text('Log kaydıyla birlikte eklenecek'),
-                  trailing: _formIconAction(
-                    label: 'Seçimden kaldır',
-                    onPressed: () =>
-                        setState(() => _pendingPhotos.removeAt(index)),
-                    icon: const Icon(Icons.close),
-                  ),
-                ),
-            ],
-            if (widget.projectLocations == null)
-              TextFormField(
-                key: const Key('log-location'),
-                controller: _location,
-                maxLength: 200,
-                decoration: const InputDecoration(
-                  labelText: 'Mahal (opsiyonel)',
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: _rebuildForUserEdit,
-              )
-            else
-              _buildStableLocationField(),
-            const SizedBox(height: 8),
-            TextFormField(
-              key: const Key('log-notes'),
-              controller: _notes,
-              maxLength: 4000,
-              minLines: 3,
-              maxLines: 8,
-              decoration: const InputDecoration(
-                labelText: 'Ayrıntılı not (opsiyonel)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            if (widget.existing == null && _hasConcreteSignal) ...[
-              const SizedBox(height: 12),
-              AgendaConcreteSuggestionCard(
-                key: const Key('agenda-concrete-form-suggestion'),
-                message: 'Bu kayıt Beton işiyle ilgili görünüyor.',
-                onSelectConcreteCategory: _category == AgendaCategory.concrete
-                    ? null
-                    : _selectConcreteCategory,
-                onOpenConcrete: _canOpenConcrete ? _openConcrete : null,
-                selectCategoryKey: const Key('agenda-concrete-select-category'),
-                openConcreteKey: const Key('agenda-concrete-form-open'),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Semantics(
-                label: _submitting ? 'Kaydediliyor…' : 'Kaydet',
-                button: true,
-                enabled: !_submitting,
-                excludeSemantics: true,
-                onTap: _submitting ? null : _submit,
-                child: FilledButton.icon(
-                  key: const Key('submit-log'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                      ],
                     ),
                   ),
-                  onPressed: _submitting ? null : _submit,
-                  icon: _submitting
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save_outlined),
-                  label: Text(_submitting ? 'Kaydediliyor…' : 'Kaydet'),
                 ),
               ),
-            ),
-          ],
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Semantics(
+                        label: _submitting ? 'Kaydediliyor…' : 'Kaydet',
+                        button: true,
+                        enabled: !_submitting,
+                        excludeSemantics: true,
+                        onTap: _submitting ? null : _submit,
+                        child: FilledButton.icon(
+                          key: const Key('submit-log'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 48),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                          onPressed: _submitting ? null : _submit,
+                          icon: _submitting
+                              ? const SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.save_outlined),
+                          label: Text(_submitting ? 'Kaydediliyor…' : 'Kaydet'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -522,6 +522,7 @@ void main() {
       find.byKey(const Key('log-description')),
       'Kullanıcının girdiği açıklama',
     );
+    await _openLogSection(tester, 'log-optional-details');
     await tester.enterText(
       find.byKey(const Key('log-location')),
       'B Blok çatı mahali',
@@ -760,6 +761,7 @@ void main() {
         find.byKey(const Key('log-description')),
         description,
       );
+      await _openLogSection(tester, 'log-time-details');
       final categoryField = find.byType(
         DropdownButtonFormField<AgendaCategory>,
       );
@@ -790,6 +792,7 @@ void main() {
       );
       await tester.tap(selectConcreteCategoryAction);
       await tester.pump();
+      await _openLogSection(tester, 'log-time-details');
       await tester.scrollUntilVisible(
         find.byKey(const Key('log-category')),
         -300,
@@ -801,6 +804,7 @@ void main() {
       );
       expect(fake.createLogCalls, 0);
 
+      await _openLogSection(tester, 'log-optional-details');
       await tester.scrollUntilVisible(
         find.byKey(const Key('log-location')),
         -300,
@@ -850,6 +854,7 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
+      await _openLogSection(tester, 'log-time-details');
       await tester.scrollUntilVisible(
         find.byKey(const Key('log-category')),
         -300,
@@ -2435,6 +2440,8 @@ void main() {
             ),
           );
           expect(find.text(project().name), findsOneWidget);
+          await _openLogSection(tester, 'log-time-details');
+          await _openLogSection(tester, 'log-optional-details');
           expect(find.text('19.07.2026'), findsOneWidget);
           final time = find.descendant(
             of: find.byKey(const Key('log-time')),
@@ -2569,6 +2576,8 @@ void main() {
           await tester.tap(edit);
           await tester.pumpAndSettle();
           expect(find.byType(LogFormPage), findsOneWidget);
+          await _openLogSection(tester, 'log-time-details');
+          await _openLogSection(tester, 'log-optional-details');
           expect(find.text('19.07.2026'), findsOneWidget);
           await _revealIcon(tester, find.byKey(const Key('log-description')));
           await tester.enterText(
@@ -2835,6 +2844,7 @@ Future<void> _revealRouteControl(
   required Finder list,
   required double scrollDelta,
 }) async {
+  await tester.pumpAndSettle();
   final scrollable = _routeListScrollable(tester, list);
   await tester.scrollUntilVisible(control, scrollDelta, scrollable: scrollable);
   await Scrollable.ensureVisible(
@@ -2859,7 +2869,10 @@ void _expectControlFullyVisible(
   expect(viewport, findsOneWidget);
   final screen =
       Offset.zero & (tester.view.physicalSize / tester.view.devicePixelRatio);
-  final visibleBounds = tester.getRect(viewport).intersect(screen);
+  final bounds = control.evaluate().single.widget.key == const Key('submit-log')
+      ? find.byKey(const Key('log-form-viewport'))
+      : viewport;
+  final visibleBounds = tester.getRect(bounds).intersect(screen);
   final controlBounds = tester.getRect(control);
   final reason =
       'Unreachable control: $control; control=$controlBounds; viewport=$visibleBounds';
@@ -3509,4 +3522,15 @@ class _RecordingConcrete implements ConcreteApplication {
 
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+Future<void> _openLogSection(WidgetTester tester, String key) async {
+  await tester.pumpAndSettle();
+  final probe = key == 'log-time-details' ? 'log-date' : 'log-notes';
+  if (find.byKey(Key(probe)).evaluate().isNotEmpty) return;
+  final section = find.byKey(Key(key));
+  await tester.ensureVisible(section);
+  await tester.pumpAndSettle();
+  await tester.tap(section);
+  await tester.pumpAndSettle();
 }

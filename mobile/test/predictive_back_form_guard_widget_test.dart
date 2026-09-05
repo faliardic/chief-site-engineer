@@ -225,6 +225,11 @@ void main() {
         agenda: FakeAgendaApplication(projects: const [_project]),
       ),
     );
+    final timeDetails = find.byKey(const Key('log-time-details'));
+    await tester.ensureVisible(timeDetails);
+    await tester.tap(timeDetails);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('log-date')));
     await tester.tap(find.byKey(const Key('log-date')));
     await tester.pumpAndSettle();
     expect(find.byType(DatePickerDialog), findsOneWidget);
