@@ -723,10 +723,13 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
                             children: detail.events
                                 .map(
                                   (event) => ListTile(
-                                    title: Text(event.eventType),
+                                    title: Text(
+                                      _historyEventLabel(event.eventType),
+                                    ),
                                     subtitle: Text(
-                                      '#${event.sequence} • '
-                                      '${CseTimeCodec.formatIstanbul(event.occurredAt)}',
+                                      CseTimeCodec.formatIstanbul(
+                                        event.occurredAt,
+                                      ),
                                     ),
                                   ),
                                 )
@@ -741,6 +744,19 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
       ),
     );
   }
+
+  String _historyEventLabel(String eventType) => switch (eventType) {
+    'attendance_day.created' => 'Puantaj günü oluşturuldu',
+    'attendance_entry.upserted' => 'Personel puantajı güncellendi',
+    'attendance_entry.removed' => 'Personel kaydı kaldırıldı',
+    'attendance_day.note_updated' => 'Günlük not güncellendi',
+    'attendance_day.completed' => 'Gün tamamlandı',
+    'attendance_day.no_work' => 'Çalışma yok olarak işaretlendi',
+    'attendance_day.reopened' => 'Gün yeniden açıldı',
+    'attendance_day.csv_exported' => 'CSV dışa aktarıldı',
+    'attendance_day.reminder_linked' => 'Puantaj hatırlatıcısı bağlandı',
+    _ => 'Puantaj kaydı güncellendi',
+  };
 
   Widget _buildRosterSelector() {
     const allTeams = '__all-active-teams__';
