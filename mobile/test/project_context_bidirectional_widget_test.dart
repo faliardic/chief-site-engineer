@@ -52,6 +52,127 @@ const _projectB = MobileProject(
 );
 
 void main() {
+  for (final outcome in [
+    'success',
+    'retry',
+    'failed back',
+    'pending back success',
+    'pending back failure',
+    'pending back immediate success',
+    'pending back immediate failure',
+  ]) {
+    testWidgets('Daily Log shared switch settles with usable Home: $outcome', (
+      tester,
+    ) async {
+      final daily = _OrderedDailyFake();
+      final agenda = _DailySwitchAgenda(daily);
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future.value(
+            BootstrapSuccess(
+              environmentLabel: 'Test',
+              smokeRecordId: 'issue-699-daily-switch',
+              smokeRecordCreatedAt: '2026-09-05T08:00:00Z',
+              agenda: agenda,
+              dailyLog: daily,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _chooseSharedProject(tester, _projectB.id);
+      await tester.pumpAndSettle();
+      final session = tester
+          .widget<ProjectDashboardPage>(find.byType(ProjectDashboardPage))
+          .session;
+      final changes = <String?>[];
+      void observe() => changes.add(session.selectedProjectId);
+      session.addListener(observe);
+      await _openDashboardTool(tester, const Key('dashboard-open-today'));
+      final selectedDay = tester
+          .widget<Text>(find.byKey(const Key('daily-log-day-heading')))
+          .data!
+          .split(' · ')
+          .first;
+      expect(changes, isEmpty);
+      final pending = Completer<void>();
+      daily.nextRead = pending;
+      final profileBaseline = agenda.profileReads.length;
+      await _startProjectSelection(
+        tester,
+        find.byKey(ValueKey('daily-log-project-${_projectB.id}')),
+        _projectA.name,
+      );
+      // The route owns this unfinished read. It must not start Home's read
+      // or replace the shared project until its entire load has settled.
+      expect(daily.reading, isTrue);
+      expect(session.selectedProjectId, _projectB.id);
+      expect(changes, isEmpty);
+      expect(agenda.profileReads.length, profileBaseline);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      final backWhilePending = outcome.startsWith('pending back');
+      if (backWhilePending) {
+        await tester.tap(find.byType(BackButton));
+        if (outcome.contains('immediate')) {
+          // A popped route remains mounted during its reverse animation.
+          expect(find.byType(DailyLogPage), findsOneWidget);
+        } else {
+          await tester.pumpAndSettle();
+          _expectSettledDailyHome(tester, _projectB);
+        }
+      }
+      if (outcome.endsWith('success')) {
+        pending.complete();
+      } else {
+        pending.completeError(const DailyLogFailure('daily_log_read_failed'));
+      }
+      await tester.pumpAndSettle();
+
+      if (outcome == 'retry' || outcome == 'failed back') {
+        expect(changes, isEmpty);
+        expect(session.selectedProjectId, _projectB.id);
+        expect(find.text('Günlük Log güvenle okunamadı.'), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(agenda.profileReads.length, profileBaseline);
+        if (outcome == 'retry') {
+          await tester.tap(find.byKey(const Key('daily-log-project-retry')));
+          await tester.pumpAndSettle();
+        }
+      }
+      final adopted = outcome == 'success' || outcome == 'retry';
+      if (adopted) {
+        expect(changes, [_projectA.id]);
+        expect(session.selectedProjectId, _projectA.id);
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('daily-log-day-heading')))
+              .data,
+          '$selectedDay · ${_projectA.name}',
+        );
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(agenda.profileReads.skip(profileBaseline), isNotEmpty);
+        expect(
+          agenda.profileReads.skip(profileBaseline),
+          everyElement(_projectA.id),
+        );
+      } else {
+        expect(changes, isEmpty);
+        expect(session.selectedProjectId, _projectB.id);
+      }
+      if (!backWhilePending) {
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+      }
+      _expectSettledDailyHome(tester, adopted ? _projectA : _projectB);
+      expect(agenda.overlappingProfileReads, isEmpty);
+      expect(agenda.createLogCalls, 0);
+      expect(agenda.createReminderCalls, 0);
+      expect(tester.takeException(), isNull);
+      session.removeListener(observe);
+    });
+  }
+
   testWidgets(
     'Inventory AppBar selection commits shared A once only after success and preserves A in captures',
     (tester) async {
@@ -1199,6 +1320,62 @@ Future<void> _openDashboardTool(WidgetTester tester, Key key) async {
   expect(target.hitTestable(), findsOneWidget);
   await tester.tap(target.hitTestable());
   await tester.pumpAndSettle();
+}
+
+void _expectSettledDailyHome(WidgetTester tester, MobileProject project) {
+  expect(find.byType(DailyLogPage), findsNothing);
+  expect(find.byKey(const Key('project-profile-home')), findsOneWidget);
+  expect(find.byKey(const Key('project-profile-fields')), findsOneWidget);
+  expect(find.byKey(const Key('dashboard-loading-projects')), findsNothing);
+  expect(find.byKey(const Key('project-profile-loading')), findsNothing);
+  expect(find.byType(CircularProgressIndicator), findsNothing);
+  expect(
+    tester.widget<Text>(find.byKey(const Key('project-profile-name'))).data,
+    project.name,
+  );
+}
+
+class _DailySwitchAgenda extends FakeAgendaApplication {
+  _DailySwitchAgenda(this.daily)
+    : super(projects: const [_projectA, _projectB]);
+
+  final _OrderedDailyFake daily;
+  final profileReads = <String>[];
+  final overlappingProfileReads = <String>[];
+
+  @override
+  Future<ProjectProfile> getProjectProfile(String projectId) {
+    profileReads.add(projectId);
+    if (daily.reading) overlappingProfileReads.add(projectId);
+    return super.getProjectProfile(projectId);
+  }
+}
+
+class _OrderedDailyFake extends _DailyFake {
+  _OrderedDailyFake()
+    : super([
+        DailyLogProject(id: _projectA.id, name: _projectA.name),
+        DailyLogProject(id: _projectB.id, name: _projectB.name),
+      ]);
+
+  Completer<void>? nextRead;
+  bool reading = false;
+
+  @override
+  Future<DailyLogDay> loadDay({
+    required String projectId,
+    required String localDay,
+  }) async {
+    final pending = nextRead;
+    nextRead = null;
+    reading = true;
+    try {
+      if (pending != null) await pending.future;
+      return await super.loadDay(projectId: projectId, localDay: localDay);
+    } finally {
+      reading = false;
+    }
+  }
 }
 
 class _DailyFake implements DailyLogApplicationPort {
