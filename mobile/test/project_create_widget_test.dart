@@ -351,7 +351,12 @@ void main() {
     await tester.scrollUntilVisible(
       save,
       120,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('project-create-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
     expect(tester.takeException(), isNull);
     _expectPrimaryAction(tester, 'Kaydet');
