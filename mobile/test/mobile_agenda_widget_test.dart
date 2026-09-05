@@ -140,9 +140,9 @@ void main() {
       );
 
       final initialDay = fake.lastAgendaQuery!.istanbulDay;
-      await tester.tap(find.byKey(const Key('next-day')));
+      await tester.tap(find.byKey(const Key('agenda-calendar-next-period')));
       await tester.pumpAndSettle();
-      final selectedDay = CseTimeCodec.shiftIstanbulDay(initialDay, 1);
+      final selectedDay = CseTimeCodec.shiftIstanbulDay(initialDay, 7);
       await _enterAgendaSearch(tester, fake, 'korunacak arama');
       final callsBeforeDraft = fake.listAgendaCalls;
 
@@ -1871,7 +1871,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
-      await tester.tap(find.byKey(const Key('next-day')));
+      await tester.tap(find.byKey(const Key('agenda-calendar-next-period')));
+      await tester.pumpAndSettle();
+      final selectedCalendarDay = fake.lastAgendaQuery!.istanbulDay;
+      await tester.ensureVisible(find.byKey(const Key('agenda-calendar-mode')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ay'));
       await tester.pumpAndSettle();
       await _openAgendaFilters(tester);
       await _setAgendaFilterDraft(
@@ -1949,6 +1954,15 @@ void main() {
       expect(
         tester.widget<EditableText>(find.byType(EditableText)).controller.text,
         'CSE264 arama',
+      );
+      expect(fake.lastAgendaQuery!.istanbulDay, selectedCalendarDay);
+      expect(
+        tester
+            .widget<SegmentedButton<bool>>(
+              find.byKey(const Key('agenda-calendar-mode')),
+            )
+            .selected,
+        {true},
       );
       expect(_agendaSearchHasFocus(tester), isFalse);
       expect(tester.testTextInput.isVisible, isFalse);
@@ -2268,9 +2282,9 @@ void main() {
           for (final entry in {
             'create-agenda-project': 'Yeni proje',
             'open-project-location-catalog': 'Mahal Kataloğu',
-            'previous-day': 'Önceki gün',
+            'agenda-calendar-previous-period': 'Önceki hafta',
             'agenda-today': 'Bugüne git',
-            'next-day': 'Sonraki gün',
+            'agenda-calendar-next-period': 'Sonraki hafta',
             'agenda-search': 'Ara',
           }.entries) {
             await _revealIcon(tester, find.byKey(Key(entry.key)));
@@ -2278,9 +2292,15 @@ void main() {
           }
           final today = fake.lastAgendaQuery!.istanbulDay;
           for (final (key, day) in [
-            ('previous-day', CseTimeCodec.shiftIstanbulDay(today, -1)),
-            ('next-day', today),
-            ('next-day', CseTimeCodec.shiftIstanbulDay(today, 1)),
+            (
+              'agenda-calendar-previous-period',
+              CseTimeCodec.shiftIstanbulDay(today, -7),
+            ),
+            ('agenda-calendar-next-period', today),
+            (
+              'agenda-calendar-next-period',
+              CseTimeCodec.shiftIstanbulDay(today, 7),
+            ),
             ('agenda-today', today),
           ]) {
             final action = find.byKey(Key(key));
