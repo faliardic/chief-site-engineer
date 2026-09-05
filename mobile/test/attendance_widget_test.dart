@@ -69,7 +69,7 @@ void main() {
     expect(find.byKey(const Key('attendance-day-detail')), findsOneWidget);
     expect(find.byKey(const Key('attendance-roster-selector')), findsOneWidget);
     expect(find.byKey(Key('attendance-member-$memberId')), findsNothing);
-    expect(find.textContaining('Önce taşeron seçin'), findsOneWidget);
+    expect(find.textContaining('Önce İşveren seçin'), findsOneWidget);
     expect(find.byKey(const Key('mark-all-full')), findsOneWidget);
     final save = find.byKey(const Key('save-attendance-draft'));
     await tester.scrollUntilVisible(
@@ -245,6 +245,10 @@ void main() {
 
       expect(find.text('Kaydet'), findsOneWidget);
       expect(find.text('Taslak kaydet'), findsNothing);
+      await tester.ensureVisible(
+        find.byKey(const Key('save-attendance-draft')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('save-attendance-draft')));
       await tester.pumpAndSettle();
 
@@ -276,6 +280,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('save-attendance-draft')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('save-attendance-draft')));
     await tester.pumpAndSettle();
 
@@ -357,6 +363,8 @@ void main() {
       find.byKey(const Key('attendance-general-note')),
       'Korunacak Türkçe form girdisi',
     );
+    await tester.ensureVisible(find.byKey(const Key('save-attendance-draft')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('save-attendance-draft')));
     await tester.tap(find.byKey(const Key('save-attendance-draft')));
     await tester.pump();
