@@ -7,6 +7,7 @@ import 'package:chief_site_engineer/application/material_request_application.dar
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
 import 'package:flutter/material.dart';
 
@@ -79,6 +80,11 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   ProjectProfileApplication? get _profileApplication =>
       widget.agenda is ProjectProfileApplication
       ? widget.agenda as ProjectProfileApplication
+      : null;
+
+  ProjectLifecycleApplication? get _projectLifecycle =>
+      widget.agenda is ProjectLifecycleApplication
+      ? widget.agenda as ProjectLifecycleApplication
       : null;
 
   @override
@@ -215,6 +221,52 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     AgendaValidationFailure() => error.message,
     _ => 'Proje profili güncellenemedi. Kayıtlar korunuyor.',
   };
+
+  Future<void> _editProjectName(MobileProject project) async {
+    final application = _projectLifecycle;
+    if (_mutating || application == null) return;
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => OwnedTextInputDialog(
+        title: 'Proje adını düzenle',
+        label: 'Proje adı',
+        confirmLabel: 'Kaydet',
+        initialValue: project.name,
+        inputKey: const Key('project-profile-edit-name'),
+        confirmKey: const Key('project-profile-save-name'),
+        maxLength: 160,
+        trimResult: true,
+        validator: (value) =>
+            value.trim().isEmpty ? 'Proje adı boş bırakılamaz.' : null,
+      ),
+    );
+    if (name == null ||
+        !mounted ||
+        widget.session.selectedProjectId != project.id) {
+      return;
+    }
+    await _runMutation(() async {
+      final renamed = await application.renameProject(
+        RenameProjectCommand(
+          projectId: project.id,
+          eventId: RecordId.randomUuid(),
+          expectedRevision: project.revision,
+          name: name,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _projects = [
+          for (final item in _projects)
+            if (item.id == renamed.id) renamed else item,
+        ];
+        final profile = _profile;
+        if (profile != null && profile.project.id == renamed.id) {
+          _profile = ProjectProfile(project: renamed, fields: profile.fields);
+        }
+      });
+    });
+  }
 
   Future<void> _editField(ProjectProfileField field) async {
     var label = field.label;
@@ -621,22 +673,27 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
       children: [
         Card(
           key: const Key('project-profile-header'),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Proje Profili',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  project.name,
-                  key: const Key('project-profile-name'),
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-              ],
+          child: InkWell(
+            onTap: _mutating || _projectLifecycle == null
+                ? null
+                : () => unawaited(_editProjectName(project)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Proje Profili',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    project.name,
+                    key: const Key('project-profile-name'),
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

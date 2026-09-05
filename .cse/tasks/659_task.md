@@ -105,3 +105,27 @@ with current master, require no conflict/unintended path drift, and verify the
 Draft PR is mergeable. All automated gates must PASS before commit/push/Draft
 PR. Manual Acceptance remains PENDING; Ready/merge requires independent review
 and Fatih manual PASS. No APK/device work is part of this correction.
+
+## Independent-review correction — PR #661
+
+Authority: https://github.com/faliardic/chief-site-engineer/issues/659#issuecomment-5549220260
+Resume head: `13f1b26f75b7aa9f385aa32cc83c2527e9af78da`.
+Execution time budget: 45 minutes. Same branch/PR; Draft and manual Acceptance
+PENDING remain mandatory until independent re-review and Fatih's manual PASS.
+
+This authority supersedes the prior test-only boundary solely to make the fixed
+Project Profile name header tap-to-edit through the existing
+`ProjectLifecycleApplication.renameProject` path. Keep `projects.name` as the
+single name source; pass the displayed project's revision and a new event ID.
+Apply only the returned successful name, preserve project selection, and show a
+safe error while retaining the previous name on stale revision or failure.
+No new profile field, schema, backup, route or reorderability change is allowed.
+
+Correction writes are limited to existing authorized Home source/test and this
+task/result provenance. `mobile/lib/app.dart`, schema/backup design and all six
+final compatibility test files are protected. New path/product decision => STOP.
+
+Validate focused Home + existing project lifecycle regressions, then material
+analyzer, then a single full mobile suite run because production source changes.
+Require touched format, authorized-path/protected drift, diff whitespace and PR
+mergeability PASS before a normal commit/push to the same Draft PR #661.

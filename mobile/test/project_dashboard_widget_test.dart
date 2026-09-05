@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/app.dart';
+import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
@@ -106,6 +107,138 @@ void main() {
     expect(find.text('Yapı sınıfı'), findsNothing);
   });
 
+  testWidgets(
+    'project name rename uses canonical revision and survives Home reload',
+    (tester) async {
+      final project = _project(
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'Kuzey',
+        revision: 7,
+      );
+      final other = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Güney');
+      final agenda = _RenamingAgenda(projects: [project, other]);
+      final fixture = _Fixture(projects: agenda.projects, agenda: agenda);
+      addTearDown(fixture.dispose);
+      fixture.session.select(project.id, agenda.projects);
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      final fieldsBefore = List.of(agenda.projectProfileFields[project.id]!);
+
+      await _renameVisibleProject(tester, '  Yeni Kuzey  ');
+      expect(find.text('Yeni Kuzey'), findsOneWidget);
+      expect(find.text('Kuzey'), findsNothing);
+      expect(fixture.session.selectedProjectId, project.id);
+      expect(agenda.projects.first.name, 'Yeni Kuzey');
+      expect(agenda.projects.first.revision, 8);
+      expect(agenda.projects.last, same(other));
+      final firstCommand = agenda.renameCommands.single;
+      expect(firstCommand.projectId, project.id);
+      expect(firstCommand.expectedRevision, 7);
+      expect(firstCommand.name, 'Yeni Kuzey');
+      expect(
+        firstCommand.eventId,
+        matches(
+          RegExp(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+          ),
+        ),
+      );
+
+      await _renameVisibleProject(tester, 'Son Kuzey');
+      expect(agenda.renameCommands, hasLength(2));
+      expect(agenda.renameCommands.last.expectedRevision, 8);
+      expect(agenda.renameCommands.last.eventId, isNot(firstCommand.eventId));
+      expect(find.text('Son Kuzey'), findsOneWidget);
+      expect(agenda.projectProfileFields, {project.id: fieldsBefore});
+      expect(agenda.projectProfileEvents, isEmpty);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      expect(find.text('Son Kuzey'), findsOneWidget);
+      expect(fixture.session.selectedProjectId, project.id);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final stale in [true, false]) {
+    testWidgets(
+      'project name ${stale ? 'stale revision' : 'failure'} preserves name and selection',
+      (tester) async {
+        final project = _project(
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          'Kuzey',
+        );
+        final agenda = _RenamingAgenda(projects: [project]);
+        final fixture = _Fixture(projects: agenda.projects, agenda: agenda);
+        addTearDown(fixture.dispose);
+        await tester.pumpWidget(fixture.app());
+        await tester.pumpAndSettle();
+        final fieldsBefore = List.of(agenda.projectProfileFields[project.id]!);
+        await tester.tap(find.byKey(const Key('project-profile-name')));
+        await tester.pumpAndSettle();
+        if (stale) {
+          agenda.projects = [_project(project.id, project.name, revision: 2)];
+        } else {
+          agenda.renameFailure = StateError('synthetic rename failure');
+        }
+        await tester.enterText(
+          find.byKey(const Key('project-profile-edit-name')),
+          'Kaydedilmemeli',
+        );
+        await tester.tap(find.byKey(const Key('project-profile-save-name')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Kuzey'), findsOneWidget);
+        expect(find.text('Kaydedilmemeli'), findsNothing);
+        expect(agenda.projects.single.name, 'Kuzey');
+        expect(fixture.session.selectedProjectId, project.id);
+        expect(agenda.renameCommands.single.expectedRevision, 1);
+        expect(agenda.appliedRenames, 0);
+        expect(agenda.projectProfileFields, {project.id: fieldsBefore});
+        expect(agenda.projectProfileEvents, isEmpty);
+        expect(
+          find.text(
+            stale
+                ? 'Proje başka bir işlem tarafından değiştirilmiş.'
+                : 'Proje profili güncellenemedi. Kayıtlar korunuyor.',
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('pending rename does not retarget a newly selected project', (
+    tester,
+  ) async {
+    final first = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+    final second = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Güney');
+    final gate = Completer<void>();
+    final agenda = _RenamingAgenda(projects: [first, second])
+      ..renameGate = gate;
+    final fixture = _Fixture(projects: agenda.projects, agenda: agenda);
+    addTearDown(fixture.dispose);
+    fixture.session.select(first.id, agenda.projects);
+    await tester.pumpWidget(fixture.app());
+    await tester.pumpAndSettle();
+    await _renameVisibleProject(tester, 'Yeni Kuzey');
+    expect(agenda.renameCommands.single.projectId, first.id);
+    expect(agenda.projects.first.name, 'Kuzey');
+    expect(fixture.session.select(second.id, agenda.projects), isTrue);
+    await tester.pumpAndSettle();
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(fixture.session.selectedProjectId, second.id);
+    expect(find.text('Güney'), findsOneWidget);
+    expect(find.text('Yeni Kuzey'), findsNothing);
+    expect(agenda.projects.first.name, 'Yeni Kuzey');
+    expect(agenda.projects.last, same(second));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('drag reorder persists the complete visible order', (
     tester,
   ) async {
@@ -192,8 +325,10 @@ void main() {
 }
 
 class _Fixture {
-  _Fixture({required List<MobileProject> projects})
-    : agenda = FakeAgendaApplication(projects: projects);
+  _Fixture({
+    required List<MobileProject> projects,
+    FakeAgendaApplication? agenda,
+  }) : agenda = agenda ?? FakeAgendaApplication(projects: projects);
 
   final FakeAgendaApplication agenda;
   final ActiveProjectSession session = ActiveProjectSession();
@@ -220,13 +355,70 @@ class _Fixture {
   void dispose() => session.dispose();
 }
 
-MobileProject _project(String id, String name) => MobileProject(
-  id: id,
-  name: name,
-  createdAt: '2026-09-04T06:00:00Z',
-  updatedAt: '2026-09-04T06:00:00Z',
-  revision: 1,
-);
+Future<void> _renameVisibleProject(WidgetTester tester, String name) async {
+  await tester.tap(find.byKey(const Key('project-profile-name')));
+  await tester.pumpAndSettle();
+  await tester.enterText(
+    find.byKey(const Key('project-profile-edit-name')),
+    name,
+  );
+  await tester.tap(find.byKey(const Key('project-profile-save-name')));
+  await tester.pumpAndSettle();
+}
+
+class _RenamingAgenda extends FakeAgendaApplication
+    implements ProjectLifecycleApplication {
+  _RenamingAgenda({required super.projects});
+
+  final List<RenameProjectCommand> renameCommands = [];
+  Object? renameFailure;
+  Completer<void>? renameGate;
+  int appliedRenames = 0;
+
+  @override
+  Future<MobileProject> renameProject(RenameProjectCommand command) async {
+    renameCommands.add(command);
+    final gate = renameGate;
+    if (gate != null) await gate.future;
+    final failure = renameFailure;
+    if (failure != null) throw failure;
+    final project = projects.singleWhere(
+      (item) => item.id == command.projectId,
+    );
+    if (project.revision != command.expectedRevision) {
+      throw const AgendaValidationFailure(
+        'Proje başka bir işlem tarafından değiştirilmiş.',
+      );
+    }
+    final renamed = MobileProject(
+      id: project.id,
+      name: command.name,
+      createdAt: project.createdAt,
+      updatedAt: '2026-09-05T04:00:00Z',
+      revision: project.revision + 1,
+      archivedAt: project.archivedAt,
+    );
+    projects = [
+      for (final item in projects)
+        if (item.id == project.id) renamed else item,
+    ];
+    appliedRenames += 1;
+    return renamed;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected lifecycle call: ${invocation.memberName}');
+}
+
+MobileProject _project(String id, String name, {int revision = 1}) =>
+    MobileProject(
+      id: id,
+      name: name,
+      createdAt: '2026-09-04T06:00:00Z',
+      updatedAt: '2026-09-04T06:00:00Z',
+      revision: revision,
+    );
 
 ProjectProfile _profile(MobileProject project, {required String value}) =>
     ProjectProfile(
