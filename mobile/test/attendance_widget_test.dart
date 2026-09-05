@@ -621,6 +621,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('workforce-person-profile')), findsOneWidget);
+    expect(find.text('İSG TAM'), findsOneWidget);
+    expect(find.text('İSG eksik 0'), findsNothing);
     expect(find.text('Genel / Puantaj'), findsOneWidget);
     expect(find.text('İSG belgeleri'), findsOneWidget);
     expect(find.text('KKD zimmetleri'), findsOneWidget);

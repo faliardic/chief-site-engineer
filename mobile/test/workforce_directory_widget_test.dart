@@ -253,6 +253,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(attendance.openedMemberId, _member2);
+    final profile = find.byKey(const Key('workforce-person-profile'));
+    expect(profile, findsOneWidget);
+    expect(
+      find.descendant(of: profile, matching: find.text('Mehmet Arşiv')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: profile, matching: find.text('3.5 kişi-gün')),
+      findsOneWidget,
+    );
     expect(find.text('Toplam 3.5 kişi-gün'), findsOneWidget);
     expect(find.textContaining('Son kayıt: 2026-08-08'), findsOneWidget);
     expect(find.text('Pasif'), findsWidgets);
