@@ -24,6 +24,14 @@ void main() {
         await _pump(tester, attendance, size: size, scale: scale);
         final profile = find.byKey(const Key('workforce-person-profile'));
         expect(profile, findsOneWidget);
+        expect(
+          tester.widgetList<Tab>(find.byType(Tab)).map((tab) => tab.text),
+          ['Profil', 'Puantaj', 'İSG', 'KKD'],
+        );
+        expect(
+          find.byKey(const Key('workforce-attendance-summary')),
+          findsNothing,
+        );
         expect(tester.getSize(profile).width, lessThanOrEqualTo(840));
         if (size.width > 900) {
           expect(tester.getCenter(profile).dx, closeTo(size.width / 2, 1));
@@ -33,7 +41,6 @@ void main() {
           'Uzun İsimli İnşaat ve Taahhüt Firması',
           'Demir donatı ve kalıp ustası',
           '2026-07-01',
-          '3.5 kişi-gün',
           'Gece ekibinde çalışır. Uzun personel notu eksiksiz okunabilir.',
           'İSG EKSİĞİ VAR',
         ]) {
@@ -67,8 +74,6 @@ void main() {
           '0555 123 45 67',
           'Şantiye lojmanı',
           'Gece ekibi',
-          'Toplam 3.5 kişi-gün',
-          '2026-08-08',
         ]) {
           final field = find.text(value);
           await Scrollable.ensureVisible(tester.element(field), alignment: 0.5);
@@ -76,12 +81,24 @@ void main() {
           expect(field.hitTestable(), findsOneWidget);
           expect(tester.takeException(), isNull);
         }
+        await _tab(tester, 'Puantaj');
+        for (final value in ['Toplam 3.5 kişi-gün', '2026-08-08']) {
+          final field = find.text(value);
+          await Scrollable.ensureVisible(tester.element(field), alignment: 0.5);
+          await tester.pumpAndSettle();
+          expect(field.hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
+        expect(find.byType(TextField), findsNothing);
+        expect(find.byType(FilledButton), findsNothing);
         final history = find.byKey(const Key('workforce-attendance-day-1'));
+        expect(tester.widget<ListTile>(history).onTap, isNull);
         expect(
           find.descendant(of: history, matching: find.text('0.5')),
           findsOneWidget,
         );
         expect(find.textContaining('Son kayıt: 2026-08-08'), findsOneWidget);
+        await _tab(tester, 'Profil');
         final jump = find.byKey(const Key('profile-open-compliance'));
         await tester.ensureVisible(jump);
         await tester.pumpAndSettle();
@@ -102,9 +119,9 @@ void main() {
         expect(find.text('Sağlık raporu'), findsOneWidget);
         expect(attendance.calls, ['read:person-1']);
         expect(tester.takeException(), isNull);
-        await _tab(tester, 'KKD zimmetleri');
+        await _tab(tester, 'KKD');
         expect(find.byKey(const Key('add-ppe-assignment')), findsOneWidget);
-        await _tab(tester, 'Genel / Puantaj');
+        await _tab(tester, 'Profil');
         expect(profile, findsOneWidget);
         expect(attendance.calls, ['read:person-1']);
         expect(tester.takeException(), isNull);
@@ -125,9 +142,11 @@ void main() {
     expect(find.text('İSG TAM'), findsOneWidget);
     expect(find.text('İSG EKSİĞİ VAR'), findsNothing);
     expect(find.byKey(const Key('profile-open-compliance')), findsNothing);
-    expect(find.text('0.0 kişi-gün'), findsOneWidget);
-    expect(find.text('Henüz Puantaj geçmişi yok.'), findsOneWidget);
+    expect(find.byKey(const Key('workforce-attendance-summary')), findsNothing);
     expect(find.text('Belirtilmedi'), findsNWidgets(4));
+    await _tab(tester, 'Puantaj');
+    expect(find.text('Toplam 0.0 kişi-gün'), findsOneWidget);
+    expect(find.text('Henüz Puantaj geçmişi yok.'), findsOneWidget);
     expect(attendance.calls, ['read:person-1']);
   });
 
@@ -158,7 +177,7 @@ void main() {
     (tester) async {
       final attendance = _Attendance();
       await _pump(tester, attendance, size: const Size(800, 1000));
-      await _tab(tester, 'İSG belgeleri');
+      await _tab(tester, 'İSG');
       await tester.tap(find.byKey(const Key('add-compliance-record')));
       await tester.pumpAndSettle();
       await tester.enterText(_field('Belge numarası'), 'BELGE-42');
@@ -201,7 +220,7 @@ void main() {
         isNotNull,
       );
 
-      await _tab(tester, 'KKD zimmetleri');
+      await _tab(tester, 'KKD');
       await tester.tap(find.byKey(const Key('add-ppe-assignment')));
       await tester.pumpAndSettle();
       await tester.enterText(_field('KKD türü *'), 'Baret');

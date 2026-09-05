@@ -473,35 +473,21 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
                         ? null
                         : _showFilters,
                   ),
+                  if (_loading ||
+                      (!_projectDiscoveryFailed && _projects.isNotEmpty))
+                    ScreenToolAction(
+                      key: const Key('manage-workforce-directory'),
+                      label: 'Sicili yönet',
+                      icon: Icons.manage_accounts_outlined,
+                      onPressed: _loading || _project == null
+                          ? null
+                          : _openManagement,
+                    ),
                 ],
               ),
             ],
           ),
         ),
-        if (_loading || (!_projectDiscoveryFailed && _projects.isNotEmpty))
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-            child: FilledButton(
-              key: const Key('manage-workforce-directory'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-              ),
-              onPressed: _loading || _project == null ? null : _openManagement,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.manage_accounts_outlined),
-                    SizedBox(width: 8),
-                    Flexible(
-                      child: Text('Sicili yönet', textAlign: TextAlign.center),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
       ],
     ),
   );
@@ -650,11 +636,28 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
                         ? Icons.person_outline
                         : Icons.person_off_outlined,
                   ),
-                  title: Text(member.fullName),
+                  title: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        member.fullName,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        member.roleName,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ],
+                  ),
                   subtitle: Text(
-                    '${member.phone ?? 'Telefon yok'} • ${member.roleName}\n'
+                    '${member.phone ?? 'Telefon yok'}\n'
                     '${member.subcontractorName ?? 'Tanımsız taşeron'} • ${member.teamName}\n'
                     '${member.isActive ? 'Aktif' : 'Arşiv'}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   isThreeLine: true,
                   trailing: const Icon(Icons.chevron_right),
