@@ -179,9 +179,14 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
 
   Future<void> _selectProject(String? projectId) async {
     if (projectId == null || projectId == _projectId || _loading) return;
+    final targetContext = _LivingPlanReadContext(
+      projectId,
+      _canonicalCalendarDay(_windowStart),
+    );
     setState(() => _projectId = projectId);
-    widget.onProjectSelected?.call(projectId);
     await _reload();
+    if (!mounted || _contentContext != targetContext) return;
+    widget.onProjectSelected?.call(projectId);
   }
 
   Future<void> _shiftWindow(int days) async {
