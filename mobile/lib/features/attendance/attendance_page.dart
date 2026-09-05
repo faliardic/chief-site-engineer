@@ -393,6 +393,18 @@ class _AttendancePageState extends State<AttendancePage> {
   @override
   Widget build(BuildContext context) {
     final detail = _detail;
+    final activePersonCount = _teamCounts.fold<int>(
+      0,
+      (total, team) => total + team.activePersonCount,
+    );
+    final needsWorkforce =
+        !_loading &&
+        !_projectReadFailed &&
+        !_dayReadFailed &&
+        detail != null &&
+        detail.day.status == AttendanceDayStatus.draft &&
+        detail.entries.isEmpty &&
+        activePersonCount == 0;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -556,6 +568,39 @@ class _AttendancePageState extends State<AttendancePage> {
                           padding: EdgeInsets.all(24),
                           child: Center(child: CircularProgressIndicator()),
                         ),
+                      if (needsWorkforce)
+                        Card(
+                          key: const Key('attendance-workforce-prerequisite'),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  'Önce personeli hazırlayın',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Bu projede aktif personel yok. Günlük puantaj '
+                                  'girişi için Personel bölümünden aktif personeli hazırlayın.',
+                                ),
+                                const SizedBox(height: 12),
+                                FilledButton(
+                                  key: const Key('attendance-setup-workforce'),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size(48, 48),
+                                    visualDensity: VisualDensity.standard,
+                                  ),
+                                  onPressed: _openWorkforce,
+                                  child: const Text('Personel yönetimini aç'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       if (detail != null)
                         Card(
                           color: Theme.of(context).colorScheme.primaryContainer,
@@ -607,7 +652,7 @@ class _AttendancePageState extends State<AttendancePage> {
                       if (_teamCounts.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Text(
-                          '${_teamCounts.length} aktif ekip • ${_teamCounts.fold<int>(0, (total, team) => total + team.activePersonCount)} aktif personel',
+                          '${_teamCounts.length} aktif ekip • $activePersonCount aktif personel',
                           key: const Key('attendance-team-summary'),
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),

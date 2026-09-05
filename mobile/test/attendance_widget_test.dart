@@ -204,6 +204,8 @@ void main() {
     expect(find.byKey(const Key('attendance-page')), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await tester.ensureVisible(find.byKey(const Key('open-attendance-day')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('open-attendance-day')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('attendance-day-detail')), findsOneWidget);
@@ -227,6 +229,73 @@ void main() {
     expect(save, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  for (final status in AttendanceDayStatus.values) {
+    for (final hasRoster in [false, true]) {
+      testWidgets(
+        'zero active workforce keeps $status day open with roster=$hasRoster',
+        (tester) async {
+          await _setPhoneSize(tester, const Size(320, 360));
+          final attendance = FakeAttendanceApplication(
+            members: [_member(isActive: false)],
+            detail: _detail(status: status, hasRoster: hasRoster),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: AttendancePage(
+                  attendance: attendance,
+                  agenda: FakeAgendaApplication(projects: [_project()]),
+                  activeProjectId: projectId,
+                  isActive: true,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('attendance-workforce-prerequisite')),
+            status == AttendanceDayStatus.draft && !hasRoster
+                ? findsOneWidget
+                : findsNothing,
+          );
+          final open = find.byKey(const Key('open-attendance-day'));
+          await tester.ensureVisible(open);
+          await tester.pumpAndSettle();
+          expect(open.hitTestable(), findsOneWidget);
+          await tester.tap(open);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('attendance-day-detail')),
+            findsOneWidget,
+          );
+          expect(find.byKey(const Key('attendance-summary')), findsOneWidget);
+          expect(attendance.detail!.day.status, status);
+          expect(attendance.detail!.day.localDate, '2026-07-19');
+          expect(attendance.detail!.entries.length, hasRoster ? 1 : 0);
+          if (status == AttendanceDayStatus.draft && hasRoster) {
+            expect(
+              find.byKey(const Key('attendance-member-$memberId')),
+              findsOneWidget,
+            );
+            expect(find.textContaining('(pasif)'), findsOneWidget);
+          }
+          expect(
+            find.byKey(
+              Key(
+                status == AttendanceDayStatus.draft
+                    ? 'complete-attendance-day'
+                    : 'reopen-attendance-day',
+              ),
+            ),
+            findsOneWidget,
+          );
+          expect(attendance.saveCalls, 0);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
 
   testWidgets(
     'Puantaj stays dormant while hidden and validates only shared project',
@@ -1090,40 +1159,61 @@ MobileProject _secondProject() => const MobileProject(
   revision: 1,
 );
 
-WorkforceMember _member() => const WorkforceMember(
+WorkforceMember _member({bool isActive = true}) => WorkforceMember(
   id: memberId,
   projectId: projectId,
   fullName: 'Çok Uzun Türkçe Personel Adı Öğrenci İşçi',
   teamName: 'Çok Uzun Türkçe Taşeron Ekibi',
   roleName: 'Demir Ustası',
   personnelCode: 'D-01',
-  isActive: true,
+  isActive: isActive,
   revision: 1,
   createdAt: '2026-07-19T08:00:00Z',
   updatedAt: '2026-07-19T08:00:00Z',
-  archivedAt: null,
+  archivedAt: isActive ? null : '2026-07-20T08:00:00Z',
 );
 
-AttendanceDayDetail _detail({MobileReminder? linkedReminder}) =>
-    AttendanceDayDetail(
-      day: const AttendanceDay(
-        id: dayId,
-        projectId: projectId,
-        projectName: 'Test Projesi',
-        localDate: '2026-07-19',
-        status: AttendanceDayStatus.draft,
-        generalNote: null,
-        revision: 1,
-        createdAt: '2026-07-19T08:00:00Z',
-        updatedAt: '2026-07-19T08:00:00Z',
-        completedAt: null,
-      ),
-      entries: const [],
-      events: const [],
-      totals: const AttendanceTotals.zero(),
-      teamSummaries: const [],
-      linkedReminder: linkedReminder,
-    );
+AttendanceDayDetail _detail({
+  MobileReminder? linkedReminder,
+  AttendanceDayStatus status = AttendanceDayStatus.draft,
+  bool hasRoster = false,
+}) => AttendanceDayDetail(
+  day: AttendanceDay(
+    id: dayId,
+    projectId: projectId,
+    projectName: 'Test Projesi',
+    localDate: '2026-07-19',
+    status: status,
+    generalNote: null,
+    revision: 1,
+    createdAt: '2026-07-19T08:00:00Z',
+    updatedAt: '2026-07-19T08:00:00Z',
+    completedAt: null,
+  ),
+  entries: hasRoster
+      ? [
+          AttendanceEntry(
+            id: 'historical-entry',
+            attendanceDayId: dayId,
+            memberId: memberId,
+            memberName: _member().fullName,
+            teamName: _member().teamName,
+            roleName: _member().roleName,
+            personnelCode: _member().personnelCode,
+            memberIsActive: false,
+            result: AttendanceResult.halfDay,
+            overtimeMinutes: 0,
+            shortNote: 'Geçmiş kayıt',
+            createdAt: '2026-07-19T08:00:00Z',
+            updatedAt: '2026-07-19T08:00:00Z',
+          ),
+        ]
+      : const [],
+  events: const [],
+  totals: const AttendanceTotals.zero(),
+  teamSummaries: const [],
+  linkedReminder: linkedReminder,
+);
 
 AttendanceDayDetail _completedDetail() {
   final current = _detail();

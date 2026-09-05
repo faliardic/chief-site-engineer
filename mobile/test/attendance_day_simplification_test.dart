@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
@@ -26,6 +27,7 @@ void main() {
     const Size(320, 640),
     const Size(390, 844),
     const Size(320, 360),
+    const Size(390, 360),
     const Size(800, 900),
     const Size(1440, 900),
   ]) {
@@ -33,66 +35,199 @@ void main() {
       testWidgets('selected roster and optional detail fit $size text $scale', (
         tester,
       ) async {
-        final attendance = await _fixture();
-        await _pump(tester, attendance, size: size, scale: scale);
-        expect(_key('attendance-member-person-a'), findsOneWidget);
-        expect(_key('attendance-subcontractor-selector'), findsNothing);
-        expect(_key('attendance-overtime-person-a'), findsNothing);
-        expect(_key('attendance-note-person-a'), findsNothing);
-        expect(_key('attendance-result-person-a'), findsOneWidget);
-        expect(
-          tester.getTopLeft(_key('attendance-member-person-a')).dy,
-          lessThan(tester.getTopLeft(_key('attendance-add-people')).dy),
-        );
-        expect(
-          tester.getSize(_key('attendance-member-person-a')).width,
-          lessThanOrEqualTo(840),
-        );
-        for (final key in [
-          'mark-all-full',
-          'mark-team-full',
-          'remove-attendance-person-a',
-          'save-attendance-draft',
-          'attendance-no-work',
-          'complete-attendance-day',
-        ]) {
-          await _reveal(tester, _key(key));
-          expect(_key(key).hitTestable(), findsOneWidget);
-          expect(tester.getSize(_key(key)).height, greaterThanOrEqualTo(48));
-          expect(tester.getSize(_key(key)).width, greaterThanOrEqualTo(48));
+        final semantics = tester.ensureSemantics();
+        try {
+          final attendance = await _fixture();
+          await _pump(tester, attendance, size: size, scale: scale);
+          expect(_key('attendance-member-person-a'), findsOneWidget);
+          expect(_key('attendance-subcontractor-selector'), findsNothing);
+          expect(_key('attendance-overtime-person-a'), findsNothing);
+          expect(_key('attendance-note-person-a'), findsNothing);
+          expect(_key('attendance-result-person-a'), findsOneWidget);
+          expect(
+            find.byType(DropdownButtonFormField<AttendanceResult?>),
+            findsNothing,
+          );
+          expect(
+            find.descendant(
+              of: _key('attendance-result-person-a'),
+              matching: find.byType(OutlinedButton),
+            ),
+            findsNWidgets(4),
+          );
+          for (final result in AttendanceResult.values) {
+            final choice = _key('attendance-result-person-a-${result.name}');
+            await _reveal(tester, choice);
+            expect(choice.hitTestable(), findsOneWidget);
+            expect(tester.getSize(choice).width, greaterThanOrEqualTo(48));
+            expect(tester.getSize(choice).height, greaterThanOrEqualTo(48));
+            final data = tester.getSemantics(choice).getSemanticsData();
+            expect(data.label, result.label);
+            expect(data.flagsCollection.isButton, isTrue);
+            expect(data.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
+            expect(data.hasAction(SemanticsAction.tap), isTrue);
+            expect(
+              data.flagsCollection.isSelected,
+              result == AttendanceResult.fullDay
+                  ? Tristate.isTrue
+                  : Tristate.isFalse,
+            );
+            expect(tester.takeException(), isNull);
+          }
+          expect(
+            tester.getTopLeft(_key('attendance-member-person-a')).dy,
+            lessThan(tester.getTopLeft(_key('attendance-add-people')).dy),
+          );
+          expect(
+            tester.getSize(_key('attendance-member-person-a')).width,
+            lessThanOrEqualTo(840),
+          );
+          for (final key in [
+            'mark-all-full',
+            'mark-team-full',
+            'remove-attendance-person-a',
+            'attendance-clear-result-person-a',
+            'save-attendance-draft',
+            'attendance-no-work',
+            'complete-attendance-day',
+          ]) {
+            await _reveal(tester, _key(key));
+            expect(_key(key).hitTestable(), findsOneWidget);
+            expect(tester.getSize(_key(key)).height, greaterThanOrEqualTo(48));
+            expect(tester.getSize(_key(key)).width, greaterThanOrEqualTo(48));
+            expect(tester.takeException(), isNull);
+          }
+          await _tap(tester, _detailsTitle);
+          await _reveal(tester, _key('attendance-note-person-a'));
+          expect(
+            _key('attendance-note-person-a').hitTestable(),
+            findsOneWidget,
+          );
+          expect(
+            tester
+                .widget<TextField>(_key('attendance-overtime-person-a'))
+                .controller!
+                .text,
+            '30',
+          );
+          expect(
+            tester
+                .widget<TextField>(_key('attendance-note-person-a'))
+                .controller!
+                .text,
+            'Mevcut not',
+          );
+          await _tap(tester, _detailsTitle);
+          await _tap(tester, _addTitle);
+          expect(find.text('İşveren seç *'), findsOneWidget);
+          expect(find.text('Taşeron seç *'), findsNothing);
+          await _reveal(tester, _key('attendance-subcontractor-selector'));
           expect(tester.takeException(), isNull);
+          expect(attendance.reads, [
+            'day:day-a',
+            'members:project-a',
+            'employers:project-a',
+          ]);
+        } finally {
+          semantics.dispose();
         }
-        await _tap(tester, _detailsTitle);
-        await _reveal(tester, _key('attendance-note-person-a'));
-        expect(_key('attendance-note-person-a').hitTestable(), findsOneWidget);
-        expect(
-          tester
-              .widget<TextField>(_key('attendance-overtime-person-a'))
-              .controller!
-              .text,
-          '30',
-        );
-        expect(
-          tester
-              .widget<TextField>(_key('attendance-note-person-a'))
-              .controller!
-              .text,
-          'Mevcut not',
-        );
-        await _tap(tester, _detailsTitle);
-        await _tap(tester, _addTitle);
-        expect(find.text('İşveren seç *'), findsOneWidget);
-        expect(find.text('Taşeron seç *'), findsNothing);
-        await _reveal(tester, _key('attendance-subcontractor-selector'));
-        expect(tester.takeException(), isNull);
-        expect(attendance.reads, [
-          'day:day-a',
-          'members:project-a',
-          'employers:project-a',
-        ]);
       });
     }
   }
+
+  for (final result in AttendanceResult.values) {
+    testWidgets('direct ${result.label} preserves exact roster save command', (
+      tester,
+    ) async {
+      final attendance = await _fixture();
+      await _pump(tester, attendance);
+      await _tap(tester, _key('attendance-result-person-a-${result.name}'));
+      expect(attendance.saveCalls, 0);
+      expect(attendance.reads.length, 3);
+      expect(attendance.removals, isEmpty);
+      await _tap(tester, _key('save-attendance-draft'));
+      final command = attendance.lastRosterCommand!;
+      expect(command.dayId, 'day-a');
+      expect(command.expectedRevision, 7);
+      expect(command.eventId, isNotEmpty);
+      expect(command.replaceGeneralNote, isTrue);
+      expect(command.generalNote, 'Önceki genel not');
+      final value = command.values.single;
+      expect(value.entryId, 'entry-a');
+      expect(value.memberId, 'person-a');
+      expect(value.result, result);
+      expect(
+        value.overtimeMinutes,
+        result == AttendanceResult.absent || result == AttendanceResult.leave
+            ? 0
+            : 30,
+      );
+      expect(value.shortNote, 'Mevcut not');
+      expect(attendance.detail!.entries.single.result, result);
+      expect(attendance.detail!.day.revision, 8);
+    });
+  }
+
+  testWidgets('secondary clear keeps no-result draft and omits it from save', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      final attendance = await _fixture();
+      attendance.saveFailure = const AgendaValidationFailure(
+        'Sentetik kayıt hatası',
+      );
+      await _pump(tester, attendance);
+      await _tap(tester, _key('attendance-clear-result-person-a'));
+      expect(find.text('Kayıt yok'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextButton>(_key('attendance-clear-result-person-a'))
+            .onPressed,
+        isNull,
+      );
+      for (final result in AttendanceResult.values) {
+        final choice = _key('attendance-result-person-a-${result.name}');
+        await _reveal(tester, choice);
+        expect(
+          tester
+              .getSemantics(choice)
+              .getSemanticsData()
+              .flagsCollection
+              .isSelected,
+          Tristate.isFalse,
+        );
+      }
+      await _tap(tester, _key('attendance-result-person-a-halfDay'));
+      expect(find.text('Kayıt yok'), findsNothing);
+      await _tap(tester, _detailsTitle);
+      expect(
+        tester
+            .widget<TextField>(_key('attendance-overtime-person-a'))
+            .controller!
+            .text,
+        '30',
+      );
+      expect(
+        tester
+            .widget<TextField>(_key('attendance-note-person-a'))
+            .controller!
+            .text,
+        'Mevcut not',
+      );
+      await _tap(tester, _detailsTitle);
+      await _tap(tester, _key('attendance-clear-result-person-a'));
+      await _tap(tester, _key('save-attendance-draft'));
+      expect(attendance.lastRosterCommand!.values, isEmpty);
+      expect(attendance.lastRosterCommand!.dayId, 'day-a');
+      expect(attendance.lastRosterCommand!.expectedRevision, 7);
+      expect(attendance.lastRosterCommand!.eventId, isNotEmpty);
+      expect(attendance.removals, isEmpty);
+      expect(find.text('Kayıt yok'), findsOneWidget);
+    } finally {
+      semantics.dispose();
+    }
+  });
 
   testWidgets(
     'FM note and general note survive collapse rebuild failed save and retry',
@@ -109,9 +244,7 @@ void main() {
       await tester.enterText(_key('attendance-overtime-person-a'), '75');
       await tester.enterText(_key('attendance-note-person-a'), 'Korunan not');
       await _tap(tester, _detailsTitle);
-      await _tap(tester, _key('attendance-result-person-a'));
-      await tester.tap(find.text('Yarım gün').last);
-      await tester.pumpAndSettle();
+      await _tap(tester, _key('attendance-result-person-a-halfDay'));
       await _tap(tester, _detailsTitle);
       expect(
         tester

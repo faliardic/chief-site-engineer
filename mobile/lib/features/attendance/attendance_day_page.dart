@@ -1259,27 +1259,63 @@ class _MemberAttendanceCard extends StatelessWidget {
               '${member.phone == null ? '' : ' • ${member.phone}'}',
             ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<AttendanceResult?>(
+            Column(
               key: Key('attendance-result-${member.id}'),
-              initialValue: result,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Çalışma sonucu',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                const DropdownMenuItem<AttendanceResult?>(
-                  value: null,
-                  child: Text('Kayıt yok'),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Çalışma sonucu'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final value in AttendanceResult.values)
+                      OutlinedButton(
+                        key: Key(
+                          'attendance-result-${member.id}-${value.name}',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          visualDensity: VisualDensity.standard,
+                          backgroundColor: result == value
+                              ? Theme.of(context).colorScheme.primaryContainer
+                              : null,
+                          foregroundColor: result == value
+                              ? Theme.of(context).colorScheme.onPrimaryContainer
+                              : null,
+                          side: result == value
+                              ? BorderSide(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  width: 2,
+                                )
+                              : null,
+                        ),
+                        onPressed: () => onResultChanged(value),
+                        child: Semantics(
+                          selected: result == value,
+                          inMutuallyExclusiveGroup: true,
+                          child: Text(value.label),
+                        ),
+                      ),
+                  ],
                 ),
-                ...AttendanceResult.values.map(
-                  (value) => DropdownMenuItem<AttendanceResult?>(
-                    value: value,
-                    child: Text(value.label),
+                if (result == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text('Kayıt yok'),
                   ),
+                TextButton(
+                  key: Key('attendance-clear-result-${member.id}'),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    visualDensity: VisualDensity.standard,
+                  ),
+                  onPressed: result == null
+                      ? null
+                      : () => onResultChanged(null),
+                  child: const Text('Seçimi temizle'),
                 ),
               ],
-              onChanged: onResultChanged,
             ),
             const SizedBox(height: 8),
             ExpansionTile(
