@@ -9,6 +9,7 @@ import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_settings_page.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_page.dart';
+import 'package:chief_site_engineer/features/screen_tool_rail.dart';
 import 'package:flutter/material.dart';
 
 class AttendancePage extends StatefulWidget {
@@ -331,181 +332,206 @@ class _AttendancePageState extends State<AttendancePage> {
   @override
   Widget build(BuildContext context) {
     final detail = _detail;
-    return ListView(
-      key: const Key('attendance-page'),
-      controller: _scrollController,
-      padding: const EdgeInsets.all(12),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_projects.isEmpty && !_loading)
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'Puantaj için önce Ajanda bölümünden bir proje oluşturun.',
-              ),
-            ),
-          )
-        else ...[
-          KeyedSubtree(
-            key: const Key('attendance-project'),
-            child: DropdownButtonFormField<String>(
-              key: ValueKey(
-                'attendance-project-field-$_projectFieldGeneration',
-              ),
-              initialValue: _project?.id,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Proje',
-                border: OutlineInputBorder(),
-              ),
-              items: _projects
-                  .map(
-                    (project) => DropdownMenuItem(
-                      value: project.id,
-                      child: Text(
-                        project.name,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
-              onChanged: (id) {
-                if (id != null) unawaited(_selectProject(id));
-              },
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
+        Expanded(
+          child: ListView(
+            key: const Key('attendance-page'),
+            controller: _scrollController,
+            padding: const EdgeInsets.all(12),
             children: [
-              IconButton.outlined(
-                key: const Key('attendance-previous-day'),
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                tooltip: 'Önceki gün',
-                onPressed: _loading ? null : () => _shiftDay(-1),
-                icon: const Icon(Icons.chevron_left),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: OutlinedButton.icon(
-                  key: const Key('attendance-date-picker'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(44),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 840),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_projects.isEmpty && !_loading)
+                        const Card(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text(
+                              'Puantaj için önce Ajanda bölümünden bir proje oluşturun.',
+                            ),
+                          ),
+                        )
+                      else ...[
+                        KeyedSubtree(
+                          key: const Key('attendance-project'),
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey(
+                              'attendance-project-field-$_projectFieldGeneration',
+                            ),
+                            initialValue: _project?.id,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Proje',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: _projects
+                                .map(
+                                  (project) => DropdownMenuItem(
+                                    value: project.id,
+                                    child: Text(
+                                      project.name,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                )
+                                .toList(growable: false),
+                            onChanged: (id) {
+                              if (id != null) unawaited(_selectProject(id));
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Seçili gün',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton(
+                          key: const Key('attendance-date-picker'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                          ),
+                          onPressed: _loading ? null : _pickDate,
+                          child: Text(_localDate),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            IconButton.outlined(
+                              key: const Key('attendance-previous-day'),
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size.square(48),
+                                visualDensity: VisualDensity.standard,
+                              ),
+                              tooltip: 'Önceki gün',
+                              onPressed: _loading ? null : () => _shiftDay(-1),
+                              icon: const Icon(Icons.chevron_left),
+                            ),
+                            OutlinedButton(
+                              key: const Key('attendance-today'),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(48, 48),
+                              ),
+                              onPressed: _loading ? null : _today,
+                              child: const Text('Bugün'),
+                            ),
+                            IconButton.outlined(
+                              key: const Key('attendance-next-day'),
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size.square(48),
+                                visualDensity: VisualDensity.standard,
+                              ),
+                              tooltip: 'Sonraki gün',
+                              onPressed: _loading ? null : () => _shiftDay(1),
+                              icon: const Icon(Icons.chevron_right),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      if (_error != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            _error!,
+                            key: const Key('attendance-page-error'),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      if (_loading)
+                        const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (detail != null)
+                        Card(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          child: InkWell(
+                            key: const Key('open-attendance-day'),
+                            onTap: _openDay,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Puantaj günü',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelLarge,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    detail.day.status.label,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${detail.totals.personDayEquivalent.toStringAsFixed(1)} kişi-gün • '
+                                    '${detail.totals.overtimeMinutes} dk fazla mesai',
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'Puantaj gününü aç',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(Icons.chevron_right),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (_teamCounts.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          '${_teamCounts.length} aktif ekip • ${_teamCounts.fold<int>(0, (total, team) => total + team.activePersonCount)} aktif personel',
+                          key: const Key('attendance-team-summary'),
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ],
                   ),
-                  onPressed: _loading ? null : _pickDate,
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  label: Text(_localDate),
                 ),
-              ),
-              const SizedBox(width: 6),
-              IconButton.outlined(
-                key: const Key('attendance-next-day'),
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                tooltip: 'Sonraki gün',
-                onPressed: _loading ? null : () => _shiftDay(1),
-                icon: const Icon(Icons.chevron_right),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          OutlinedButton(
-            key: const Key('attendance-today'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
+        ),
+        ScreenToolRail(
+          actions: [
+            ScreenToolAction(
+              key: const Key('manage-workforce'),
+              label: 'Personel',
+              icon: Icons.groups_outlined,
+              onPressed: _project == null ? null : _openWorkforce,
             ),
-            onPressed: _loading ? null : _today,
-            child: const Text('Bugün'),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            key: const Key('manage-workforce'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
+            ScreenToolAction(
+              key: const Key('attendance-reminder-settings'),
+              label: 'Hatırlatıcı',
+              icon: Icons.notifications_active_outlined,
+              onPressed: _project == null ? null : _openSettings,
             ),
-            onPressed: _openWorkforce,
-            icon: const Icon(Icons.groups_outlined),
-            label: const Text('Taşeronlar ve ekipler'),
-          ),
-          if (_teamCounts.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Aktif ekipler',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            for (final team in _teamCounts)
-              Card(
-                key: Key('active-team-${team.teamId}'),
-                child: ListTile(
-                  dense: true,
-                  title: Text(
-                    '${team.teamName} — ${team.activePersonCount} kişi',
-                  ),
-                  subtitle: Text(team.subcontractorName),
-                ),
-              ),
           ],
-          const SizedBox(height: 6),
-          OutlinedButton.icon(
-            key: const Key('attendance-reminder-settings'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-            ),
-            onPressed: _openSettings,
-            icon: const Icon(Icons.notifications_active_outlined),
-            label: const Text('Puantaj hatırlatıcısı'),
-          ),
-        ],
-        if (_error != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              _error!,
-              key: const Key('attendance-page-error'),
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ),
-        if (_loading)
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else if (detail != null)
-          Card(
-            child: InkWell(
-              key: const Key('open-attendance-day'),
-              onTap: _openDay,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      detail.day.status.label,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${detail.totals.personDayEquivalent.toStringAsFixed(1)} kişi-gün • '
-                      '${detail.totals.overtimeMinutes} dk fazla mesai',
-                    ),
-                    const SizedBox(height: 8),
-                    const Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Puantaj gününü aç',
-                            textAlign: TextAlign.end,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Icon(Icons.chevron_right),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+        ),
       ],
     );
   }
