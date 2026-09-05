@@ -594,15 +594,44 @@ class _AgendaPageState extends State<AgendaPage> {
       key: const Key('agenda-calendar'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<bool>(
-          key: const Key('agenda-calendar-mode'),
-          segments: const [
-            ButtonSegment(value: false, label: Text('Hafta')),
-            ButtonSegment(value: true, label: Text('Ay')),
-          ],
-          selected: {_calendarMonth},
-          onSelectionChanged: (values) =>
-              setState(() => _calendarMonth = values.single),
+        SingleChildScrollView(
+          key: const Key('agenda-calendar-mode-scroll'),
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<bool>(
+            key: const Key('agenda-calendar-mode'),
+            segments: [
+              ButtonSegment(
+                value: true,
+                label: Semantics(
+                  key: Key('agenda-calendar-mode-month'),
+                  label: 'Aylık',
+                  excludeSemantics: true,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [Text('Ay'), Text('lık')],
+                  ),
+                ),
+              ),
+              ButtonSegment(
+                value: false,
+                label: Semantics(
+                  key: Key('agenda-calendar-mode-week'),
+                  label: 'Haftalık',
+                  excludeSemantics: true,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [Text('Hafta'), Text('lık')],
+                  ),
+                ),
+              ),
+            ],
+            selected: {_calendarMonth},
+            style: const ButtonStyle(
+              minimumSize: WidgetStatePropertyAll(Size(0, 48)),
+            ),
+            onSelectionChanged: (values) =>
+                setState(() => _calendarMonth = values.single),
+          ),
         ),
         const SizedBox(height: 8),
         Wrap(
