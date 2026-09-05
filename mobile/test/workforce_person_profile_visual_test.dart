@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
@@ -42,7 +43,7 @@ void main() {
           'Demir donatı ve kalıp ustası',
           '2026-07-01',
           'Gece ekibinde çalışır. Uzun personel notu eksiksiz okunabilir.',
-          'İSG EKSİĞİ VAR',
+          'Eksik olarak işaretlenmiş kayıt var',
         ]) {
           final field = find.descendant(
             of: profile,
@@ -129,19 +130,20 @@ void main() {
     }
   }
 
-  testWidgets('empty optional values and complete ISG have safe wording', (
+  testWidgets('empty optional values and unrecorded ISG have safe wording', (
     tester,
   ) async {
-    final attendance = _Attendance(empty: true, missing: false);
+    final attendance = _Attendance(empty: true);
     await _pump(tester, attendance);
     final profile = find.byKey(const Key('workforce-person-profile'));
     expect(
       find.descendant(of: profile, matching: find.text('Belirtilmedi')),
       findsNWidgets(3),
     );
-    expect(find.text('İSG TAM'), findsOneWidget);
+    expect(find.text('İSG TAM'), findsNothing);
     expect(find.text('İSG EKSİĞİ VAR'), findsNothing);
-    expect(find.byKey(const Key('profile-open-compliance')), findsNothing);
+    expect(find.text('Kayıt yok / değerlendirilmedi'), findsOneWidget);
+    expect(find.byKey(const Key('profile-open-compliance')), findsOneWidget);
     expect(find.byKey(const Key('workforce-attendance-summary')), findsNothing);
     expect(find.text('Belirtilmedi'), findsNWidgets(4));
     await _tab(tester, 'Puantaj');
@@ -172,6 +174,310 @@ void main() {
     expect(attendance.calls, ['read:person-1']);
   });
 
+  testWidgets('compliance empty categories open without writing records', (
+    tester,
+  ) async {
+    final attendance = _Attendance(empty: true);
+    await _pump(tester, attendance, size: const Size(320, 360), scale: 2);
+    final jump = find.byKey(const Key('profile-open-compliance'));
+    await tester.ensureVisible(jump);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(jump).height, greaterThanOrEqualTo(48));
+    await tester.tap(jump);
+    await tester.pumpAndSettle();
+    for (final type in ComplianceDocumentType.values) {
+      final title = find.text(type.label);
+      await _revealCompliance(tester, title);
+      final category = find.byKey(
+        PageStorageKey('compliance-category-${type.storageValue}'),
+      );
+      expect(
+        find.descendant(
+          of: category,
+          matching: find.text('Kayıt yok / değerlendirilmedi'),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(title);
+      await tester.pumpAndSettle();
+      await _revealCompliance(tester, title);
+      await tester.tap(title);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+    expect(attendance.calls, ['read:person-1']);
+    expect(attendance.store.compliance, isEmpty);
+    expect(attendance.complianceCommands, isEmpty);
+    expect(attendance.archiveCommand, isNull);
+  });
+
+  for (final scenario in [
+    (
+      ComplianceSourceStatus.missing,
+      ComplianceReadStatus.missing,
+      null,
+      'Eksik olarak işaretlenmiş kayıt var',
+      'Eksik olarak işaretlendi',
+    ),
+    (
+      ComplianceSourceStatus.valid,
+      ComplianceReadStatus.expired,
+      '2026-08-31',
+      'Süresi geçmiş kayıt var',
+      'Süresi geçmiş',
+    ),
+    (
+      ComplianceSourceStatus.valid,
+      ComplianceReadStatus.expiring,
+      '2026-09-30',
+      'Süresi yaklaşan kayıt var',
+      'Süresi yaklaşıyor',
+    ),
+    (
+      ComplianceSourceStatus.valid,
+      ComplianceReadStatus.valid,
+      null,
+      'Son geçerlilik tarihi girilmemiş kayıt var',
+      'Son geçerlilik tarihi girilmemiş',
+    ),
+    (
+      ComplianceSourceStatus.notApplicable,
+      ComplianceReadStatus.exception,
+      null,
+      'Uygulanamaz olarak işaretlenmiş kayıt: 1',
+      'Uygulanamaz olarak işaretlendi',
+    ),
+    (
+      ComplianceSourceStatus.exception,
+      ComplianceReadStatus.exception,
+      null,
+      'İstisna olarak işaretlenmiş kayıt: 1',
+      'İstisna olarak işaretlendi',
+    ),
+  ]) {
+    testWidgets(
+      'compliance single-record profile and category signal ${scenario.$4}',
+      (tester) async {
+        final attendance = _Attendance(
+          compliance: [
+            _complianceRecord(
+              'single',
+              source: scenario.$1,
+              read: scenario.$2,
+              expiry: scenario.$3,
+            ),
+          ],
+        );
+        await _pump(tester, attendance);
+        expect(find.text(scenario.$4), findsOneWidget);
+        expect(find.text('Mevcut kayıtlarda uyarı yok'), findsNothing);
+        await _tab(tester, 'İSG');
+        await _revealCompliance(tester, find.text(scenario.$5));
+        expect(find.text(scenario.$5).hitTestable(), findsOneWidget);
+        if (scenario.$1 == ComplianceSourceStatus.valid) {
+          await _revealCompliance(
+            tester,
+            find.text('Kullanıcı kaydı: geçerli olarak işaretlendi'),
+          );
+          expect(find.text('Geçerli'), findsNothing);
+        }
+        await _revealCompliance(
+          tester,
+          find.text('Gerekçe: Kullanıcının gerekçesi single'),
+        );
+        expect(attendance.calls, ['read:person-1']);
+      },
+    );
+  }
+
+  for (final size in [const Size(320, 640), const Size(390, 500)]) {
+    testWidgets(
+      'compliance signals metadata and accessible controls at $size text 2',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final records = [
+            _complianceRecord(
+              'expired',
+              read: ComplianceReadStatus.expired,
+              expiry: '2026-08-31',
+            ),
+            _complianceRecord('valid', expiry: '2027-12-31'),
+            _complianceRecord(
+              'missing',
+              type: ComplianceDocumentType.healthReport,
+              source: ComplianceSourceStatus.missing,
+              read: ComplianceReadStatus.missing,
+            ),
+            _complianceRecord(
+              'na',
+              type: ComplianceDocumentType.basicSafetyTraining,
+              source: ComplianceSourceStatus.notApplicable,
+              read: ComplianceReadStatus.exception,
+            ),
+            _complianceRecord(
+              'exception',
+              type: ComplianceDocumentType.vocationalCertificate,
+              source: ComplianceSourceStatus.exception,
+              read: ComplianceReadStatus.exception,
+            ),
+            _complianceRecord('undated', type: ComplianceDocumentType.other),
+          ];
+          final attendance = _Attendance(compliance: records);
+          await _pump(tester, attendance, size: size, scale: 2);
+          for (final signal in [
+            'Eksik olarak işaretlenmiş kayıt var',
+            'Süresi geçmiş kayıt var',
+            'Uygulanamaz olarak işaretlenmiş kayıt: 1',
+            'İstisna olarak işaretlenmiş kayıt: 1',
+            'Aynı türde birden fazla aktif kayıt var',
+            'Son geçerlilik tarihi girilmemiş kayıt var',
+          ]) {
+            final field = find.text(signal);
+            await tester.ensureVisible(field);
+            await tester.pumpAndSettle();
+            expect(field.hitTestable(), findsOneWidget);
+            expect(tester.takeException(), isNull);
+          }
+          expect(find.text('İSG TAM'), findsNothing);
+          expect(find.text('İSG EKSİĞİ VAR'), findsNothing);
+          await _tab(tester, 'İSG');
+          final add = find.byKey(const Key('add-compliance-record'));
+          expect(tester.getSize(add).height, greaterThanOrEqualTo(48));
+          await _revealCompliance(
+            tester,
+            find.text('Bu türde birden fazla aktif kayıt var'),
+          );
+          for (final record in records) {
+            final card = find.byKey(Key('compliance-${record.id}'));
+            await _revealCompliance(tester, card);
+            for (final text in [
+              'Belge numarası: ${record.documentNumber}',
+              'Düzenlenme tarihi: ${record.issuedDate}',
+              record.expiryDate == null
+                  ? 'Son geçerlilik tarihi girilmemiş'
+                  : 'Son geçerlilik tarihi: ${record.expiryDate}',
+              'Not: ${record.note}',
+              'Gerekçe: ${record.reason}',
+            ]) {
+              final field = find.descendant(
+                of: card,
+                matching: find.text(text),
+              );
+              await _revealCompliance(tester, field);
+              expect(field.hitTestable(), findsOneWidget);
+            }
+            for (final action in ['edit', 'archive']) {
+              final control = find.byKey(
+                Key('$action-compliance-${record.id}'),
+              );
+              await _revealCompliance(tester, control);
+              final bounds = tester.getSize(control);
+              expect(bounds.height, greaterThanOrEqualTo(48));
+              expect(bounds.width, greaterThanOrEqualTo(48));
+              final data = tester.getSemantics(control).getSemanticsData();
+              expect(data.flagsCollection.isButton, isTrue);
+              expect(data.hasAction(SemanticsAction.tap), isTrue);
+            }
+          }
+          expect(attendance.calls, ['read:person-1']);
+          expect(attendance.complianceCommands, isEmpty);
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
+
+  testWidgets(
+    'compliance duplicate edit and archive preserve sibling and optional metadata',
+    (tester) async {
+      final selected = _complianceRecord(
+        'selected',
+        expiry: '2027-06-01',
+        revision: 7,
+      );
+      final sibling = _complianceRecord(
+        'sibling',
+        expiry: '2027-07-01',
+        revision: 9,
+      );
+      final attendance = _Attendance(compliance: [selected, sibling]);
+      await _pump(tester, attendance, size: const Size(390, 844), scale: 2);
+      await _tab(tester, 'İSG');
+      final edit = find.byKey(const Key('edit-compliance-selected'));
+      await _revealCompliance(tester, edit);
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+      for (final field in [
+        ('Belge numarası', selected.documentNumber),
+        ('Düzenlenme tarihi (YYYY-AA-GG)', selected.issuedDate),
+        ('Son geçerlilik tarihi (YYYY-AA-GG)', selected.expiryDate),
+        ('Not', selected.note),
+        ('İstisna/uygulanamaz gerekçesi', selected.reason),
+      ]) {
+        expect(
+          tester.widget<TextField>(_field(field.$1)).controller!.text,
+          field.$2,
+        );
+      }
+      expect(find.text('Geçerli (kullanıcı kaydı)'), findsOneWidget);
+      await tester.enterText(_field('Not'), 'Yalnız seçilen kaydın yeni notu');
+      await _saveDialog(tester);
+      final command = attendance.complianceCommands.single;
+      expect(command.id, selected.id);
+      expect(command.memberId, selected.memberId);
+      expect(command.expectedRevision, 7);
+      expect(command.documentType, selected.documentType);
+      expect(command.sourceStatus, selected.sourceStatus);
+      expect(command.documentNumber, selected.documentNumber);
+      expect(command.issuedDate, selected.issuedDate);
+      expect(command.expiryDate, selected.expiryDate);
+      expect(command.reason, selected.reason);
+      expect(command.note, 'Yalnız seçilen kaydın yeni notu');
+      expect(
+        identical(
+          attendance.store.compliance.firstWhere(
+            (item) => item.id == sibling.id,
+          ),
+          sibling,
+        ),
+        isTrue,
+      );
+      final archive = find.byKey(const Key('archive-compliance-selected'));
+      await _revealCompliance(tester, archive);
+      await tester.tap(archive);
+      await tester.pumpAndSettle();
+      expect(attendance.archiveCommand!.id, selected.id);
+      expect(attendance.archiveCommand!.expectedRevision, 8);
+      expect(attendance.archiveCommand!.eventId, isNot(command.eventId));
+      expect(find.byKey(const Key('compliance-selected')), findsNothing);
+      expect(
+        identical(
+          attendance.store.compliance.firstWhere(
+            (item) => item.id == sibling.id,
+          ),
+          sibling,
+        ),
+        isTrue,
+      );
+      await _revealCompliance(
+        tester,
+        find.byKey(const Key('compliance-sibling')),
+      );
+      expect(find.text('Bu türde birden fazla aktif kayıt var'), findsNothing);
+      expect(attendance.calls, [
+        'read:person-1',
+        'save-compliance',
+        'read:person-1',
+        'archive-compliance',
+        'read:person-1',
+      ]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     'compliance create edit archive and PPE assignment keep commands',
     (tester) async {
@@ -189,7 +495,7 @@ void main() {
       expect(created.documentType, ComplianceDocumentType.employmentEntry);
       expect(created.sourceStatus, ComplianceSourceStatus.valid);
       expect(created.eventId, isNotEmpty);
-      await tester.tap(find.byKey(Key('compliance-${created.id}')));
+      await tester.tap(find.byKey(Key('edit-compliance-${created.id}')));
       await tester.pumpAndSettle();
       expect(
         tester.widget<TextField>(_field('Belge numarası')).controller!.text,
@@ -206,7 +512,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: find.byKey(Key('compliance-${created.id}')),
-          matching: find.byTooltip('Arşivle'),
+          matching: find.byKey(Key('archive-compliance-${created.id}')),
         ),
       );
       await tester.pumpAndSettle();
@@ -254,6 +560,51 @@ Finder _field(String label) => find.byWidgetPredicate(
   (widget) => widget is TextField && widget.decoration?.labelText == label,
 );
 
+Future<void> _revealCompliance(WidgetTester tester, Finder finder) async {
+  final scrollable = find
+      .descendant(
+        of: find.byKey(const PageStorageKey('workforce-person-compliance')),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+  if (finder.evaluate().isEmpty) {
+    tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+    await tester.pumpAndSettle();
+  }
+  await tester.scrollUntilVisible(
+    finder,
+    160,
+    maxScrolls: 100,
+    scrollable: scrollable,
+  );
+  await tester.pumpAndSettle();
+  expect(tester.takeException(), isNull);
+}
+
+WorkforceComplianceRecord _complianceRecord(
+  String id, {
+  ComplianceDocumentType type = ComplianceDocumentType.employmentEntry,
+  ComplianceSourceStatus source = ComplianceSourceStatus.valid,
+  ComplianceReadStatus read = ComplianceReadStatus.valid,
+  String? expiry,
+  int revision = 1,
+}) => WorkforceComplianceRecord(
+  id: id,
+  memberId: 'person-1',
+  documentType: type,
+  documentNumber: 'BELGE-$id',
+  issuedDate: '2026-07-01',
+  expiryDate: expiry,
+  sourceStatus: source,
+  readStatus: read,
+  note: 'Kayıt notu $id',
+  reason: 'Kullanıcının gerekçesi $id',
+  revision: revision,
+  createdAt: '2026-07-01T08:00:00Z',
+  updatedAt: '2026-07-01T08:00:00Z',
+  archivedAt: null,
+);
+
 Future<void> _saveDialog(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.widgetWithText(FilledButton, 'Kaydet'));
@@ -299,7 +650,10 @@ Future<void> _pump(
 }
 
 class _Attendance implements AttendanceApplication {
-  _Attendance({this.empty = false, this.missing = true}) {
+  _Attendance({
+    this.empty = false,
+    List<WorkforceComplianceRecord>? compliance,
+  }) {
     store =
         FakeAttendanceApplication(
             members: [
@@ -327,27 +681,29 @@ class _Attendance implements AttendanceApplication {
               ),
             ],
           )
-          ..compliance = [
-            const WorkforceComplianceRecord(
-              id: 'health-1',
-              memberId: 'person-1',
-              documentType: ComplianceDocumentType.healthReport,
-              documentNumber: null,
-              issuedDate: null,
-              expiryDate: null,
-              sourceStatus: ComplianceSourceStatus.missing,
-              readStatus: ComplianceReadStatus.missing,
-              note: null,
-              reason: null,
-              revision: 1,
-              createdAt: '2026-07-01',
-              updatedAt: '2026-07-01',
-              archivedAt: null,
-            ),
-          ];
+          ..compliance =
+              compliance ??
+              [
+                if (!empty)
+                  const WorkforceComplianceRecord(
+                    id: 'health-1',
+                    memberId: 'person-1',
+                    documentType: ComplianceDocumentType.healthReport,
+                    documentNumber: null,
+                    issuedDate: null,
+                    expiryDate: null,
+                    sourceStatus: ComplianceSourceStatus.missing,
+                    readStatus: ComplianceReadStatus.missing,
+                    note: null,
+                    reason: null,
+                    revision: 1,
+                    createdAt: '2026-07-01',
+                    updatedAt: '2026-07-01',
+                    archivedAt: null,
+                  ),
+              ];
   }
   final bool empty;
-  final bool missing;
   late final FakeAttendanceApplication store;
   final calls = <String>[];
   final complianceCommands = <SaveComplianceRecordCommand>[];
@@ -364,10 +720,10 @@ class _Attendance implements AttendanceApplication {
       member: detail.member,
       compliance: detail.compliance,
       ppeAssignments: detail.ppeAssignments,
-      missingComplianceCount: missing ? 1 : 0,
-      validComplianceCount: 2,
-      expiringComplianceCount: 3,
-      expiredComplianceCount: 4,
+      missingComplianceCount: detail.missingComplianceCount,
+      validComplianceCount: detail.validComplianceCount,
+      expiringComplianceCount: detail.expiringComplianceCount,
+      expiredComplianceCount: detail.expiredComplianceCount,
       activePpeCount: detail.activePpeCount,
       attendanceSummary: empty
           ? const WorkforceAttendanceSummary.empty()

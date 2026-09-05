@@ -841,7 +841,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('workforce-person-profile')), findsOneWidget);
-    expect(find.text('İSG TAM'), findsOneWidget);
+    expect(find.text('Kayıt yok / değerlendirilmedi'), findsOneWidget);
+    expect(find.byKey(const Key('profile-open-compliance')), findsOneWidget);
     expect(find.text('İSG eksik 0'), findsNothing);
     expect(tester.widgetList<Tab>(find.byType(Tab)).map((tab) => tab.text), [
       'Profil',
@@ -857,7 +858,7 @@ void main() {
     await tester.ensureVisible(find.widgetWithText(Tab, 'İSG'));
     await tester.tap(find.widgetWithText(Tab, 'İSG'));
     await tester.pumpAndSettle();
-    expect(find.text('İSG belgesi ekle'), findsOneWidget);
+    expect(find.text('İSG kaydı ekle'), findsOneWidget);
     await tester.ensureVisible(find.widgetWithText(Tab, 'KKD'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(Tab, 'KKD'));

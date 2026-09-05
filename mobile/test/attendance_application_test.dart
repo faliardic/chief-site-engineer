@@ -563,6 +563,102 @@ void main() {
   );
 
   test(
+    'compliance date boundaries and source precedence use the existing Istanbul read model',
+    () async {
+      final originalClock = now;
+      addTearDown(() => now = originalClock);
+      now = DateTime.utc(2026, 7, 19, 20, 59, 59);
+      await _createMember(attendance, id: member1, name: 'Ayşe', team: 'A');
+      final cases = [
+        (
+          ComplianceSourceStatus.valid,
+          '2026-07-18',
+          ComplianceReadStatus.expired,
+        ),
+        (
+          ComplianceSourceStatus.valid,
+          '2026-07-19',
+          ComplianceReadStatus.expiring,
+        ),
+        (
+          ComplianceSourceStatus.valid,
+          '2026-08-18',
+          ComplianceReadStatus.expiring,
+        ),
+        (
+          ComplianceSourceStatus.valid,
+          '2026-08-19',
+          ComplianceReadStatus.valid,
+        ),
+        (ComplianceSourceStatus.valid, null, ComplianceReadStatus.valid),
+        (
+          ComplianceSourceStatus.missing,
+          '2026-07-18',
+          ComplianceReadStatus.missing,
+        ),
+        (
+          ComplianceSourceStatus.notApplicable,
+          '2026-07-18',
+          ComplianceReadStatus.exception,
+        ),
+        (
+          ComplianceSourceStatus.exception,
+          '2026-08-19',
+          ComplianceReadStatus.exception,
+        ),
+      ];
+      final saved = <WorkforceComplianceRecord>[];
+      for (var index = 0; index < cases.length; index++) {
+        final value = cases[index];
+        final suffix = (index + 1).toString().padLeft(12, '0');
+        final record = await attendance.saveComplianceRecord(
+          SaveComplianceRecordCommand(
+            id: '44444444-4444-4444-8444-$suffix',
+            eventId: '55555555-5555-4555-8555-$suffix',
+            memberId: member1,
+            expectedRevision: 0,
+            documentType: ComplianceDocumentType.healthReport,
+            sourceStatus: value.$1,
+            expiryDate: value.$2,
+            reason: 'Kullanıcı açıklaması $index',
+          ),
+        );
+        saved.add(record);
+        expect(record.readStatus, value.$3);
+        expect(record.sourceStatus, value.$1);
+        expect(record.expiryDate, value.$2);
+      }
+      final before = await attendance.getPersonDetail(member1);
+      expect(
+        before.compliance.map((item) => item.id),
+        unorderedEquals(saved.map((item) => item.id)),
+      );
+      expect(before.missingComplianceCount, 1);
+      expect(before.expiredComplianceCount, 1);
+      expect(before.expiringComplianceCount, 2);
+      expect(before.validComplianceCount, 2);
+
+      now = DateTime.utc(2026, 7, 19, 21);
+      final after = await attendance.getPersonDetail(member1);
+      final byId = {for (final record in after.compliance) record.id: record};
+      expect(byId[saved[1].id]!.readStatus, ComplianceReadStatus.expired);
+      expect(byId[saved[3].id]!.readStatus, ComplianceReadStatus.expiring);
+      expect(byId[saved[4].id]!.readStatus, ComplianceReadStatus.valid);
+      expect(byId[saved[5].id]!.readStatus, ComplianceReadStatus.missing);
+      expect(
+        byId[saved[6].id]!.sourceStatus,
+        ComplianceSourceStatus.notApplicable,
+      );
+      expect(byId[saved[7].id]!.sourceStatus, ComplianceSourceStatus.exception);
+      for (final record in saved) {
+        expect(byId[record.id]!.revision, record.revision);
+        expect(byId[record.id]!.updatedAt, record.updatedAt);
+        expect(byId[record.id]!.reason, record.reason);
+      }
+    },
+  );
+
+  test(
     'compliance date read-model and PPE lifecycle stay person-linked',
     () async {
       await _createMember(attendance, id: member1, name: 'Ayşe', team: 'A');
