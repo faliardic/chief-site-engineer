@@ -259,6 +259,93 @@ class ProjectEvent {
   final String payloadJson;
 }
 
+enum ProjectProfileBuiltinField {
+  totalFloors('total_floors', 'Toplam kat'),
+  totalArea('total_area', 'Toplam alan'),
+  yibfNumber('yibf_number', 'YİBF No');
+
+  const ProjectProfileBuiltinField(this.storageValue, this.label);
+
+  final String storageValue;
+  final String label;
+
+  static ProjectProfileBuiltinField fromStorage(String value) =>
+      values.firstWhere(
+        (item) => item.storageValue == value,
+        orElse: () => throw const AgendaValidationFailure(
+          'Proje profil alanı desteklenmiyor.',
+        ),
+      );
+}
+
+enum ProjectProfileEventType {
+  fieldCreated('profile.field_created'),
+  fieldUpdated('profile.field_updated'),
+  fieldArchived('profile.field_archived'),
+  fieldRestored('profile.field_restored'),
+  fieldsReordered('profile.fields_reordered');
+
+  const ProjectProfileEventType(this.storageValue);
+
+  final String storageValue;
+}
+
+class ProjectProfileField {
+  const ProjectProfileField({
+    required this.id,
+    required this.projectId,
+    required this.label,
+    required this.value,
+    required this.sortOrder,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    this.builtinField,
+    this.archivedAt,
+  });
+
+  final String id;
+  final String projectId;
+  final ProjectProfileBuiltinField? builtinField;
+  final String label;
+  final String value;
+  final int sortOrder;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+  final String? archivedAt;
+
+  bool get isBuiltIn => builtinField != null;
+  bool get isArchived => archivedAt != null;
+}
+
+class ProjectProfile {
+  const ProjectProfile({required this.project, required this.fields});
+
+  final MobileProject project;
+  final List<ProjectProfileField> fields;
+}
+
+class ProjectProfileEvent {
+  const ProjectProfileEvent({
+    required this.id,
+    required this.projectId,
+    required this.sequence,
+    required this.eventType,
+    required this.occurredAt,
+    required this.payloadJson,
+    this.fieldId,
+  });
+
+  final String id;
+  final String projectId;
+  final String? fieldId;
+  final int sequence;
+  final ProjectProfileEventType eventType;
+  final String occurredAt;
+  final String payloadJson;
+}
+
 class AgendaLog {
   const AgendaLog({
     required this.id,
@@ -721,6 +808,78 @@ class MutateProjectArchiveCommand {
   final String eventId;
   final int expectedRevision;
   final bool archive;
+}
+
+class CreateProjectProfileFieldCommand {
+  const CreateProjectProfileFieldCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.label,
+    required this.value,
+  });
+
+  final String id;
+  final String eventId;
+  final String projectId;
+  final String label;
+  final String value;
+}
+
+class UpdateProjectProfileFieldCommand {
+  const UpdateProjectProfileFieldCommand({
+    required this.fieldId,
+    required this.eventId,
+    required this.projectId,
+    required this.expectedRevision,
+    required this.label,
+    required this.value,
+  });
+
+  final String fieldId;
+  final String eventId;
+  final String projectId;
+  final int expectedRevision;
+  final String label;
+  final String value;
+}
+
+class MutateProjectProfileFieldArchiveCommand {
+  const MutateProjectProfileFieldArchiveCommand({
+    required this.fieldId,
+    required this.eventId,
+    required this.projectId,
+    required this.expectedRevision,
+    required this.archive,
+  });
+
+  final String fieldId;
+  final String eventId;
+  final String projectId;
+  final int expectedRevision;
+  final bool archive;
+}
+
+class ProjectProfileFieldOrder {
+  const ProjectProfileFieldOrder({
+    required this.fieldId,
+    required this.expectedRevision,
+  });
+
+  final String fieldId;
+  final int expectedRevision;
+}
+
+class ReorderProjectProfileFieldsCommand {
+  const ReorderProjectProfileFieldsCommand({
+    required this.eventId,
+    required this.projectId,
+    required this.fields,
+  });
+
+  final String eventId;
+  final String projectId;
+  final List<ProjectProfileFieldOrder> fields;
 }
 
 class CreateAgendaLogCommand {

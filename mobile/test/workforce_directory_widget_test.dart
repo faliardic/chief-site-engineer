@@ -23,7 +23,7 @@ const _member3 = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd3';
 
 void main() {
   testWidgets(
-    'Saha Rehberi opens from Dashboard with the shared project control',
+    'Saha Rehberi opens from Profile tools with the shared project control',
     (tester) async {
       await _setPhoneSize(tester);
       final attendance = FakeAttendanceApplication();
@@ -421,7 +421,13 @@ Future<void> _setPhoneSize(WidgetTester tester) async {
 }
 
 Future<void> _openDashboardTool(WidgetTester tester, Key key) async {
-  final list = find.byKey(const Key('project-dashboard-list'));
+  final tools = find.byKey(const Key('project-profile-tools'));
+  await tester.ensureVisible(tools);
+  await tester.pumpAndSettle();
+  expect(tools.hitTestable(), findsOneWidget);
+  await tester.tap(tools.hitTestable());
+  await tester.pumpAndSettle();
+  final list = find.byKey(const Key('project-profile-tools-sheet'));
   final scrollable = find.descendant(
     of: list,
     matching: find.byType(Scrollable),
@@ -441,7 +447,9 @@ Future<void> _openDashboardTool(WidgetTester tester, Key key) async {
   }
   expect(target, findsOneWidget);
   await tester.ensureVisible(target);
-  await tester.tap(target);
+  await tester.pumpAndSettle();
+  expect(target.hitTestable(), findsOneWidget);
+  await tester.tap(target.hitTestable());
   await tester.pumpAndSettle();
 }
 

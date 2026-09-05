@@ -257,6 +257,28 @@ abstract interface class ProjectLifecycleApplication {
   Future<List<ProjectEvent>> listProjectEvents(String projectId);
 }
 
+abstract interface class ProjectProfileApplication {
+  Future<ProjectProfile> getProjectProfile(String projectId);
+
+  Future<ProjectProfileField> createProjectProfileField(
+    CreateProjectProfileFieldCommand command,
+  );
+
+  Future<ProjectProfileField> updateProjectProfileField(
+    UpdateProjectProfileFieldCommand command,
+  );
+
+  Future<ProjectProfileField> mutateProjectProfileFieldArchive(
+    MutateProjectProfileFieldArchiveCommand command,
+  );
+
+  Future<ProjectProfile> reorderProjectProfileFields(
+    ReorderProjectProfileFieldsCommand command,
+  );
+
+  Future<List<ProjectProfileEvent>> listProjectProfileEvents(String projectId);
+}
+
 abstract interface class ReminderSourceAgendaMediaApplication {
   Future<ReminderSourceAgendaMedia> getReminderSourceAgendaMedia(
     String sourceLogId,
@@ -277,6 +299,8 @@ abstract interface class ReminderDeliveryApplication {
 
 typedef ReminderTransactionHook =
     Future<void> Function(Transaction transaction);
+typedef ProjectProfileTransactionHook =
+    Future<void> Function(Transaction transaction);
 
 class SqliteAgendaApplication
     implements
@@ -286,6 +310,7 @@ class SqliteAgendaApplication
         AgendaPhoneCallCaptureApplication,
         AgendaPhotoExportApplication,
         ProjectLifecycleApplication,
+        ProjectProfileApplication,
         ProjectLocationApplication,
         AttachmentCatalogHost,
         AgendaExistingAttachmentApplication,
@@ -302,6 +327,7 @@ class SqliteAgendaApplication
     AgendaPhotoExportGateway? photoExportGateway,
     this.attachmentCatalog,
     this.beforeReminderEventInsert,
+    this.beforeProjectProfileEventInsert,
   }) : coordinator = coordinator ?? MobileOperationCoordinator(),
        notificationGateway =
            notificationGateway ??
@@ -322,6 +348,7 @@ class SqliteAgendaApplication
   @override
   final AttachmentCatalogApplication? attachmentCatalog;
   final ReminderTransactionHook? beforeReminderEventInsert;
+  final ProjectProfileTransactionHook? beforeProjectProfileEventInsert;
   final StreamController<void> _projectChanges =
       StreamController<void>.broadcast();
   final StreamController<void> _projectLocationChanges =
@@ -571,6 +598,425 @@ class SqliteAgendaApplication
         orderBy: 'sequence ASC, id ASC',
       );
       return rows.map(_projectEventFromRow).toList(growable: false);
+    });
+  }
+
+  @override
+  Future<ProjectProfile> getProjectProfile(String projectId) async {
+    validateUuid(projectId, 'Proje kimliği');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      final project = await _requireProjectRecord(database, projectId);
+      _requireActiveProjectRecord(project);
+      return _readProjectProfile(database, project);
+    });
+  }
+
+  @override
+  Future<ProjectProfileField> createProjectProfileField(
+    CreateProjectProfileFieldCommand command,
+  ) async {
+    validateUuid(command.id, 'Profil alanı kimliği');
+    validateUuid(command.eventId, 'Profil event kimliği');
+    validateUuid(command.projectId, 'Proje kimliği');
+    final label = requiredTrimmed(
+      command.label,
+      'Profil alanı etiketi',
+      maxLength: 120,
+    );
+    final value = _projectProfileValue(command.value);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final field = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final project = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(project);
+        final existing = await transaction.query(
+          'project_profile_fields',
+          columns: ['id'],
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) {
+          throw const AgendaValidationFailure(
+            'Profil alanı kimliği başka bir kayıt tarafından kullanılıyor.',
+          );
+        }
+        final materialized = await _materializeProjectProfileBuiltins(
+          transaction,
+          project,
+          occurredAt: occurredAt,
+        );
+        final sortOrder =
+            Sqflite.firstIntValue(
+              await transaction.rawQuery(
+                '''
+                  SELECT COALESCE(MAX(sort_order), -1) + 1
+                  FROM project_profile_fields
+                  WHERE project_id = ? AND archived_at IS NULL
+                ''',
+                [project.id],
+              ),
+            ) ??
+            0;
+        await transaction.insert('project_profile_fields', {
+          'id': command.id,
+          'project_id': project.id,
+          'field_kind': 'custom',
+          'builtin_key': null,
+          'label': label,
+          'value': value,
+          'sort_order': sortOrder,
+          'revision': 1,
+          'created_at': occurredAt,
+          'updated_at': occurredAt,
+          'archived_at': null,
+        });
+        await beforeProjectProfileEventInsert?.call(transaction);
+        await _insertProjectProfileEvent(
+          transaction,
+          id: command.eventId,
+          projectId: project.id,
+          fieldId: command.id,
+          eventType: ProjectProfileEventType.fieldCreated,
+          occurredAt: occurredAt,
+          payload: {
+            'label': label,
+            'value': value,
+            'sort_order': sortOrder,
+            'materialized_builtins': materialized,
+          },
+        );
+        return _requireProjectProfileField(
+          transaction,
+          projectId: project.id,
+          fieldId: command.id,
+        );
+      });
+    });
+    _projectChanges.add(null);
+    return field;
+  }
+
+  @override
+  Future<ProjectProfileField> updateProjectProfileField(
+    UpdateProjectProfileFieldCommand command,
+  ) async {
+    validateUuid(command.eventId, 'Profil event kimliği');
+    validateUuid(command.projectId, 'Proje kimliği');
+    _validateProjectProfileRevision(command.expectedRevision);
+    final label = requiredTrimmed(
+      command.label,
+      'Profil alanı etiketi',
+      maxLength: 120,
+    );
+    final value = _projectProfileValue(command.value);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final project = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(project);
+        final profile = await _readProjectProfile(transaction, project);
+        final matches = profile.fields.where(
+          (field) => field.id == command.fieldId,
+        );
+        if (matches.length != 1) {
+          throw const AgendaValidationFailure('Profil alanı bulunamadı.');
+        }
+        final current = matches.single;
+        if (current.revision != command.expectedRevision) {
+          throw const AgendaValidationFailure(
+            'Profil alanı başka bir işlem tarafından değiştirilmiş.',
+          );
+        }
+        if (current.isBuiltIn && label != current.label) {
+          throw const AgendaValidationFailure(
+            'Yerleşik profil alanı etiketi değiştirilemez.',
+          );
+        }
+        if (current.label == label && current.value == value) {
+          return (field: current, changed: false);
+        }
+        final materialized = await _materializeProjectProfileBuiltins(
+          transaction,
+          project,
+          occurredAt: occurredAt,
+          valueOverrides: {current.id: value},
+        );
+        ProjectProfileField updated;
+        if (current.revision == 0) {
+          updated = await _requireProjectProfileField(
+            transaction,
+            projectId: project.id,
+            fieldId: current.id,
+          );
+        } else {
+          final changed = await transaction.update(
+            'project_profile_fields',
+            {
+              'label': current.isBuiltIn ? current.label : label,
+              'value': value,
+              'updated_at': occurredAt,
+              'revision': current.revision + 1,
+            },
+            where: 'id = ? AND project_id = ? AND revision = ?',
+            whereArgs: [current.id, project.id, current.revision],
+          );
+          if (changed != 1) {
+            throw const AgendaValidationFailure(
+              'Profil alanı başka bir işlem tarafından değiştirilmiş.',
+            );
+          }
+          updated = await _requireProjectProfileField(
+            transaction,
+            projectId: project.id,
+            fieldId: current.id,
+          );
+        }
+        await beforeProjectProfileEventInsert?.call(transaction);
+        await _insertProjectProfileEvent(
+          transaction,
+          id: command.eventId,
+          projectId: project.id,
+          fieldId: current.id,
+          eventType: ProjectProfileEventType.fieldUpdated,
+          occurredAt: occurredAt,
+          payload: {
+            'old_label': current.label,
+            'new_label': updated.label,
+            'old_value': current.value,
+            'new_value': updated.value,
+            'revision_before': current.revision,
+            'revision_after': updated.revision,
+            'materialized_builtins': materialized,
+          },
+        );
+        return (field: updated, changed: true);
+      });
+    });
+    if (result.changed) _projectChanges.add(null);
+    return result.field;
+  }
+
+  @override
+  Future<ProjectProfileField> mutateProjectProfileFieldArchive(
+    MutateProjectProfileFieldArchiveCommand command,
+  ) async {
+    validateUuid(command.eventId, 'Profil event kimliği');
+    validateUuid(command.projectId, 'Proje kimliği');
+    _validateProjectProfileRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final project = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(project);
+        final current = await _requireProjectProfileField(
+          transaction,
+          projectId: project.id,
+          fieldId: command.fieldId,
+          includeArchived: true,
+        );
+        if (current.isBuiltIn) {
+          throw const AgendaValidationFailure(
+            'Yerleşik profil alanı arşivlenemez.',
+          );
+        }
+        if (current.revision != command.expectedRevision) {
+          throw const AgendaValidationFailure(
+            'Profil alanı başka bir işlem tarafından değiştirilmiş.',
+          );
+        }
+        if (current.isArchived == command.archive) {
+          return (field: current, changed: false);
+        }
+        final values = <String, Object?>{
+          'archived_at': command.archive ? occurredAt : null,
+          'updated_at': occurredAt,
+          'revision': current.revision + 1,
+        };
+        if (!command.archive) {
+          values['sort_order'] =
+              Sqflite.firstIntValue(
+                await transaction.rawQuery(
+                  '''
+                    SELECT COALESCE(MAX(sort_order), -1) + 1
+                    FROM project_profile_fields
+                    WHERE project_id = ? AND archived_at IS NULL
+                  ''',
+                  [project.id],
+                ),
+              ) ??
+              0;
+        }
+        final changed = await transaction.update(
+          'project_profile_fields',
+          values,
+          where: 'id = ? AND project_id = ? AND revision = ?',
+          whereArgs: [current.id, project.id, current.revision],
+        );
+        if (changed != 1) {
+          throw const AgendaValidationFailure(
+            'Profil alanı başka bir işlem tarafından değiştirilmiş.',
+          );
+        }
+        final updated = await _requireProjectProfileField(
+          transaction,
+          projectId: project.id,
+          fieldId: current.id,
+          includeArchived: true,
+        );
+        await beforeProjectProfileEventInsert?.call(transaction);
+        await _insertProjectProfileEvent(
+          transaction,
+          id: command.eventId,
+          projectId: project.id,
+          fieldId: current.id,
+          eventType: command.archive
+              ? ProjectProfileEventType.fieldArchived
+              : ProjectProfileEventType.fieldRestored,
+          occurredAt: occurredAt,
+          payload: {
+            'was_archived': current.isArchived,
+            'is_archived': updated.isArchived,
+            'revision_before': current.revision,
+            'revision_after': updated.revision,
+            'sort_order': updated.sortOrder,
+          },
+        );
+        return (field: updated, changed: true);
+      });
+    });
+    if (result.changed) _projectChanges.add(null);
+    return result.field;
+  }
+
+  @override
+  Future<ProjectProfile> reorderProjectProfileFields(
+    ReorderProjectProfileFieldsCommand command,
+  ) async {
+    validateUuid(command.eventId, 'Profil event kimliği');
+    validateUuid(command.projectId, 'Proje kimliği');
+    final requestedIds = <String>{};
+    for (final field in command.fields) {
+      _validateProjectProfileRevision(field.expectedRevision);
+      if (!requestedIds.add(field.fieldId)) {
+        throw const AgendaValidationFailure(
+          'Profil alanı sırası benzersiz olmalıdır.',
+        );
+      }
+    }
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final project = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(project);
+        final current = await _readProjectProfile(transaction, project);
+        final currentById = {
+          for (final field in current.fields) field.id: field,
+        };
+        if (currentById.length != command.fields.length ||
+            !currentById.keys.toSet().containsAll(requestedIds)) {
+          throw const AgendaValidationFailure(
+            'Profil sırası bütün aktif alanları tam olarak içermelidir.',
+          );
+        }
+        for (final requested in command.fields) {
+          if (currentById[requested.fieldId]!.revision !=
+              requested.expectedRevision) {
+            throw const AgendaValidationFailure(
+              'Profil alanı başka bir işlem tarafından değiştirilmiş.',
+            );
+          }
+        }
+        final oldOrder = current.fields.map((field) => field.id).toList();
+        final newOrder = command.fields.map((field) => field.fieldId).toList();
+        if (_sameStringOrder(oldOrder, newOrder)) {
+          return (profile: current, changed: false);
+        }
+        final requestedOrder = <String, int>{
+          for (var index = 0; index < newOrder.length; index += 1)
+            newOrder[index]: index,
+        };
+        final materialized = await _materializeProjectProfileBuiltins(
+          transaction,
+          project,
+          occurredAt: occurredAt,
+          sortOrderOverrides: requestedOrder,
+        );
+        for (final field in current.fields) {
+          final nextOrder = requestedOrder[field.id]!;
+          if (field.revision == 0 || field.sortOrder == nextOrder) continue;
+          final changed = await transaction.update(
+            'project_profile_fields',
+            {
+              'sort_order': nextOrder,
+              'updated_at': occurredAt,
+              'revision': field.revision + 1,
+            },
+            where: 'id = ? AND project_id = ? AND revision = ?',
+            whereArgs: [field.id, project.id, field.revision],
+          );
+          if (changed != 1) {
+            throw const AgendaValidationFailure(
+              'Profil alanı başka bir işlem tarafından değiştirilmiş.',
+            );
+          }
+        }
+        await beforeProjectProfileEventInsert?.call(transaction);
+        await _insertProjectProfileEvent(
+          transaction,
+          id: command.eventId,
+          projectId: project.id,
+          fieldId: null,
+          eventType: ProjectProfileEventType.fieldsReordered,
+          occurredAt: occurredAt,
+          payload: {
+            'old_order': oldOrder,
+            'new_order': newOrder,
+            'materialized_builtins': materialized,
+          },
+        );
+        return (
+          profile: await _readProjectProfile(transaction, project),
+          changed: true,
+        );
+      });
+    });
+    if (result.changed) _projectChanges.add(null);
+    return result.profile;
+  }
+
+  @override
+  Future<List<ProjectProfileEvent>> listProjectProfileEvents(
+    String projectId,
+  ) async {
+    validateUuid(projectId, 'Proje kimliği');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      await _requireProjectRecord(database, projectId);
+      final rows = await database.query(
+        'project_profile_events',
+        where: 'project_id = ?',
+        whereArgs: [projectId],
+        orderBy: 'sequence ASC, id ASC',
+      );
+      return rows.map(_projectProfileEventFromRow).toList(growable: false);
     });
   }
 
@@ -4755,6 +5201,180 @@ Future<void> _insertProjectEvent(
   });
 }
 
+String _projectProfileValue(String value) {
+  final normalized = value.trim();
+  if (normalized.length > 4000) {
+    throw const AgendaValidationFailure(
+      'Profil alanı değeri en fazla 4000 karakter olabilir.',
+    );
+  }
+  return normalized;
+}
+
+String _projectProfileBuiltinId(
+  String projectId,
+  ProjectProfileBuiltinField field,
+) => 'project-profile:$projectId:${field.storageValue}';
+
+Future<ProjectProfile> _readProjectProfile(
+  DatabaseExecutor database,
+  MobileProject project,
+) async {
+  final rows = await database.query(
+    'project_profile_fields',
+    where: 'project_id = ? AND archived_at IS NULL',
+    whereArgs: [project.id],
+    orderBy: 'sort_order ASC, id ASC',
+  );
+  if (rows.isEmpty) {
+    return ProjectProfile(
+      project: project,
+      fields: List.unmodifiable([
+        for (
+          var index = 0;
+          index < ProjectProfileBuiltinField.values.length;
+          index += 1
+        )
+          ProjectProfileField(
+            id: _projectProfileBuiltinId(
+              project.id,
+              ProjectProfileBuiltinField.values[index],
+            ),
+            projectId: project.id,
+            builtinField: ProjectProfileBuiltinField.values[index],
+            label: ProjectProfileBuiltinField.values[index].label,
+            value: '',
+            sortOrder: index,
+            revision: 0,
+            createdAt: project.createdAt,
+            updatedAt: project.updatedAt,
+          ),
+      ]),
+    );
+  }
+  final fields = rows.map(_projectProfileFieldFromRow).toList(growable: false);
+  final builtinKeys = fields
+      .map((field) => field.builtinField)
+      .whereType<ProjectProfileBuiltinField>()
+      .toSet();
+  if (builtinKeys.length != ProjectProfileBuiltinField.values.length) {
+    throw const AgendaValidationFailure(
+      'Proje profilinin yerleşik alan bütünlüğü bozulmuş.',
+    );
+  }
+  return ProjectProfile(project: project, fields: List.unmodifiable(fields));
+}
+
+Future<bool> _materializeProjectProfileBuiltins(
+  DatabaseExecutor database,
+  MobileProject project, {
+  required String occurredAt,
+  Map<String, String> valueOverrides = const {},
+  Map<String, int> sortOrderOverrides = const {},
+}) async {
+  final rows = await database.query(
+    'project_profile_fields',
+    columns: ['id', 'builtin_key'],
+    where: 'project_id = ? AND field_kind = ?',
+    whereArgs: [project.id, 'builtin'],
+  );
+  if (rows.length == ProjectProfileBuiltinField.values.length) return false;
+  if (rows.isNotEmpty) {
+    throw const AgendaValidationFailure(
+      'Proje profilinin yerleşik alan bütünlüğü bozulmuş.',
+    );
+  }
+  for (
+    var index = 0;
+    index < ProjectProfileBuiltinField.values.length;
+    index += 1
+  ) {
+    final builtin = ProjectProfileBuiltinField.values[index];
+    final id = _projectProfileBuiltinId(project.id, builtin);
+    await database.insert('project_profile_fields', {
+      'id': id,
+      'project_id': project.id,
+      'field_kind': 'builtin',
+      'builtin_key': builtin.storageValue,
+      'label': builtin.label,
+      'value': valueOverrides[id] ?? '',
+      'sort_order': sortOrderOverrides[id] ?? index,
+      'revision': 1,
+      'created_at': occurredAt,
+      'updated_at': occurredAt,
+      'archived_at': null,
+    });
+  }
+  return true;
+}
+
+Future<ProjectProfileField> _requireProjectProfileField(
+  DatabaseExecutor database, {
+  required String projectId,
+  required String fieldId,
+  bool includeArchived = false,
+}) async {
+  final rows = await database.query(
+    'project_profile_fields',
+    where:
+        'id = ? AND project_id = ?${includeArchived ? '' : ' AND archived_at IS NULL'}',
+    whereArgs: [fieldId, projectId],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    throw const AgendaValidationFailure('Profil alanı bulunamadı.');
+  }
+  return _projectProfileFieldFromRow(rows.single);
+}
+
+void _validateProjectProfileRevision(int revision) {
+  if (revision < 0) {
+    throw const AgendaValidationFailure(
+      'Beklenen profil revision değeri geçersizdir.',
+    );
+  }
+}
+
+bool _sameStringOrder(List<String> left, List<String> right) {
+  if (left.length != right.length) return false;
+  for (var index = 0; index < left.length; index += 1) {
+    if (left[index] != right[index]) return false;
+  }
+  return true;
+}
+
+Future<void> _insertProjectProfileEvent(
+  DatabaseExecutor database, {
+  required String id,
+  required String projectId,
+  required String? fieldId,
+  required ProjectProfileEventType eventType,
+  required String occurredAt,
+  required Map<String, Object?> payload,
+}) async {
+  final sequence =
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          '''
+            SELECT COALESCE(MAX(sequence), 0) + 1
+            FROM project_profile_events
+            WHERE project_id = ?
+          ''',
+          [projectId],
+        ),
+      ) ??
+      1;
+  await database.insert('project_profile_events', {
+    'id': id,
+    'project_id': projectId,
+    'field_id': fieldId,
+    'sequence': sequence,
+    'event_type': eventType.storageValue,
+    'occurred_at': occurredAt,
+    'payload_json': jsonEncode(payload),
+  });
+}
+
 Future<void> _requireActiveProject(
   DatabaseExecutor database,
   String projectId,
@@ -5121,6 +5741,107 @@ MobileProject _projectFromRow(Map<String, Object?> row) {
     updatedAt: updatedAt,
     revision: revision,
     archivedAt: archivedAt,
+  );
+}
+
+ProjectProfileField _projectProfileFieldFromRow(Map<String, Object?> row) {
+  final id = row['id']! as String;
+  final projectId = row['project_id']! as String;
+  final createdAt = row['created_at']! as String;
+  final updatedAt = row['updated_at']! as String;
+  final archivedAt = row['archived_at'] as String?;
+  final revision = row['revision']! as int;
+  final sortOrder = row['sort_order']! as int;
+  validateUuid(projectId, 'Proje kimliği');
+  validateCanonicalTimestamp(createdAt, 'Profil alanı oluşturma zamanı');
+  validateCanonicalTimestamp(updatedAt, 'Profil alanı güncelleme zamanı');
+  if (archivedAt != null) {
+    validateCanonicalTimestamp(archivedAt, 'Profil alanı arşivleme zamanı');
+  }
+  if (revision < 1 || sortOrder < 0) {
+    throw const AgendaValidationFailure(
+      'Profil alanı revision veya sıra değeri geçersizdir.',
+    );
+  }
+
+  final kind = row['field_kind']! as String;
+  final builtinKey = row['builtin_key'] as String?;
+  ProjectProfileBuiltinField? builtinField;
+  if (kind == 'builtin') {
+    if (builtinKey == null) {
+      throw const AgendaValidationFailure(
+        'Yerleşik profil alanı anahtarı eksiktir.',
+      );
+    }
+    builtinField = ProjectProfileBuiltinField.fromStorage(builtinKey);
+    if (id != _projectProfileBuiltinId(projectId, builtinField) ||
+        row['label'] != builtinField.label ||
+        archivedAt != null) {
+      throw const AgendaValidationFailure(
+        'Yerleşik profil alanı kimliği veya etiketi geçersizdir.',
+      );
+    }
+  } else if (kind == 'custom') {
+    validateUuid(id, 'Profil alanı kimliği');
+    if (builtinKey != null) {
+      throw const AgendaValidationFailure(
+        'Özel profil alanında yerleşik alan anahtarı bulunamaz.',
+      );
+    }
+  } else {
+    throw const AgendaValidationFailure('Profil alanı türü desteklenmiyor.');
+  }
+
+  return ProjectProfileField(
+    id: id,
+    projectId: projectId,
+    builtinField: builtinField,
+    label: requiredTrimmed(
+      row['label']! as String,
+      'Profil alanı etiketi',
+      maxLength: 120,
+    ),
+    value: _projectProfileValue(row['value']! as String),
+    sortOrder: sortOrder,
+    revision: revision,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    archivedAt: archivedAt,
+  );
+}
+
+ProjectProfileEvent _projectProfileEventFromRow(Map<String, Object?> row) {
+  final id = row['id']! as String;
+  final projectId = row['project_id']! as String;
+  final fieldId = row['field_id'] as String?;
+  final occurredAt = row['occurred_at']! as String;
+  final sequence = row['sequence']! as int;
+  validateUuid(id, 'Profil event kimliği');
+  validateUuid(projectId, 'Proje kimliği');
+  validateCanonicalTimestamp(occurredAt, 'Profil event zamanı');
+  if (sequence < 1) {
+    throw const AgendaValidationFailure('Profil event sırası geçersizdir.');
+  }
+  final storageType = row['event_type']! as String;
+  final matches = ProjectProfileEventType.values.where(
+    (item) => item.storageValue == storageType,
+  );
+  if (matches.isEmpty) {
+    throw const AgendaValidationFailure('Profil event türü desteklenmiyor.');
+  }
+  final payloadJson = row['payload_json']! as String;
+  final payload = jsonDecode(payloadJson);
+  if (payload is! Map<String, dynamic>) {
+    throw const AgendaValidationFailure('Profil event payload geçersizdir.');
+  }
+  return ProjectProfileEvent(
+    id: id,
+    projectId: projectId,
+    fieldId: fieldId,
+    sequence: sequence,
+    eventType: matches.single,
+    occurredAt: occurredAt,
+    payloadJson: payloadJson,
   );
 }
 

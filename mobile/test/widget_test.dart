@@ -462,7 +462,7 @@ void main() {
         EnginePhase.sendSemanticsUpdate,
         const Duration(seconds: 5),
       );
-      expect(find.byKey(const Key('dashboard-project-header')), findsOneWidget);
+      expect(find.byKey(const Key('project-profile-header')), findsOneWidget);
       expect(
         tester
             .widget<ProjectDashboardPage>(find.byType(ProjectDashboardPage))
@@ -609,10 +609,7 @@ void main() {
         expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
         _selectPrimaryDestination(tester, 0);
         await settle('Dashboard after first project');
-        expect(
-          find.byKey(const Key('dashboard-project-header')),
-          findsOneWidget,
-        );
+        expect(find.byKey(const Key('project-profile-header')), findsOneWidget);
         expect(
           tester
               .widget<ProjectDashboardPage>(find.byType(ProjectDashboardPage))
@@ -656,34 +653,30 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('dashboard-project-header')), findsOneWidget);
+    expect(find.byKey(const Key('project-profile-header')), findsOneWidget);
     expect(find.byKey(const Key('home-field-tip-card')), findsNothing);
 
+    expect(find.byKey(const Key('dashboard-quick-reminder')), findsNothing);
+    await tester.tap(find.byKey(const Key('project-profile-tools')));
+    await tester.pumpAndSettle();
     final reminderAction = find.byKey(const Key('dashboard-quick-reminder'));
     final agendaAction = find.byKey(const Key('dashboard-quick-agenda'));
-    expect(tester.widget<IconButton>(reminderAction).tooltip, 'Unutma ekle');
-    expect(
-      tester.widget<IconButton>(agendaAction).tooltip,
-      'Ajanda kaydı ekle',
-    );
     expect(
       find.descendant(
         of: reminderAction,
-        matching: find.byIcon(Icons.add_alert_outlined),
+        matching: find.byIcon(Icons.notifications_active_outlined),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: agendaAction,
-        matching: find.byIcon(Icons.note_add_outlined),
+        matching: find.byIcon(Icons.edit_note_outlined),
       ),
       findsOneWidget,
     );
-    expect(find.text('+ Unutma'), findsNothing);
-    expect(find.text('+ Ajanda kaydı'), findsNothing);
-    expect(find.bySemanticsLabel('Unutma ekle'), findsOneWidget);
-    expect(find.bySemanticsLabel('Ajanda kaydı ekle'), findsOneWidget);
+    expect(find.text('Hatırlatıcı ekle'), findsOneWidget);
+    expect(find.text('Ajanda kaydı ekle'), findsOneWidget);
 
     await tester.tap(reminderAction);
     await tester.pumpAndSettle();
@@ -695,6 +688,8 @@ void main() {
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byKey(const Key('project-profile-tools')));
+    await tester.pumpAndSettle();
     await tester.tap(agendaAction);
     await tester.pumpAndSettle();
     final logProject = tester.widget<DropdownButtonFormField<String>>(
@@ -859,9 +854,9 @@ void main() {
         find.byType(ProjectDashboardPage),
       );
       expect(dashboard.session.selectedProjectId, first.id);
-      expect(find.text('Yeni proje'), findsOneWidget);
+      expect(find.byKey(const Key('project-profile-tools')), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('dashboard-create-project')));
+      await tester.tap(find.byKey(const Key('project-profile-create-project')));
       await tester.pumpAndSettle();
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
@@ -872,7 +867,7 @@ void main() {
       expect(dashboard.session.selectedProjectId, first.id);
       expect(agenda.projects, const [first]);
 
-      await tester.tap(find.byKey(const Key('dashboard-create-project')));
+      await tester.tap(find.byKey(const Key('project-profile-create-project')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('project-name')),
@@ -923,7 +918,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('dashboard-create-project')));
+    await tester.tap(find.byKey(const Key('project-profile-create-project')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('project-name')),
