@@ -76,6 +76,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   int _projectGeneration = 0;
   int _profileGeneration = 0;
   bool _mutating = false;
+  EdgeDraggingAutoScroller? _fieldAutoScroller;
 
   ProjectProfileApplication? get _profileApplication =>
       widget.agenda is ProjectProfileApplication
@@ -99,6 +100,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
 
   @override
   void dispose() {
+    _fieldAutoScroller?.stopAutoScroll();
     _projectSubscription?.cancel();
     widget.session.removeListener(_handleActiveProjectChanged);
     super.dispose();
@@ -298,6 +300,16 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           ],
         ),
         actions: [
+          if (!field.isBuiltIn)
+            TextButton.icon(
+              key: ValueKey('project-profile-archive-${field.id}'),
+              onPressed: () {
+                Navigator.pop(context);
+                unawaited(_archiveField(field));
+              },
+              icon: const Icon(Icons.archive_outlined),
+              label: const Text('Arşivle'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Vazgeç'),
@@ -673,27 +685,60 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
       children: [
         Card(
           key: const Key('project-profile-header'),
-          child: InkWell(
-            onTap: _mutating || _projectLifecycle == null
-                ? null
-                : () => unawaited(_editProjectName(project)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Proje Profili',
-                    style: Theme.of(context).textTheme.labelLarge,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: _mutating || _projectLifecycle == null
+                        ? null
+                        : () => unawaited(_editProjectName(project)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Proje Profili',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            project.name,
+                            key: const Key('project-profile-name'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    project.name,
-                    key: const Key('project-profile-name'),
-                    style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                IconButton(
+                  key: const Key('project-profile-create-project'),
+                  tooltip: 'Yeni Proje',
+                  constraints: const BoxConstraints(
+                    minWidth: 48,
+                    minHeight: 48,
                   ),
-                ],
-              ),
+                  onPressed: widget.onCreateProject,
+                  icon: const Icon(Icons.add_business_rounded),
+                ),
+                IconButton(
+                  key: const Key('project-profile-tools'),
+                  tooltip: 'Araçlar',
+                  constraints: const BoxConstraints(
+                    minWidth: 48,
+                    minHeight: 48,
+                  ),
+                  onPressed: () => _openTools(project),
+                  icon: const Icon(Icons.widgets_outlined),
+                ),
+              ],
             ),
           ),
         ),
@@ -718,72 +763,177 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
             onAction: () => _loadProfile(project.id),
           )
         else if (profile != null && profile.project.id == project.id) ...[
-          ReorderableListView.builder(
-            key: const Key('project-profile-fields'),
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            buildDefaultDragHandles: false,
-            itemCount: profile.fields.length,
-            onReorderItem: _reorderFields,
-            itemBuilder: (context, index) {
-              final field = profile.fields[index];
-              return Card(
-                key: ValueKey('project-profile-field-${field.id}'),
-                child: ListTile(
-                  onTap: _mutating ? null : () => _editField(field),
-                  title: Text(field.label),
-                  subtitle: Text(
-                    field.value.isEmpty ? 'Henüz girilmedi' : field.value,
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (!field.isBuiltIn)
-                        IconButton(
-                          key: ValueKey('project-profile-archive-${field.id}'),
-                          tooltip: 'Alanı arşivle',
-                          onPressed: _mutating
-                              ? null
-                              : () => _archiveField(field),
-                          icon: const Icon(Icons.archive_outlined),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = (constraints.maxWidth - 16) / 3;
+              final height = 64 + MediaQuery.textScalerOf(context).scale(52);
+              return Wrap(
+                key: const Key('project-profile-fields'),
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (var index = 0; index < profile.fields.length; index++)
+                    SizedBox(
+                      key: ValueKey(
+                        'project-profile-field-${profile.fields[index].id}',
+                      ),
+                      width: width,
+                      height: height,
+                      child: _buildFieldCell(
+                        context,
+                        profile,
+                        index,
+                        width,
+                        height,
+                      ),
+                    ),
+                  SizedBox(
+                    width: width,
+                    height: height,
+                    child: Tooltip(
+                      message: 'Özel alan ekle',
+                      child: OutlinedButton(
+                        key: const Key('project-profile-add-field'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.all(8),
                         ),
-                      ReorderableDragStartListener(
-                        key: ValueKey('project-profile-drag-${field.id}'),
-                        index: index,
-                        enabled: !_mutating,
-                        child: const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: Icon(Icons.drag_handle_rounded),
+                        onPressed: _mutating ? null : () => _addField(project),
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_rounded),
+                            SizedBox(height: 4),
+                            Text(
+                              'Özel alan ekle',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               );
             },
           ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: const Key('project-profile-add-field'),
-              onPressed: _mutating ? null : () => _addField(project),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Özel alan ekle'),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildFieldCell(
+    BuildContext context,
+    ProjectProfile profile,
+    int index,
+    double width,
+    double height,
+  ) {
+    final field = profile.fields[index];
+    return DragTarget<ProjectProfileField>(
+      onWillAcceptWithDetails: (details) =>
+          !_mutating &&
+          details.data.projectId == profile.project.id &&
+          details.data.id != field.id &&
+          profile.fields.any(
+            (item) =>
+                item.id == details.data.id &&
+                item.revision == details.data.revision,
+          ),
+      onAcceptWithDetails: (details) {
+        if (!identical(_profile, profile) ||
+            widget.session.selectedProjectId != profile.project.id) {
+          return;
+        }
+        final oldIndex = profile.fields.indexWhere(
+          (item) => item.id == details.data.id,
+        );
+        if (oldIndex >= 0) unawaited(_reorderFields(oldIndex, index));
+      },
+      builder: (context, candidates, rejected) => Card(
+        margin: EdgeInsets.zero,
+        color: candidates.isEmpty
+            ? null
+            : Theme.of(context).colorScheme.secondaryContainer,
+        child: InkWell(
+          onTap: _mutating ? null : () => _editField(field),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  field.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: Text(
+                    field.value.isEmpty ? 'Henüz girilmedi' : field.value,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Draggable<ProjectProfileField>(
+                      key: ValueKey('project-profile-drag-${field.id}'),
+                      data: field,
+                      maxSimultaneousDrags: _mutating ? 0 : 1,
+                      onDragStarted: () {
+                        _fieldAutoScroller?.stopAutoScroll();
+                        _fieldAutoScroller = EdgeDraggingAutoScroller(
+                          Scrollable.of(context),
+                          velocityScalar: 30,
+                        );
+                      },
+                      onDragUpdate: (details) {
+                        _fieldAutoScroller!.startAutoScrollIfNecessary(
+                          Rect.fromCenter(
+                            center: details.globalPosition,
+                            width: 40,
+                            height: 40,
+                          ),
+                        );
+                      },
+                      onDragEnd: (_) => _fieldAutoScroller?.stopAutoScroll(),
+                      feedback: Material(
+                        elevation: 6,
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: width,
+                          height: height,
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              field.label,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                      child: const Tooltip(
+                        message: 'Sıralamak için sürükleyin',
+                        child: SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Icon(Icons.drag_handle_rounded, size: 20),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ],
-        const SizedBox(height: 8),
-        Card(
-          child: ListTile(
-            key: const Key('project-profile-tools'),
-            leading: const Icon(Icons.widgets_outlined),
-            title: const Text('Araçlar'),
-            subtitle: const Text('Saha akışları ve güvenli yardımcı işlemler'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => _openTools(project),
-          ),
         ),
-      ],
+      ),
     );
   }
 }

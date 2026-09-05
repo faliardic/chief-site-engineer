@@ -856,9 +856,7 @@ void main() {
       expect(dashboard.session.selectedProjectId, first.id);
       expect(find.byKey(const Key('project-profile-tools')), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('project-profile-tools')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('dashboard-create-project')));
+      await tester.tap(find.byKey(const Key('project-profile-create-project')));
       await tester.pumpAndSettle();
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
@@ -869,9 +867,7 @@ void main() {
       expect(dashboard.session.selectedProjectId, first.id);
       expect(agenda.projects, const [first]);
 
-      await tester.tap(find.byKey(const Key('project-profile-tools')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('dashboard-create-project')));
+      await tester.tap(find.byKey(const Key('project-profile-create-project')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('project-name')),
@@ -922,9 +918,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('project-profile-tools')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('dashboard-create-project')));
+    await tester.tap(find.byKey(const Key('project-profile-create-project')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('project-name')),

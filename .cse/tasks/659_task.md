@@ -129,3 +129,26 @@ Validate focused Home + existing project lifecycle regressions, then material
 analyzer, then a single full mobile suite run because production source changes.
 Require touched format, authorized-path/protected drift, diff whitespace and PR
 mergeability PASS before a normal commit/push to the same Draft PR #661.
+
+
+## Owner Home UI refinement — 2026-09-05
+
+Authority: https://github.com/faliardic/chief-site-engineer/issues/659#issuecomment-5549793588
+and the current owner handoff; execution time budget 45 minutes.
+Resume clean head `097ecff561871d2365847145d47f233976e72224`, preserving the branch.
+Current GitHub master remains `450febd1e55277dbce4c3cacc877c2ffa4f0d69c`;
+its AGENTS.md was read remotely before edits.
+
+Place icon-first New Project then Tools at the right of the profile header,
+with tooltips and 48-pixel tap targets. Remove the bottom Tools card. Render
+three compact columns, unlimited downward custom rows and an in-grid add action.
+Preserve canonical name edit, all existing mutations/order/isolation, schema 23,
+backup format 1 and the global active-project selector. Archive stays available
+in the custom field edit dialog so narrow cells retain usable tap targets.
+
+Only Home source, Home widget tests, shell widget tests and existing task/result
+records may change. Validate affected Home/shell/context tests, touched-file
+analyzer, formatting, aggregate authorized paths, protected drift and diff check.
+The latest owner authority requests materially affected validation only: reuse
+unchanged schema/backup/lifecycle evidence; no full-suite or APK/device rerun.
+Keep PR #661 Draft and manual Acceptance PENDING; no Ready/merge.

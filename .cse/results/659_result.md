@@ -124,3 +124,37 @@ compatibility files; all six are byte-unchanged in this rename correction:
   in source but reviewer acceptance is not asserted by this execution.
 - Manual Acceptance: **PENDING**. Keep Draft; no Ready/merge or Issue closure.
 - No APK/device execution, MAIN/debug mutation or real-user-data access.
+
+
+## Owner Home UI refinement result — 2026-09-05
+
+Applied the header placement and three-column grid from the latest owner UI
+comment (authority and exact boundary recorded in the task). New Project uses
+the existing callback, Tools uses the unchanged sheet, and the bottom Tools
+card is removed. Name and value previews ellipsize; custom fields extend down
+without a count cap. Custom archive is reached through its edit dialog.
+Grid drag/drop invokes the unchanged revisioned reorder command; drag targets
+reject another project's field, and screen-edge auto-scroll supports later rows.
+
+Validation on the final source:
+- Focused Home + shell + global active-project + bidirectional context widget
+  files together: **46 PASS / 0 FAIL** (11 seconds test execution).
+- New coverage: 320/390 px at 2x text, action order/48 px targets/tooltips,
+  long values, 25 custom fields plus another added field, isolation on switching,
+  real pointer reorder across rows, automatic edge scrolling and order on reload.
+- Existing create cancel/failure/retry assertions now exercise the direct header
+  entry; all existing rename, session, mutation and route assertions remain.
+- Touched Dart analyzer: **PASS**, no issues. Format: **PASS**.
+- During development, the new edge-scroll test initially sent only the movement
+  that starts a drag; adding the subsequent pointer movement fixed the test.
+  A lint was also fixed before the final combined PASS run; neither assertion
+  weakening nor persistence edits were needed.
+- Full mobile suite was not repeated for this presentation correction under the
+  latest owner materially-affected-validation authority. The earlier 1086 PASS
+  run belongs to head 097ecff and is not claimed as a fresh full-suite result.
+- Correction scope: 5 existing authorized paths; aggregate PR scope: 21/21.
+  All other tracked files, including app.dart, schema, application/domain,
+  backup and the six compatibility files, remain unchanged from resume head.
+- Manual Acceptance and independent review of this refinement: **PENDING**.
+  Same PR #661 remains Draft; no Ready/merge, APK/device or real-data operation.
+  The previously delivered 097ecff APK does not contain this refinement.

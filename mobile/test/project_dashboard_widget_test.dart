@@ -60,6 +60,108 @@ void main() {
     expect(find.byKey(const Key('dashboard-attachment-catalog')), findsNothing);
   });
 
+  for (final width in [320.0, 390.0]) {
+    testWidgets('three-column grid and header actions fit $width phone', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final project = _project(
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'Çok uzun proje adı ' * 8,
+      );
+      final other = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Güney');
+      final fixture = _Fixture(projects: [project, other]);
+      addTearDown(fixture.dispose);
+      final defaults = _profile(project, value: 'Uzun değer ' * 100).fields;
+      fixture.agenda.projectProfileFields[project.id] = [
+        ...defaults,
+        for (var i = 0; i < 25; i++)
+          ProjectProfileField(
+            id: 'custom-$i',
+            projectId: project.id,
+            label: 'Uzun özel alan $i',
+            value: 'Özel değer $i ' * 50,
+            sortOrder: i + 3,
+            revision: 1,
+            createdAt: project.createdAt,
+            updatedAt: project.updatedAt,
+          ),
+      ];
+      fixture.session.select(project.id, fixture.agenda.projects);
+      var creates = 0;
+      await tester.pumpWidget(
+        fixture.app(onCreateProject: () => creates++, textScale: 2),
+      );
+      await tester.pumpAndSettle();
+      final header = find.byKey(const Key('project-profile-header'));
+      final create = find.byKey(const Key('project-profile-create-project'));
+      final tools = find.byKey(const Key('project-profile-tools'));
+      expect(find.descendant(of: header, matching: create), findsOneWidget);
+      expect(find.descendant(of: header, matching: tools), findsOneWidget);
+      expect(
+        tester.getRect(create).right,
+        lessThanOrEqualTo(tester.getRect(tools).left),
+      );
+      for (final action in [create, tools]) {
+        expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+      }
+      expect(find.byTooltip('Yeni Proje'), findsOneWidget);
+      expect(find.byTooltip('Araçlar'), findsOneWidget);
+      await tester.tap(create);
+      expect(creates, 1);
+      expect(fixture.session.selectedProjectId, project.id);
+      final rects = [
+        for (final field in defaults)
+          tester.getRect(
+            find.byKey(ValueKey('project-profile-field-${field.id}')),
+          ),
+      ];
+      expect(rects[0].top, rects[1].top);
+      expect(rects[1].top, rects[2].top);
+      expect(rects[0].right, lessThan(rects[1].left));
+      expect(rects[1].right, lessThan(rects[2].left));
+      final preview = tester.widget<Text>(find.text(defaults.first.value));
+      expect(preview.maxLines, 2);
+      expect(preview.overflow, TextOverflow.ellipsis);
+      expect(find.byType(ListTile), findsNothing);
+      final add = find.byKey(const Key('project-profile-add-field'));
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('project-profile-field-custom-24')),
+        findsOneWidget,
+      );
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('project-profile-new-label')),
+        'Yeni özel alan',
+      );
+      await tester.enterText(
+        find.byKey(const Key('project-profile-new-value')),
+        'Yeni değer',
+      );
+      await tester.tap(find.byKey(const Key('project-profile-create-field')));
+      await tester.pumpAndSettle();
+      expect(fixture.agenda.projectProfileFields[project.id], hasLength(29));
+      final saved = List.of(fixture.agenda.projectProfileFields[project.id]!);
+      fixture.session.select(other.id, fixture.agenda.projects);
+      await tester.pumpAndSettle();
+      expect(find.text('Yeni değer'), findsNothing);
+      fixture.session.select(project.id, fixture.agenda.projects);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Yeni değer'));
+      await tester.pumpAndSettle();
+      expect(find.text('Yeni değer'), findsOneWidget);
+      expect(fixture.agenda.projectProfileFields[project.id], saved);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('builtin edit and custom add archive persist in Home state', (
     tester,
   ) async {
@@ -98,6 +200,8 @@ void main() {
     final custom = fixture.agenda.projectProfileFields[project.id]!.singleWhere(
       (field) => !field.isBuiltIn,
     );
+    await tester.tap(find.text('Yapı sınıfı'));
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(ValueKey('project-profile-archive-${custom.id}')),
     );
@@ -249,10 +353,19 @@ void main() {
     await tester.pumpWidget(fixture.app());
     await tester.pumpAndSettle();
 
-    final list = tester.widget<ReorderableListView>(
-      find.byKey(const Key('project-profile-fields')),
+    final fields = fixture.agenda.projectProfileFields[project.id]!;
+    final gesture = await tester.startGesture(
+      tester.getCenter(
+        find.byKey(ValueKey('project-profile-drag-${fields.first.id}')),
+      ),
     );
-    list.onReorderItem?.call(0, 2);
+    await gesture.moveTo(
+      tester.getCenter(
+        find.byKey(ValueKey('project-profile-field-${fields.last.id}')),
+      ),
+    );
+    await tester.pump();
+    await gesture.up();
     await tester.pumpAndSettle();
 
     expect(
@@ -266,6 +379,89 @@ void main() {
       ProjectProfileEventType.fieldsReordered,
     );
   });
+
+  testWidgets(
+    'grid drag scrolls to later rows and retains order after reload',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 500);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final fixture = _Fixture(projects: [project]);
+      addTearDown(fixture.dispose);
+      final fields = [
+        ..._profile(project, value: '12').fields,
+        for (var i = 0; i < 15; i++)
+          ProjectProfileField(
+            id: 'custom-$i',
+            projectId: project.id,
+            label: 'Alan $i',
+            value: 'Değer $i',
+            sortOrder: i + 3,
+            revision: 1,
+            createdAt: project.createdAt,
+            updatedAt: project.updatedAt,
+          ),
+      ];
+      fixture.agenda.projectProfileFields[project.id] = fields;
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      final gesture = await tester.startGesture(
+        tester.getCenter(
+          find.byKey(ValueKey('project-profile-drag-${fields.first.id}')),
+        ),
+      );
+      await gesture.moveBy(const Offset(24, 0));
+      await tester.pump();
+      await gesture.moveTo(const Offset(150, 498));
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      final scroll = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byKey(const Key('project-profile-home')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(scroll.position.pixels, greaterThan(0));
+      final target = find.byKey(
+        ValueKey('project-profile-field-${fields[10].id}'),
+      );
+      await tester.ensureVisible(target);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.moveTo(tester.getCenter(target));
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+      final expected = fields.map((field) => field.id).toList();
+      expected.insert(10, expected.removeAt(0));
+      expect(
+        fixture.agenda.projectProfileFields[project.id]!.map(
+          (field) => field.id,
+        ),
+        expected,
+      );
+      expect(
+        fixture.agenda.projectProfileEvents.last.eventType,
+        ProjectProfileEventType.fieldsReordered,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      final grid = tester.widget<Wrap>(
+        find.byKey(const Key('project-profile-fields')),
+      );
+      expect(
+        grid.children.take(fields.length).map((child) => child.key),
+        expected.map((id) => ValueKey('project-profile-field-$id')),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('compact tools preserves exact project actions', (tester) async {
     final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
@@ -336,7 +532,14 @@ class _Fixture {
   Widget app({
     VoidCallback? onCreateProject,
     DashboardProjectAction? onOpenPlan,
+    double textScale = 1,
   }) => MaterialApp(
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: TextScaler.linear(textScale)),
+      child: child!,
+    ),
     locale: CseApp.locale,
     supportedLocales: CseApp.supportedLocales,
     localizationsDelegates: CseApp.localizationsDelegates,
