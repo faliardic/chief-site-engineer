@@ -1202,6 +1202,7 @@ class InventoryPageState extends State<InventoryPage> {
               ),
             ],
           ),
+        SizedBox(height: 64, child: _gestureAwareControl(_topTools())),
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) => Stack(
@@ -1210,11 +1211,11 @@ class InventoryPageState extends State<InventoryPage> {
                   child: switch (controller.view) {
                     InventoryPageView.map => _map(),
                     InventoryPageView.floors => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 56),
+                      padding: const EdgeInsets.only(left: 64),
                       child: _floors(),
                     ),
                     InventoryPageView.list => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 56),
+                      padding: const EdgeInsets.only(left: 64),
                       child: _list(visible),
                     ),
                   },
@@ -1227,16 +1228,6 @@ class InventoryPageState extends State<InventoryPage> {
                       : constraints.maxHeight / 2,
                   child: _gestureAwareControl(
                     SingleChildScrollView(child: _viewRail()),
-                  ),
-                ),
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  bottom: _targetSelectionRequest == null
-                      ? 64
-                      : constraints.maxHeight / 2,
-                  child: _gestureAwareControl(
-                    SingleChildScrollView(child: _toolRail()),
                   ),
                 ),
                 if (controller.view == InventoryPageView.map &&
@@ -1285,10 +1276,14 @@ class InventoryPageState extends State<InventoryPage> {
       child: Tooltip(
         message: label,
         child: SizedBox.square(
-          dimension: 44,
+          dimension: 48,
           child: IconButton.filledTonal(
             onPressed: onPressed,
             style: IconButton.styleFrom(
+              fixedSize: const Size.square(48),
+              minimumSize: const Size.square(48),
+              visualDensity: VisualDensity.standard,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               backgroundColor: selected == true
                   ? Theme.of(context).colorScheme.primaryContainer
                   : null,
@@ -1326,87 +1321,91 @@ class InventoryPageState extends State<InventoryPage> {
     ],
   );
 
-  Widget _toolRail() {
+  Widget _topTools() {
     final block = controller.activeBlocks
         .where((block) => block.id == controller.selectedBlockId)
         .firstOrNull;
     final floor = controller.selectedBlockFloors
         .where((floor) => floor.id == controller.selectedFloorId)
         .firstOrNull;
-    return Column(
-      key: const Key('inventory-right-rail'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Column(
-          key: const Key('inventory-context-tools'),
-          children: [
-            _edgeButton(
-              key: const Key('inventory-search-tool'),
-              label: controller.search.isEmpty
-                  ? 'Ada göre ara'
-                  : 'Ara: ${controller.search}',
-              icon: Icons.search,
-              marked: controller.search.isNotEmpty,
-              onPressed: () => _showToolPanel(_InventoryToolPanel.search),
-            ),
-            _edgeButton(
-              key: const Key('inventory-block-tool'),
-              label: 'Blok: ${block?.displayName ?? 'Tümü'}',
-              icon: Icons.domain_outlined,
-              marked: block != null,
-              onPressed: () => _showToolPanel(_InventoryToolPanel.block),
-            ),
-            _edgeButton(
-              key: const Key('inventory-floor-tool'),
-              label: block == null
-                  ? 'Kat: Önce blok seçin'
-                  : 'Kat: ${floor?.displayName ?? 'Tüm katlar'}',
-              icon: Icons.layers_outlined,
-              marked: floor != null,
-              onPressed: block == null
-                  ? null
-                  : () => _showToolPanel(_InventoryToolPanel.floor),
-            ),
-            _edgeButton(
-              key: const Key('inventory-filters-tool'),
-              label:
-                  'Filtreler: ${controller.categoryFilter == null ? 'Tümü' : inventoryCategoryLabel(controller.categoryFilter!)}, ${controller.statusFilter == null ? 'Tümü' : inventoryAssetStatusLabel(controller.statusFilter!)}, ${controller.archiveFilter.label}',
-              icon: Icons.filter_alt_outlined,
-              marked:
-                  controller.categoryFilter != null ||
-                  controller.statusFilter != null ||
-                  controller.archiveFilter != InventoryArchiveFilter.active,
-              onPressed: () => _showToolPanel(_InventoryToolPanel.filters),
-            ),
-          ],
-        ),
-        if (controller.view == InventoryPageView.map) ...[
-          const SizedBox(height: 16),
-          Column(
-            key: const Key('inventory-map-tools'),
+    return SingleChildScrollView(
+      key: const Key('inventory-top-tools'),
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            key: const Key('inventory-context-tools'),
             children: [
               _edgeButton(
-                key: const Key('inventory-map-zoom-in'),
-                label: 'Yaklaştır',
-                icon: Icons.add,
-                onPressed: () => _mapKey.currentState?.zoomIn(),
+                key: const Key('inventory-search-tool'),
+                label: controller.search.isEmpty
+                    ? 'Ada göre ara'
+                    : 'Ara: ${controller.search}',
+                icon: Icons.search,
+                marked: controller.search.isNotEmpty,
+                onPressed: () => _showToolPanel(_InventoryToolPanel.search),
               ),
               _edgeButton(
-                key: const Key('inventory-map-zoom-out'),
-                label: 'Uzaklaştır',
-                icon: Icons.remove,
-                onPressed: () => _mapKey.currentState?.zoomOut(),
+                key: const Key('inventory-block-tool'),
+                label: 'Blok: ${block?.displayName ?? 'Tümü'}',
+                icon: Icons.domain_outlined,
+                marked: block != null,
+                onPressed: () => _showToolPanel(_InventoryToolPanel.block),
               ),
               _edgeButton(
-                key: const Key('inventory-map-fit'),
-                label: 'Tamamını göster',
-                icon: Icons.fit_screen,
-                onPressed: () => _mapKey.currentState?.fitCanvas(),
+                key: const Key('inventory-floor-tool'),
+                label: block == null
+                    ? 'Kat: Önce blok seçin'
+                    : 'Kat: ${floor?.displayName ?? 'Tüm katlar'}',
+                icon: Icons.layers_outlined,
+                marked: floor != null,
+                onPressed: block == null
+                    ? null
+                    : () => _showToolPanel(_InventoryToolPanel.floor),
+              ),
+              _edgeButton(
+                key: const Key('inventory-filters-tool'),
+                label:
+                    'Filtreler: ${controller.categoryFilter == null ? 'Tümü' : inventoryCategoryLabel(controller.categoryFilter!)}, ${controller.statusFilter == null ? 'Tümü' : inventoryAssetStatusLabel(controller.statusFilter!)}, ${controller.archiveFilter.label}',
+                icon: Icons.filter_alt_outlined,
+                marked:
+                    controller.categoryFilter != null ||
+                    controller.statusFilter != null ||
+                    controller.archiveFilter != InventoryArchiveFilter.active,
+                onPressed: () => _showToolPanel(_InventoryToolPanel.filters),
               ),
             ],
           ),
+          if (controller.view == InventoryPageView.map) ...[
+            const SizedBox(width: 16),
+            Row(
+              key: const Key('inventory-map-tools'),
+              children: [
+                _edgeButton(
+                  key: const Key('inventory-map-zoom-in'),
+                  label: 'Yaklaştır',
+                  icon: Icons.add,
+                  onPressed: () => _mapKey.currentState?.zoomIn(),
+                ),
+                _edgeButton(
+                  key: const Key('inventory-map-zoom-out'),
+                  label: 'Uzaklaştır',
+                  icon: Icons.remove,
+                  onPressed: () => _mapKey.currentState?.zoomOut(),
+                ),
+                _edgeButton(
+                  key: const Key('inventory-map-fit'),
+                  label: 'Tamamını göster',
+                  icon: Icons.fit_screen,
+                  onPressed: () => _mapKey.currentState?.fitCanvas(),
+                ),
+              ],
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
