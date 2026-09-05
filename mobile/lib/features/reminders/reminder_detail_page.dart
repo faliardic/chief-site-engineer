@@ -1489,16 +1489,36 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
         const SizedBox(height: 8),
         for (final event in detail.events)
           ListTile(
+            key: Key('reminder-history-event-${event.id}'),
             dense: true,
             contentPadding: EdgeInsets.zero,
-            leading: CircleAvatar(child: Text('${event.sequence}')),
-            title: Text(event.eventType),
+            leading: const Icon(Icons.history_outlined),
+            title: Text(_reminderHistoryEventLabel(event.eventType)),
             subtitle: Text(CseTimeCodec.formatIstanbul(event.occurredAt)),
           ),
       ],
     );
   }
 }
+
+String _reminderHistoryEventLabel(String eventType) => switch (eventType) {
+  'created' => 'Hatırlatıcı oluşturuldu',
+  'scheduled' => 'Hatırlatıcı planlandı',
+  'rescheduled' => 'Hatırlatıcı yeniden planlandı',
+  'details_updated' => 'Hatırlatıcı bilgileri güncellendi',
+  'waiting_started' => 'Beklemeye alındı',
+  'legacy_waiting_normalized' => 'Bekleme kaydı güncellendi',
+  'snoozed' => 'Hatırlatıcı ertelendi',
+  'completed' => 'Hatırlatıcı tamamlandı',
+  'cancelled' => 'Hatırlatıcı iptal edildi',
+  'reopened' => 'Hatırlatıcı yeniden açıldı',
+  'moved_to_inbox' => 'Unutma Kutusu’na taşındı',
+  'trashed' => 'Geri Dönüşüm Kutusu’na taşındı',
+  'restored_from_trash' => 'Geri yüklendi',
+  'notification_scheduled' => 'Bildirim planlandı',
+  'notification_cancelled' => 'Bildirim planı kaldırıldı',
+  _ => 'Hatırlatıcı kaydı güncellendi',
+};
 
 class _AgendaReminderSyncDiff {
   const _AgendaReminderSyncDiff({
