@@ -507,197 +507,234 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
                 key: const Key('attendance-day-detail'),
                 padding: const EdgeInsets.all(12),
                 children: [
-                  _DayHeader(detail: detail),
-                  if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        _error!,
-                        key: const Key('attendance-day-error'),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ),
-                  if (detail.linkedReminder case final reminder?)
-                    Card(
-                      child: ListTile(
-                        key: const Key('attendance-linked-reminder'),
-                        minVerticalPadding: 12,
-                        leading: const Icon(Icons.notifications_outlined),
-                        title: Text(reminder.title),
-                        subtitle: Text(reminder.status.label),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.of(context).push<void>(
-                          MaterialPageRoute(
-                            builder: (_) => ReminderDetailPage(
-                              agenda: widget.agenda,
-                              attendance: widget.attendance,
-                              reminderId: reminder.id,
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 840),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _DayHeader(detail: detail),
+                          if (_error != null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                _error!,
+                                key: const Key('attendance-day-error'),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (detail.day.status == AttendanceDayStatus.draft) ...[
-                    _buildRosterSelector(),
-                    if (_showNewMemberWarning)
-                      Card(
-                        key: const Key('attendance-new-member-warning'),
-                        color: Theme.of(context).colorScheme.secondaryContainer,
-                        child: const ListTile(
-                          leading: Icon(Icons.info_outline),
-                          title: Text('Yeni personel Sicil’e kaydedildi'),
-                          subtitle: Text(
-                            'SGK işe giriş ve İSG/OSGB kayıtlarını Sicil’den '
-                            'kontrol edin. CSE resmi uygunluk kararı vermez; '
-                            'yalnız saha kaydı ve görünürlük sağlar.',
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton.icon(
-                          key: const Key('mark-all-full'),
-                          onPressed: _submitting ? null : _markFull,
-                          icon: const Icon(Icons.done_all_outlined),
-                          label: const Text('Tümünü tam gün'),
-                        ),
-                        OutlinedButton.icon(
-                          key: const Key('mark-team-full'),
-                          onPressed: _submitting ? null : _pickTeam,
-                          icon: const Icon(Icons.groups_outlined),
-                          label: const Text('Ekibi tam gün'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (_members.isEmpty)
-                      const Card(
-                        child: Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Text(
-                            'Bu gün için seçilmiş personel yok. Yukarıdan '
-                            'taşeron ve personel seçin.',
-                          ),
-                        ),
-                      )
-                    else
-                      ..._buildTeamSections(detail),
-                    TextField(
-                      key: const Key('attendance-general-note'),
-                      controller: _generalNote,
-                      minLines: 2,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        labelText: 'Günlük genel not',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    FilledButton.icon(
-                      key: const Key('save-attendance-draft'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                      ),
-                      onPressed: _submitting ? null : _save,
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('Kaydet'),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            key: const Key('attendance-no-work'),
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                            ),
-                            onPressed: _submitting
-                                ? null
-                                : () =>
-                                      _transition(AttendanceTransition.noWork),
-                            child: const Text('Çalışma yok'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: FilledButton(
-                            key: const Key('complete-attendance-day'),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                            ),
-                            onPressed: _submitting
-                                ? null
-                                : () => _transition(
-                                    AttendanceTransition.complete,
+                          if (detail.linkedReminder case final reminder?)
+                            Card(
+                              child: ListTile(
+                                key: const Key('attendance-linked-reminder'),
+                                minVerticalPadding: 12,
+                                leading: const Icon(
+                                  Icons.notifications_outlined,
+                                ),
+                                title: Text(reminder.title),
+                                subtitle: Text(reminder.status.label),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => Navigator.of(context).push<void>(
+                                  MaterialPageRoute(
+                                    builder: (_) => ReminderDetailPage(
+                                      agenda: widget.agenda,
+                                      attendance: widget.attendance,
+                                      reminderId: reminder.id,
+                                    ),
                                   ),
-                            child: const Text('Günü tamamla'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ] else
-                    FilledButton.icon(
-                      key: const Key('reopen-attendance-day'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                      ),
-                      onPressed: _submitting
-                          ? null
-                          : () => _transition(AttendanceTransition.reopen),
-                      icon: const Icon(Icons.lock_open_outlined),
-                      label: const Text('Günü yeniden aç'),
-                    ),
-                  const SizedBox(height: 16),
-                  _SummaryCard(detail: detail),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        key: const Key('save-attendance-csv'),
-                        onPressed: _submitting
-                            ? null
-                            : () => _export(share: false),
-                        icon: const Icon(Icons.download_outlined),
-                        label: const Text('CSV kaydet'),
-                      ),
-                      OutlinedButton.icon(
-                        key: const Key('share-attendance-csv'),
-                        onPressed: _submitting
-                            ? null
-                            : () => _export(share: true),
-                        icon: const Icon(Icons.share_outlined),
-                        label: const Text('CSV paylaş'),
-                      ),
-                      OutlinedButton.icon(
-                        key: const Key('copy-attendance-summary'),
-                        onPressed: _copySummary,
-                        icon: const Icon(Icons.content_copy_outlined),
-                        label: const Text('Özeti kopyala'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ExpansionTile(
-                    key: const Key('attendance-event-history'),
-                    title: Text('Değişiklik geçmişi (${detail.events.length})'),
-                    children: detail.events
-                        .map(
-                          (event) => ListTile(
-                            title: Text(event.eventType),
-                            subtitle: Text(
-                              '#${event.sequence} • '
-                              '${CseTimeCodec.formatIstanbul(event.occurredAt)}',
+                                ),
+                              ),
                             ),
+                          if (detail.day.status ==
+                              AttendanceDayStatus.draft) ...[
+                            if (_showNewMemberWarning)
+                              Card(
+                                key: const Key('attendance-new-member-warning'),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.secondaryContainer,
+                                child: const ListTile(
+                                  leading: Icon(Icons.info_outline),
+                                  title: Text(
+                                    'Yeni personel Sicil’e kaydedildi',
+                                  ),
+                                  subtitle: Text(
+                                    'SGK işe giriş ve İSG/OSGB kayıtlarını Sicil’den '
+                                    'kontrol edin. CSE resmi uygunluk kararı vermez; '
+                                    'yalnız saha kaydı ve görünürlük sağlar.',
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                OutlinedButton.icon(
+                                  key: const Key('mark-all-full'),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(48, 48),
+                                  ),
+                                  onPressed: _submitting ? null : _markFull,
+                                  icon: const Icon(Icons.done_all_outlined),
+                                  label: const Text('Tümünü tam gün'),
+                                ),
+                                OutlinedButton.icon(
+                                  key: const Key('mark-team-full'),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(48, 48),
+                                  ),
+                                  onPressed: _submitting ? null : _pickTeam,
+                                  icon: const Icon(Icons.groups_outlined),
+                                  label: const Text('Ekibi tam gün'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (_members.isEmpty)
+                              const Card(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text(
+                                    'Bu gün için seçilmiş personel yok. Personel ekle '
+                                    'alanından İşveren ve personel seçin.',
+                                  ),
+                                ),
+                              )
+                            else
+                              ..._buildTeamSections(detail),
+                            Card(
+                              child: ExpansionTile(
+                                key: const Key('attendance-add-people'),
+                                initiallyExpanded: _members.isEmpty,
+                                maintainState: true,
+                                title: const Text('Personel ekle'),
+                                children: [_buildRosterSelector()],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              key: const Key('attendance-general-note'),
+                              controller: _generalNote,
+                              minLines: 2,
+                              maxLines: 4,
+                              decoration: const InputDecoration(
+                                labelText: 'Günlük genel not',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton.icon(
+                              key: const Key('save-attendance-draft'),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                              ),
+                              onPressed: _submitting ? null : _save,
+                              icon: const Icon(Icons.save_outlined),
+                              label: const Text('Kaydet'),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    key: const Key('attendance-no-work'),
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(48),
+                                    ),
+                                    onPressed: _submitting
+                                        ? null
+                                        : () => _transition(
+                                            AttendanceTransition.noWork,
+                                          ),
+                                    child: const Text('Çalışma yok'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: FilledButton(
+                                    key: const Key('complete-attendance-day'),
+                                    style: FilledButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(48),
+                                    ),
+                                    onPressed: _submitting
+                                        ? null
+                                        : () => _transition(
+                                            AttendanceTransition.complete,
+                                          ),
+                                    child: const Text('Günü tamamla'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ] else
+                            FilledButton.icon(
+                              key: const Key('reopen-attendance-day'),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                              ),
+                              onPressed: _submitting
+                                  ? null
+                                  : () => _transition(
+                                      AttendanceTransition.reopen,
+                                    ),
+                              icon: const Icon(Icons.lock_open_outlined),
+                              label: const Text('Günü yeniden aç'),
+                            ),
+                          const SizedBox(height: 16),
+                          _SummaryCard(detail: detail),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              OutlinedButton.icon(
+                                key: const Key('save-attendance-csv'),
+                                onPressed: _submitting
+                                    ? null
+                                    : () => _export(share: false),
+                                icon: const Icon(Icons.download_outlined),
+                                label: const Text('CSV kaydet'),
+                              ),
+                              OutlinedButton.icon(
+                                key: const Key('share-attendance-csv'),
+                                onPressed: _submitting
+                                    ? null
+                                    : () => _export(share: true),
+                                icon: const Icon(Icons.share_outlined),
+                                label: const Text('CSV paylaş'),
+                              ),
+                              OutlinedButton.icon(
+                                key: const Key('copy-attendance-summary'),
+                                onPressed: _copySummary,
+                                icon: const Icon(Icons.content_copy_outlined),
+                                label: const Text('Özeti kopyala'),
+                              ),
+                            ],
                           ),
-                        )
-                        .toList(growable: false),
+                          const SizedBox(height: 8),
+                          ExpansionTile(
+                            key: const Key('attendance-event-history'),
+                            title: Text(
+                              'Değişiklik geçmişi (${detail.events.length})',
+                            ),
+                            children: detail.events
+                                .map(
+                                  (event) => ListTile(
+                                    title: Text(event.eventType),
+                                    subtitle: Text(
+                                      '#${event.sequence} • '
+                                      '${CseTimeCodec.formatIstanbul(event.occurredAt)}',
+                                    ),
+                                  ),
+                                )
+                                .toList(growable: false),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -722,7 +759,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Önce taşeron seçin; yalnız o taşeronun aktif personelleri '
+              'Önce İşveren seçin; yalnız o işverenin aktif personelleri '
               'aday olarak gösterilir.',
             ),
             const SizedBox(height: 12),
@@ -733,7 +770,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
                 initialValue: subcontractorId,
                 isExpanded: true,
                 decoration: const InputDecoration(
-                  labelText: 'Taşeron seç *',
+                  labelText: 'İşveren seç *',
                   border: OutlineInputBorder(),
                 ),
                 items: _subcontractors
@@ -750,7 +787,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
             if (_subcontractors.isEmpty) ...[
               const SizedBox(height: 8),
               const Text(
-                'Aktif taşeron yok. Önce Sicil’den taşeron ve ekip oluşturun.',
+                'Aktif işveren yok. Önce Sicil’den işveren ve ekip oluşturun.',
               ),
             ],
             if (subcontractorId != null) ...[
@@ -796,7 +833,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
                 const SizedBox(height: 8),
                 if (_teams.isEmpty)
                   const Text(
-                    'Bu taşeronun aktif ekibi yok. Yeni personel için önce '
+                    'Bu işverenin aktif ekibi yok. Yeni personel için önce '
                     'Sicil’den aktif ekip oluşturun.',
                     key: Key('attendance-no-active-team'),
                   ),
@@ -1010,7 +1047,7 @@ class _InlineWorkforceMemberSheetState
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 4),
-            Text('Taşeron: ${widget.subcontractor.name}'),
+            Text('İşveren: ${widget.subcontractor.name}'),
             const SizedBox(height: 12),
             if (_error case final error?) ...[
               Text(
@@ -1186,8 +1223,8 @@ class _MemberAttendanceCard extends StatelessWidget {
                   IconButton(
                     key: Key('remove-attendance-${member.id}'),
                     constraints: const BoxConstraints(
-                      minWidth: 44,
-                      minHeight: 44,
+                      minWidth: 48,
+                      minHeight: 48,
                     ),
                     tooltip: hasPersistedEntry
                         ? 'Kaydı kaldır'
@@ -1229,33 +1266,32 @@ class _MemberAttendanceCard extends StatelessWidget {
               onChanged: onResultChanged,
             ),
             const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            ExpansionTile(
+              key: Key('attendance-member-details-${member.id}'),
+              maintainState: true,
+              tilePadding: EdgeInsets.zero,
+              title: const Text('FM ve not'),
+              childrenPadding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                SizedBox(
-                  width: 104,
-                  child: TextField(
-                    key: Key('attendance-overtime-${member.id}'),
-                    controller: overtime,
-                    enabled:
-                        result != AttendanceResult.absent &&
-                        result != AttendanceResult.leave,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'FM dk',
-                      border: OutlineInputBorder(),
-                    ),
+                TextField(
+                  key: Key('attendance-overtime-${member.id}'),
+                  controller: overtime,
+                  enabled:
+                      result != AttendanceResult.absent &&
+                      result != AttendanceResult.leave,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'FM dk',
+                    border: OutlineInputBorder(),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    key: Key('attendance-note-${member.id}'),
-                    controller: note,
-                    decoration: const InputDecoration(
-                      labelText: 'Kısa not',
-                      border: OutlineInputBorder(),
-                    ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: Key('attendance-note-${member.id}'),
+                  controller: note,
+                  decoration: const InputDecoration(
+                    labelText: 'Kısa not',
+                    border: OutlineInputBorder(),
                   ),
                 ),
               ],
