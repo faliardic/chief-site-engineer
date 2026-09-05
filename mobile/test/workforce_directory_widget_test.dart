@@ -94,7 +94,7 @@ void main() {
       find.byKey(const Key('workforce-directory-search')),
       'ZEYNEP',
     );
-    await tester.tap(find.text('Arşiv'));
+    await _setDirectoryStatus(tester, 'Arşiv');
     await tester.pump();
     final state = tester.state<WorkforceDirectoryPageState>(
       find.byType(WorkforceDirectoryPage),
@@ -113,7 +113,7 @@ void main() {
       'ZEYNEP',
     );
     expect(find.text('Görünen proje: Proje İki'), findsOneWidget);
-    await tester.tap(find.text('Aktif'));
+    await _setDirectoryStatus(tester, 'Aktif');
     await tester.pump();
     expect(find.text('Zeynep Mimar'), findsOneWidget);
 
@@ -186,13 +186,14 @@ void main() {
       expect(find.text('Ayşe Usta'), findsOneWidget);
       expect(find.text('Mehmet Arşiv'), findsNothing);
 
-      await tester.tap(find.text('Arşiv'));
+      await _setDirectoryStatus(tester, 'Arşiv');
       await tester.pump();
       expect(find.text('Ayşe Usta'), findsNothing);
       expect(find.text('Mehmet Arşiv'), findsOneWidget);
 
-      await tester.tap(find.text('Aktif'));
+      await _setDirectoryStatus(tester, 'Aktif');
       await tester.pump();
+      await _openDirectoryFilters(tester);
       await tester.tap(
         find.byKey(const Key('workforce-directory-subcontractor')),
       );
@@ -207,6 +208,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Gece Ekibi').last);
       await tester.pumpAndSettle();
+      await _applyDirectoryFilters(tester);
       expect(find.text('Ayşe Usta'), findsOneWidget);
       expect(find.text('Zeynep Mimar'), findsNothing);
     },
@@ -243,7 +245,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Arşiv'));
+    await _setDirectoryStatus(tester, 'Arşiv');
     await tester.pump();
     await tester.tap(
       find.byKey(const Key('workforce-directory-member-$_member2')),
@@ -342,6 +344,26 @@ void main() {
     expect(attendance.subcontractorUpdate!.replaceStartedOn, isTrue);
     expect(attendance.subcontractorUpdate!.replaceEndedOn, isTrue);
   });
+}
+
+Future<void> _openDirectoryFilters(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('workforce-directory-filter-action')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _applyDirectoryFilters(WidgetTester tester) async {
+  final apply = find.byKey(const Key('workforce-directory-filter-apply'));
+  await tester.ensureVisible(apply);
+  await tester.pumpAndSettle();
+  await tester.tap(apply);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _setDirectoryStatus(WidgetTester tester, String status) async {
+  await _openDirectoryFilters(tester);
+  await tester.tap(find.text(status));
+  await tester.pump();
+  await _applyDirectoryFilters(tester);
 }
 
 class _TrackingAttendance extends FakeAttendanceApplication {
