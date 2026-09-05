@@ -42,6 +42,7 @@ class _AgendaPageState extends State<AgendaPage> {
   final FocusNode _searchFocusNode = FocusNode();
   final GlobalKey _searchFieldKey = GlobalKey();
   late String _selectedDay;
+  bool _calendarMonth = false;
   List<MobileProject> _projects = const [];
   List<AgendaLog> _logs = const [];
   Map<String, MobileReminder> _linkedReminders = const {};
@@ -560,6 +561,185 @@ class _AgendaPageState extends State<AgendaPage> {
     }
   }
 
+  void _movePeriod(int delta) {
+    if (!_calendarMonth) {
+      _moveDay(delta * 7);
+      return;
+    }
+    final selected = DateTime.parse('${_selectedDay}T00:00:00Z');
+    final first = DateTime.utc(selected.year, selected.month + delta);
+    final lastDay = DateTime.utc(first.year, first.month + 1, 0).day;
+    final target = DateTime.utc(
+      first.year,
+      first.month,
+      selected.day.clamp(1, lastDay),
+    );
+    _moveDay(target.difference(selected).inDays);
+  }
+
+  Widget _buildCalendar() {
+    final selected = DateTime.parse('${_selectedDay}T00:00:00Z');
+    final first = _calendarMonth
+        ? DateTime.utc(selected.year, selected.month)
+        : selected.subtract(Duration(days: selected.weekday - 1));
+    final leading = _calendarMonth ? first.weekday - 1 : 0;
+    final count = _calendarMonth
+        ? DateTime.utc(selected.year, selected.month + 1, 0).day
+        : 7;
+    final rows = ((leading + count) / 7).ceil();
+    final today = CseTimeCodec.istanbulDayKey(
+      CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+    );
+    return Column(
+      key: const Key('agenda-calendar'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SegmentedButton<bool>(
+          key: const Key('agenda-calendar-mode'),
+          segments: const [
+            ButtonSegment(value: false, label: Text('Hafta')),
+            ButtonSegment(value: true, label: Text('Ay')),
+          ],
+          selected: {_calendarMonth},
+          onSelectionChanged: (values) =>
+              setState(() => _calendarMonth = values.single),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _listIconAction(
+              key: const Key('agenda-calendar-previous-period'),
+              onPressed: () => _movePeriod(-1),
+              icon: const Icon(Icons.chevron_left),
+              label: _calendarMonth ? 'Önceki ay' : 'Önceki hafta',
+            ),
+            _listIconAction(
+              key: const Key('agenda-today'),
+              onPressed: () {
+                setState(() {
+                  _selectedDay = CseTimeCodec.istanbulDayKey(
+                    CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+                  );
+                });
+                _reload();
+              },
+              icon: const Icon(Icons.today_outlined),
+              label: 'Bugüne git',
+            ),
+            OutlinedButton.icon(
+              key: const Key('selected-day'),
+              onPressed: _selectDate,
+              icon: const Icon(Icons.calendar_month_outlined),
+              label: Text(_selectedDay),
+            ),
+            _listIconAction(
+              key: const Key('agenda-calendar-next-period'),
+              onPressed: () => _movePeriod(1),
+              icon: const Icon(Icons.chevron_right),
+              label: _calendarMonth ? 'Sonraki ay' : 'Sonraki hafta',
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 8),
+        Text(
+          MaterialLocalizations.of(context).formatMonthYear(selected),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          key: const Key('agenda-calendar-days'),
+          scrollDirection: Axis.horizontal,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  for (final label in const [
+                    'Pzt',
+                    'Sal',
+                    'Çar',
+                    'Per',
+                    'Cum',
+                    'Cmt',
+                    'Paz',
+                  ])
+                    SizedBox(
+                      width: 56,
+                      child: Center(
+                        child: Text(
+                          label,
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              for (var row = 0; row < rows; row++)
+                Row(
+                  children: [
+                    for (var column = 0; column < 7; column++)
+                      if (row * 7 + column < leading ||
+                          row * 7 + column >= leading + count)
+                        const SizedBox.square(dimension: 56)
+                      else
+                        _calendarDay(
+                          first.add(Duration(days: row * 7 + column - leading)),
+                          today,
+                        ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _calendarDay(DateTime day, String today) {
+    final key =
+        '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+    final selected = key == _selectedDay;
+    final colors = Theme.of(context).colorScheme;
+    void select() {
+      setState(() => _selectedDay = key);
+      _reload();
+    }
+
+    return Semantics(
+      label: key,
+      selected: selected,
+      button: true,
+      hint: key == today ? 'Bugün' : null,
+      excludeSemantics: true,
+      onTap: select,
+      child: SizedBox.square(
+        dimension: 56,
+        child: TextButton(
+          key: Key('agenda-calendar-day-$key'),
+          onPressed: select,
+          style: TextButton.styleFrom(
+            minimumSize: const Size.square(48),
+            padding: EdgeInsets.zero,
+            foregroundColor: selected
+                ? colors.onPrimaryContainer
+                : colors.onSurface,
+            backgroundColor: selected ? colors.primaryContainer : null,
+            side: key == today
+                ? BorderSide(color: colors.outline)
+                : BorderSide.none,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Text('${day.day}'),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -579,61 +759,29 @@ class _AgendaPageState extends State<AgendaPage> {
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.fromLTRB(12, 8, 4, 16),
                   children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _listIconAction(
-                          key: const Key('previous-day'),
-                          onPressed: () => _moveDay(-1),
-                          icon: const Icon(Icons.chevron_left),
-                          label: 'Önceki gün',
-                        ),
-                        _listIconAction(
-                          key: const Key('agenda-today'),
-                          onPressed: () {
-                            setState(() {
-                              _selectedDay = CseTimeCodec.istanbulDayKey(
-                                CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
-                              );
-                            });
-                            _reload();
-                          },
-                          icon: const Icon(Icons.today_outlined),
-                          label: 'Bugüne git',
-                        ),
-                        OutlinedButton.icon(
-                          key: const Key('selected-day'),
-                          onPressed: _selectDate,
-                          icon: const Icon(Icons.calendar_month_outlined),
-                          label: Text(_selectedDay),
-                        ),
-                        _listIconAction(
-                          key: const Key('next-day'),
-                          onPressed: () => _moveDay(1),
-                          icon: const Icon(Icons.chevron_right),
-                          label: 'Sonraki gün',
+                        _buildCalendar(),
+                        const SizedBox(height: 12),
+                        KeyedSubtree(
+                          key: _searchFieldKey,
+                          child: TextField(
+                            key: const Key('agenda-literal-search'),
+                            controller: _searchController,
+                            focusNode: _searchFocusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Literal ara',
+                              hintText: 'Açıklama, mahal, not veya proje',
+                              border: const OutlineInputBorder(),
+                            ),
+                            textInputAction: TextInputAction.search,
+                            onChanged: (value) => _search = value,
+                            onSubmitted: (_) => _reload(),
+                            onTapOutside: (_) => _searchFocusNode.unfocus(),
+                          ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                    KeyedSubtree(
-                      key: _searchFieldKey,
-                      child: TextField(
-                        key: const Key('agenda-literal-search'),
-                        controller: _searchController,
-                        focusNode: _searchFocusNode,
-                        decoration: InputDecoration(
-                          labelText: 'Literal ara',
-                          hintText: 'Açıklama, mahal, not veya proje',
-                          border: const OutlineInputBorder(),
-                        ),
-                        textInputAction: TextInputAction.search,
-                        onChanged: (value) => _search = value,
-                        onSubmitted: (_) => _reload(),
-                        onTapOutside: (_) => _searchFocusNode.unfocus(),
-                      ),
                     ),
                     if (_hasActiveFilters) ...[
                       const SizedBox(height: 8),

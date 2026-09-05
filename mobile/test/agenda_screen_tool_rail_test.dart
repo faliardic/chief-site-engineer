@@ -84,7 +84,11 @@ void main() {
           findsOneWidget,
         );
         expect(find.descendant(of: rail, matching: primary), findsNothing);
-        for (final key in ['previous-day', 'selected-day', 'next-day']) {
+        for (final key in [
+          'agenda-calendar-previous-period',
+          'selected-day',
+          'agenda-calendar-next-period',
+        ]) {
           expect(
             find.descendant(of: list, matching: find.byKey(Key(key))),
             findsOneWidget,
