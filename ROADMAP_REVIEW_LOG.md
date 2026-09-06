@@ -581,3 +581,88 @@ Standing owner kuralı gereği bütün current sıra yeniden değerlendirildi:
 ### ROADMAP etkisi
 
 `VAR` — owner-inserted Q05 Envanter/Kroki refinement eklendi; Q06–Q21 yeniden numaralandırıldı; eski evidence ve manual-debt release gate'leri Q22 altında birleştirildi; cross-reference'lar yeni Q numaralarına taşındı. Inventory contract'taki explicit toolbar/create yasakları source implementation'dan önce yeni owner yönüyle truth-sync edilmek zorundadır.
+
+## 13. REVIEW-007 — İş Gücü / Saha Rehberi / Sicil owner geri bildirimi ve tam kuyruk yeniden sıralaması
+
+**Tarih:** 2026-09-06  
+**Amaç:** Owner'ın İş Gücü / Saha Rehberi / Sicil kullanım geri bildirimini current compact shell, attendance/workforce source ve frictionless sözleşmeyle karşılaştırmak; first-class İş Gücü ürün modelini ve Firma → Personel sadeleştirmesini pre-release kuyruğa almak.  
+**Değerlendirilen Q'lar:** Güncel Q01–Q26 kuyruğunun tamamı; ayrıntılı kapsam yeni Q05.
+
+### Current GitHub gerçeği
+
+- Toplantı sırasında current `master`, `AGENTS.md`, ROADMAP, UI/UX sistem sözleşmesi, current shell ve Workforce/Attendance source yeniden doğrulandı.
+- Açık production işi Issue #708 / Draft PR #715 / Q01 İSG Geçmiş-Arşiv işidir. Exact Fatih Acceptance gate'i kapanmadan yeni production child başlamaz.
+- Current compact shell beş destination taşır: `Ana Sayfa`, `Hatırlatıcı`, `Ajanda`, `Envanter`, `Puantaj`; focused adaptive test de compact destination sayısını `5` olarak sabitler.
+- Normatif frictionless sözleşme compact pencerede **en fazla beş ana destination** şartı koyar. Bu nedenle owner feedback item 60'taki literal `5 → 6` bottom-navigation genişlemesi kabul edilmedi.
+- Current `WorkforceDirectoryPage` aktif proje kapsamında personel directory, search, active/archive, firma ve ekip filtreleri ile personel detail erişimi sağlar; bu güçlü baseline korunmalıdır.
+- Current `WorkforcePage` ilk seviyede `Personel ekle` FAB'ı ve `Taşeronlar ve ekipler` yönetim yolunu sunar; personel formu submit sırasında firma + aktif ekip seçimini zorunlu tutar.
+- Current attendance/Puantaj inline add akışı da seçili İşveren altında aktif ekip yoksa personel oluşturmayı durdurur ve önce Sicil'den ekip oluşturulmasını ister.
+- Domain `WorkforceMember.teamId` nullable görünse de current application create/read zinciri `teamName`i required alır, `team_id` ve `subcontractor_id` yazar ve member/detail query'lerinde firma+ekip `JOIN` kullanır. Upgrade testleri de mevcut member kayıtlarında `team_id` non-null bekler. Bu nedenle “Ekip kullanıcıya zorunlu olmasın” kararı doğrudan kolon/identity silme olarak uygulanamaz.
+- Stable `WorkforceMember.id`, Puantaj/İSG/KKD ve geçmiş ilişkilerinin ana kişisel kimliğidir; mevcut personel detail copy'si firma/ekip değişikliğinin geçmiş Puantaj günlerini yeniden yazmadığını açıkça belirtir.
+
+### Owner kararları ve ürün değerlendirmesi
+
+1. İş Gücü yalnız Puantaj prerequisite/helper ekranı değildir; aktif projenin first-class ana günlük insan kaynağı alanıdır.
+2. Mevcut Saha Rehberi/Sicil search, filtre, profile, İSG/KKD/Puantaj bağlantıları korunur; iyi çalışan baseline yeniden yazılmaz.
+3. Literal altıncı compact destination **RED** kararıdır. Bunun yerine mevcut `Puantaj` primary destination'ı **`İş Gücü`** parent destination'ına dönüşür; compact destination sayısı beş kalır.
+4. İş Gücü parent altında daily attendance/Puantaj ve Sicil/Saha Rehberi aynı ürün ailesinde birinci seviye alt yüzeylerdir. Exact control implementation child'da görsel review ile seçilir; çalışma modeli `Bugün` + `Sicil` gibi iki açık yüzey olabilir.
+5. Puantaj yalnız canonical Sicil `WorkforceMember` identity'si olan kişi için entry oluşturur. Puantaj içi personel-ekleme shortcut'ı varsa önce aynı canonical person kaydını yaratır; serbest isimli/geçici daily person yoktur.
+6. İlk boş durumda ana eylem `Personel ekle` değil **`Taşeron / İşveren ekle`** olur.
+7. Firma oluşturma success'inden sonra kullanıcı Ekip yönetimine atılmaz; aynı context'te doğrudan **`Personel ekle`** sunulur. Birden fazla personel eklerken firma tekrar seçtirilmez.
+8. User-facing registry dili yalnız `Taşeron` olmaz; genel firma bağlamında **`Taşeron / İşveren`** veya kısa `Firma` kullanılır. Teknik tablo/class adları sırf copy için migrate edilmez.
+9. Firma formunun ilk required alanı **`Firma adı`** olur; hemen altında optional **`Yetkili adı`** bulunur. Telefon, Adres ve İş kalemi/uzmanlık korunur; tarihler/not da veri kaybı olmadan progressive disclosure altında kalabilir.
+10. Ekip normal Firma → Personel akışında user-facing zorunlu prerequisite değildir. Ekip gerçek organizasyon ihtiyacı için optional/advanced katman olarak kalabilir.
+11. Current teknik model team relation'ı güçlü biçimde kullandığı için implementation önce compatibility audit yapar. Tercih, stable ekip/geçmiş modelini koruyup kullanıcı-facing ekip seçimini kaldırmaktır; gerekirse açıkça contract edilmiş canonical per-firm default/internal team compatibility katmanı düşünülebilir. Ad-hoc gizli identity üretimi yoktur.
+12. Audit güvenli Ekip opsiyonelliğinin nullable relation/schema migration veya stable identity/event/history değişikliği gerektirdiğini kanıtlarsa Q05 STANDARD UI kapsamında sessizce büyütülmez; ayrı CRITICAL child açılır. Existing gerçek ekipler ve tarihsel ilişkiler silinmez/birleştirilmez.
+13. Personel common-case ilk görünümü: bağlı Firma context'i + `Ad Soyad` + `Meslek / Pozisyon`. Ekip optional/advanced olur.
+14. `Personel kodu`, `Telefon`, `Adres`, `İşe başlama tarihi`, `Not` tek **`Diğer`** progressive-disclosure bölümüne alınır; edit'te kapalı alanlar existing değeri silmez.
+15. Saha Rehberi/Sicil filtre/copy dili de aynı Firma/Ekip modeline uyarlanır; backend terimi kullanıcıya gereksiz sızdırılmaz.
+
+### Tam kuyruk yeniden değerlendirmesi
+
+Standing owner kuralı gereği Q01–Q26'nın tamamı yeniden değerlendirildi:
+
+- Yeni first-class İş Gücü/Sicil + Firma→Personel işi **Q05** oldu. Proje Profili Q04'ten sonra gelmesi doğru; çünkü Q04 ana sayfadaki İş Gücü kartı ve proje context'i bu shared destination'a bağlanır. Inventory interaction polish ve KKD'ye göre önce yapılması gerekir; çünkü Puantaj, İSG ve KKD'nin canonical person/firma temelini doğrudan belirler.
+- Eski Q05 Inventory refinement **Q06**, KKD Q07 ve sonraki feature/decision maddeleri bir sıra kaydı.
+- Telemetry ile Privacy/KVKK/store declarations birbirinden bağımsız iki implementation hedefi gibi yürütülmedi. Privacy/store beyanı final telemetry/provider/permission davranışını bilmeden kapanamayacağı için aynı release-observability ailesinde tek **Q18 — Minimum crash/ANR/fatal telemetry + Privacy/KVKK/store declarations** maddesinde birleştirildi.
+- Bu birleşme nedeniyle kuyruk yine Q01–Q26'dır; sayı için değerli bir iş silinmemiştir.
+- Q22 current RC evidence/manual-debt gate'i Q05 İş Gücü first-class/Firma→Personel ve Q06 Inventory refinement kanıtlarını da kapsar.
+- Q23 entegre gün senaryosu `İş Gücü/Sicil/Puantaj → İSG/KKD` zincirini canonical person prerequisite ile birlikte doğrular.
+- Q01 açık production gate'i değişmedi; Q02 hâlâ NEXT'tir.
+
+### Yeni kanonik sıra özeti
+
+1. Q01 — İSG Geçmiş / Arşiv
+2. Q02 — Hatırlatıcı aktif-proje bağlamı + hızlı Unutma
+3. Q03 — Ajanda aktif-proje takvimi + hızlı kayıt oluşturma
+4. Q04 — Ana Sayfa / Proje Profili
+5. Q05 — İş Gücü / Sicil first-class alanı + Firma → Personel sadeleştirmesi
+6. Q06 — Envanter / Kroki hedefli interaction refinement
+7. Q07 — KKD hızlı seçim
+8. Q08 — Beton completion/detail/edit
+9. Q09 — Malzemeler UI/UX uyumu
+10. Q10 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
+11. Q11 — Minimum proje-geneli arama
+12. Q12 — Kısa guided onboarding
+13. Q13 — Puantaj → Ajanda otomatik kayıt
+14. Q14 — Şefim otomatik yedek klasörü
+15. Q15 — Otomatik personel kodu decision gate
+16. Q16 — Metraj V1 decision gate
+17. Q17 — Global hızlı cetvel
+18. Q18 — Minimum crash/ANR/fatal telemetry + Privacy/KVKK/store declarations
+19. Q19 — Recovery/backup owner acceptance
+20. Q20 — Adaptive cihaz/pencere matrisi
+21. Q21 — TalkBack/yüksek yazı/focus/grayscale
+22. Q22 — Release evidence + manuel kabul borçları + Inventory release-QA
+23. Q23 — Entegre şantiye şefi günü
+24. Q24 — Automated milestone/build/provenance
+25. Q25 — Owner telefon+tablet RC kabulü
+26. Q26 — Açık genel yayın kararı
+
+### Önceki değerlendirmelerle ilişki
+
+`REVIEW-006` Q01–Q04 sıralaması, Inventory owner bulguları ve güvenlik gerekçeleri bakımından **CURRENT** kalır; ancak Inventory'nin Q05 numarası ve sonraki sıra bu raporla **KISMEN SUPERSEDED** durumundadır. Inventory refinement artık Q06'dır. `REVIEW-005` Q03 kapsamı bakımından current kalır.
+
+### ROADMAP etkisi
+
+`VAR` — İş Gücü/Sicil first-class + Firma→Personel yeni Q05 olarak eklendi; literal altıncı compact navigation reddedilip mevcut Puantaj destination'ının İş Gücü parent'a dönüşmesi kanonikleştirildi; Inventory Q06 ve sonraki işler yeniden numaralandırıldı; telemetry + privacy/store tek Q18'de birleştirildi; Q22/Q23 ve post-release cross-reference'ları yeni numaralara taşındı. Ekip user-facing opsiyonelliği production implementation'dan önce compatibility audit ve gerektiğinde ayrı CRITICAL authority gerektirir.
