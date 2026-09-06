@@ -24,7 +24,7 @@ CSE owner-only, local-first ve mobile-first kişisel saha asistanıdır. V1 saha
 
 Frictionless Release Readiness programı Issue #617 ile yürür. UI/UX sözleşmesi, adaptive shell, ortak aktif proje, 48×48 erişilebilirlik tabanı, form/primary-action standardı, temel search/filter/error state altyapısı ve visual-first dönüşümün ana dilimleri merged durumdadır.
 
-Son Inventory refinement zinciri #709/#710 → #711/#712 → #713/#714 tamamlanmış ve owner manuel kabulünden geçmiştir. 6 Eylül owner saha kullanım geri bildirimiyle Q05 altında yalnız dar Kroki/interaction refinement istisnası yeniden açılmıştır; önceki tamamlanmış davranışlar bunun dışında tekrar geliştirme işi sayılmaz. DWG Viewer / Issue #523 ilk genel yayın için blocker değildir ve `POST-RELEASE / DEFERRED` kalır.
+Son Inventory refinement zinciri #709/#710 → #711/#712 → #713/#714 tamamlanmış ve owner manuel kabulünden geçmiştir. 6 Eylül owner saha kullanım geri bildirimiyle Q06 altında yalnız dar Kroki/interaction refinement istisnası yeniden açılmıştır; önceki tamamlanmış davranışlar bunun dışında tekrar geliştirme işi sayılmaz. Aynı gün İş Gücü/Sicil için current Puantaj-yardımcısı konumundan first-class günlük saha alanına geçiş ve Firma → Personel sadeleştirmesi Q05 olarak kanonik kuyruğa alınmıştır. DWG Viewer / Issue #523 ilk genel yayın için blocker değildir ve `POST-RELEASE / DEFERRED` kalır.
 
 Değişmeyen teknik baseline değerleri ilgili source/protokol ve current master'dan okunur; bu dosya sabit master SHA tutmaz.
 
@@ -38,9 +38,9 @@ Aşağıdaki alanlar yeni queue maddesi olarak tekrar açılmaz; yalnız release
 - #617 Phase 2 ortak form/action, search/filter, loading/error/retry ve insan-okunur event dili temel işleri.
 - Reminder/Unutma, Ajanda ve Living Plan günlük akış sadeleştirmelerinin mevcut merged dalgaları; Q02 ve Q03 yalnız 6 Eylül owner saha kullanımında kalan yeni sürtünme/bağlam borcunu ele alır.
 - Daily Log + Work Chain targeted Acceptance evidence closure (#698).
-- Saha Rehberi/Sicil temel bilgi mimarisi ve Puantaj prerequisite/quick-result sadeleştirmeleri.
+- Saha Rehberi/Sicil temel bilgi mimarisi ve Puantaj prerequisite/quick-result sadeleştirmeleri mevcut baseline'dır. Q05 bu baseline'ı silmez; yalnız first-class İş Gücü IA'sı, Firma → Personel hızlı kayıt yolu, user-facing Ekip opsiyonelliği ve form progressive disclosure borcunu düzeltir.
 - İSG model audit + 20A aktif checklist/tracking temeli.
-- Inventory compact top tools + D-pad + iki sıralı sketch-editor toolbar (#709–#714) tamamlanmış baseline'dır. Q05 yalnız 6 Eylül owner kullanımında kanıtlanan toolbar/gesture, first-create movement ve same-point multi-record borcunu düzeltir; Inventory'nin geri kalanını yeniden tasarım programına dönüştürmez.
+- Inventory compact top tools + D-pad + iki sıralı sketch-editor toolbar (#709–#714) tamamlanmış baseline'dır. Q06 yalnız 6 Eylül owner kullanımında kanıtlanan toolbar/gesture, first-create movement ve same-point multi-record borcunu düzeltir; Inventory'nin geri kalanını yeniden tasarım programına dönüştürmez.
 
 Bu tamamlanmış temel, ilerideki queue maddelerinde sessizce geri alınmaz.
 
@@ -344,7 +344,7 @@ Proje profilinde görünür **İş Gücü** kartı bulunur. Birincil günlük bi
 
 #### AP-09 — İş Gücü kartını gerçek personel listesine bağla
 
-İş Gücü kartına dokunulduğunda aktif projedeki saha personeli açılır. Bugünkü saha durumu önceliklidir. Liste gerektiğinde kişi, **Taşeron / İşveren** ve mevcut günlük durum bilgisini gösterebilir. Kullanıcı yalnız listeyi görmek için Sicil → ekip → Puantaj arasında gereksiz ekran dolaşımına zorlanmaz.
+İş Gücü kartına dokunulduğunda aktif projedeki saha personeli açılır. Bugünkü saha durumu önceliklidir. Liste gerektiğinde kişi, **Taşeron / İşveren** ve mevcut günlük durum bilgisini gösterebilir. Kullanıcı yalnız listeyi görmek için Sicil → ekip → Puantaj arasında gereksiz ekran dolaşımına zorlanmaz. Q05 first-class İş Gücü alanı tamamlandığında bu kart aynı shared destination/context'e derin link verir; ikinci bir bağımsız personel akışı oluşturmaz.
 
 #### AP-10 — İş Gücü için doğru empty state'ler
 
@@ -376,7 +376,121 @@ Dashboard hâlâ canlı proje kontrol merkezi olmalı; bakım/form yoğunluğu g
 - ilk proje oluşturma onlarca zorunlu alana dönüşmez;
 - schema/stable identity/persistence değişikliği gerekiyorsa ayrı CRITICAL yetki olmadan yapılmaz.
 
-### Q05 — Envanter / Kroki hedefli interaction refinement
+### Q05 — İş Gücü / Sicil first-class alanı + Firma → Personel sadeleştirmesi
+
+**Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi — `İş Gücü / Saha Rehberi / Sicil` başlığı; #617 daily-core ve progressive-disclosure ilkeleri; current `WorkforceDirectoryPage`, `WorkforcePage`, `AttendancePage` baseline'ı.  
+**Durum:** `QUEUED`
+
+Amaç; İş Gücü'nü yalnız Puantaj ön-koşulu veya gizli yardımcı akış olmaktan çıkarıp aktif projenin günlük insan kaynağı yüzeyi haline getirmek, mevcut güçlü Saha Rehberi/Sicil yeteneklerini korumak ve ilk kayıt yolunu `Firma → Personel` seviyesine indirmektir.
+
+#### WF-01 — İş Gücü'nü first-class ürün alanı yap; compact shell'i altıya çıkarma
+
+- Compact navigation normatif `en fazla 5` sınırını korur; alt bara altıncı destination eklenmez.
+- Current compact shell'deki `Puantaj` destination'ı **İş Gücü** üst alanına dönüşür. Böylece beş ana destination korunur: `Ana Sayfa`, `Hatırlatıcı`, `Ajanda`, `Envanter`, `İş Gücü`.
+- İş Gücü alanı, daily attendance/Puantaj kabiliyeti ile Sicil/Saha Rehberi kabiliyetini aynı ürün ailesinde birleştirir. İlk seviye alt yüzeyler örneğin `Bugün` ve `Sicil` olarak ayrılabilir; exact compact control implementation child'da owner görsel review ile kilitlenir.
+- `Bugün` mevcut daily Puantaj write semantics'ini sessizce değiştirmez; yalnız parent IA değişir. 7. owner feedback başlığındaki Puantaj IA/refinement ayrıca kendi roadmap kararında ele alınır.
+- Q04 İş Gücü kartı bu shared destination'a doğru subview/context ile gider; farklı bir personel stack'i yaratmaz.
+- Medium/expanded rail de aynı destination setini ve active-project context'i kullanır.
+
+#### WF-02 — Mevcut Saha Rehberi / Sicil güçlü taraflarını koru
+
+- Mevcut kişi arama, aktif/arşiv ayrımı, firma/ekip filtreleri, personel detail ve İSG/KKD/Puantaj ilişkileri yeniden yazılıp kaybedilmez.
+- `Sicil` görünümü aktif projedeki canonical `WorkforceMember` kayıtlarının okunabilir directory/profile yüzeyi olur.
+- Kişiye dokunmak mevcut stable person identity üzerinden profile gider; firma/ekip değişikliği geçmiş Puantaj, İSG, KKD veya event kayıtlarını yeniden yazmaz.
+- User-facing sadeleştirme, backend `subcontractor`/team/table adlarını sırf isim uyumu için rename/migrate etme yetkisi değildir.
+
+#### WF-03 — Puantaj için canonical Sicil/personel prerequisite'ini açıklaştır
+
+- Puantaj satırı yalnız canonical Sicil `WorkforceMember` identity'si bulunan kişi için oluşturulur.
+- Kullanıcı Puantaj içinden `Personel ekle` shortcut'ı kullanabiliyorsa bu shortcut önce aynı canonical Sicil kayıt akışını tamamlar; kayıt başarıyla oluşmadan attendance row yazılmaz.
+- Serbest isim, geçici one-off person veya yalnız o güne ait sahte personel kaydı oluşturulmaz.
+- Firma/personel prerequisite eksikse empty state kullanıcıyı doğru ilk kayıt eylemine yönlendirir; dead end üretmez.
+
+#### WF-04 — İlk empty state'i Firma ile başlat ve Firma → Personel akışını doğrudan kur
+
+- Seçili projede hiç firma/personel yoksa ilk ana eylem **`Taşeron / İşveren ekle`** olur; doğrudan `Personel ekle` gösterilmez.
+- Firma başarıyla oluşturulduğunda kullanıcı registry/ekip yönetim ekranına geri atılmaz; aynı akışta görünür **`Personel ekle`** eylemi sunulur ve yeni personel o firmaya bağlanmış context ile açılır.
+- Birden fazla personel ardışık eklenebilir; firma her seferinde yeniden seçtirilmez.
+- Personel kayıtlı fakat bugün Puantaj yoksa `Bugün` yüzeyi `Puantaja git / Bugünü başlat` gibi doğru günlük eylemi sunar.
+
+#### WF-05 — Firma terminolojisi ve hızlı firma formu
+
+User-facing firma dili:
+
+- genel registry/oluşturma eylemi: **`Taşeron / İşveren ekle`**;
+- birinci alan: **`Firma adı`** — required;
+- hemen altında: **`Yetkili adı`** — optional;
+- **Telefon** korunur ve hızlı erişilebilir optional iletişim alanıdır;
+- **Adres** ve **İş kalemi / uzmanlık** korunur;
+- mevcut başlangıç/bitiş tarihi ve not gibi ikincil firma bilgileri veri kaybı olmadan korunur.
+
+İlk görünüm form yığınına dönüşmez. `Firma adı`, `Yetkili adı` ve gerekirse `Telefon` önde; Adres, İş kalemi/uzmanlık, tarihler ve not progressive-disclosure `Diğer bilgiler` altında olabilir. Current source'taki `subcontractors` teknik adı user-facing copy'yi belirlemez.
+
+#### WF-06 — Ekip'i kullanıcı-facing zorunlu prerequisite olmaktan çıkar
+
+- Normal `Firma → Personel` akışında kullanıcı `Ekip oluştur` veya `Ekip seç` adımına zorlanmaz.
+- Ekip kavramı tamamen silinmez; sahada gerçekten ekip yönetmek isteyen kullanıcı için optional/advanced organizasyon katmanı olarak kalabilir.
+- Mevcut source bugün personel create/read zincirinde `teamName`, `team_id` ve firma+ekip JOIN'lerini zorunlu kullanmaktadır. Bu nedenle ilk implementation child **compatibility audit** ile başlar.
+- Tercih edilen release yolu schema'yı gereksiz değiştirmeden current stable team/history modelini koruyarak kullanıcı-facing seçim adımını kaldırmaktır. Gerekirse her firma için açıkça kanonikleştirilmiş bir teknik/default ekip compatibility katmanı kullanılabilir; ad-hoc veya görünmez identity üretimi yapılmaz, davranış contract/test ile açıkça sabitlenir.
+- Audit user-facing Ekip opsiyonelliğinin ancak nullable relation/schema migration, stable identity veya event/history contract değişikliğiyle güvenli olacağını kanıtlarsa bu alt dilim Q05 STANDARD UI işi içinde sessizce büyütülmez; ayrı **CRITICAL** child, exact migration/compatibility/backup gate ile açılır.
+- Existing gerçek ekipler, ekip şefleri ve tarihsel ekip ilişkileri silinmez veya tek default ekip altında birleştirilmez.
+
+#### WF-07 — Personel formunu minimum gerekli bilgiye indir
+
+Yeni personel common-case ilk görünümü:
+
+- bağlı **Taşeron / İşveren** — mevcut akıştan gelen salt-okunur context veya kolay override;
+- **Ad Soyad** — required;
+- **Meslek / Pozisyon** — required.
+
+Ekip varsa **opsiyonel/advanced** seçim olur; personel oluşturmak için ilk görünümde zorunlu değildir.
+
+Aşağıdakiler tek **`Diğer`** progressive-disclosure bölümü altında kalır:
+
+- Personel kodu;
+- Telefon;
+- Adres;
+- İşe başlama tarihi;
+- Not.
+
+Mevcut değerler edit sırasında korunur; kapalı `Diğer` bölümü existing data'yı sessizce boşaltmaz. İlk görünüm yalnız kaydın gerçekten gerekli bilgisini gösterir.
+
+#### WF-08 — Directory filtre ve copy dilini aynı modele getir
+
+- Saha Rehberi/Sicil filtrelerinde user-facing `Taşeron` tek başına kullanılmaz; bağlama göre **`Taşeron / İşveren`** veya açık `Firma` dili kullanılır.
+- Existing ekip filtresi advanced/opsiyonel kalabilir; Ekip normal kayıt prerequisite'iymiş gibi gösterilmez.
+- `Tanımsız taşeron` gibi eski fallback copy'ler audit edilir; canonical firma ilişkisi varken kullanıcıya backend terimi sızdırılmaz.
+- İsim değişikliği source ID veya geçmiş event payload'ını rewrite etmez.
+
+#### WF-09 — Firma sonrası doğrudan personel ve personel sonrası günlük işe dönüş
+
+- Firma oluşturma success'i → doğrudan `Personel ekle`.
+- Personel oluşturma success'i → yeni kişi Sicil listesinde görünür ve gerekiyorsa aynı İş Gücü context'inden bugünkü Puantaj'a eklenebilir.
+- Kullanıcı yalnız bir personel eklemek için `Firma → Ekip yönetimi → Ekip ekle → Personel → tekrar Puantaj` zincirine zorlanmaz.
+- Existing registry management ekranı advanced bakım için kalabilir; common-case ana yol değildir.
+
+#### WF-10 — Veri güvenliği, risk ayrımı ve kabul
+
+- `WorkforceMember.id` stable person identity olarak korunur; geçmiş attendance, İSG, KKD ve event ilişkileri isim/firma/ekip UX sadeleştirmesiyle yeniden yazılmaz.
+- Firma arşivleme/pasifleştirme ve existing ekip lifecycle davranışları sessizce gevşetilmez.
+- Shell destination değişimi source kaydı mutate etmez ve active-project context'i kaybettirmez.
+- Schema/migration, stable identity, event/history veya backup relation değişikliği kanıtlanırsa exact CRITICAL child olmadan uygulanmaz.
+- Compact 320/390 px, yüksek text scale, keyboard/back, empty states, Firma → Personel, existing-team edit, Sicil detail ve Puantaj prerequisite focused test + owner Acceptance ile doğrulanır.
+
+**Q05 bitiş tanımı:**
+
+- İş Gücü compact shell'de first-class ana destination'dır fakat compact destination sayısı 5'i geçmez;
+- current Puantaj capability İş Gücü parent alanında günlük erişilebilirliğini kaybetmez;
+- Sicil/Saha Rehberi doğrudan aynı İş Gücü alanından erişilir;
+- Puantaj yalnız canonical kayıtlı personel identity'si üzerinde çalışır;
+- ilk boş durumda `Taşeron / İşveren ekle`, firma sonrası doğrudan `Personel ekle` akışı vardır;
+- normal personel ekleme Ekip oluşturma/seçme adımına zorlamaz;
+- firma formunda `Firma adı`, `Yetkili adı`, telefon/adres/iş kalemi bilgileri doğru progressive disclosure ile korunur;
+- personel formunun ilk görünümünde yalnız gerekli alanlar vardır; kod/telefon/adres/başlangıç/not `Diğer` altındadır;
+- existing ekip, person identity, Puantaj/İSG/KKD geçmişi ve event ilişkileri korunur;
+- teknik team compatibility schema/event/history değişikliği gerektirirse ayrı CRITICAL authority olmadan implementation yapılmaz.
+
+### Q06 — Envanter / Kroki hedefli interaction refinement
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi — `Envanter / Kroki` başlığı; tamamlanmış #709–#714 baseline'ı; `docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md`.  
 **Durum:** `QUEUED`
@@ -428,20 +542,20 @@ Bu Q, tamamlanmış Inventory v1'i yeniden tasarım programına açmaz. Yalnız 
 #### INV-07 — Aynı fiziksel noktaya birden fazla farklı Inventory kaydı ekle
 
 - Farklı `inventory_assets` kayıtları aynı exact aktif floor + `x/y` koordinatını paylaşabilir; bu davranış tek asset için v1 `one active placement` sınırını kaldırmaz.
-- Current model/DB audit farklı asset'ler için same-coordinate uniqueness göstermediğinden varsayılan plan schema değişikliği değildir. Schema ihtiyacı ortaya çıkarsa Q05 aynı STANDARD UI işi içinde büyütülmez; ayrı CRITICAL child gerekir.
+- Current model/DB audit farklı asset'ler için same-coordinate uniqueness göstermediğinden varsayılan plan schema değişikliği değildir. Schema ihtiyacı ortaya çıkarsa Q06 aynı STANDARD UI işi içinde büyütülmez; ayrı CRITICAL child gerekir.
 - Mevcut marker/cluster'a dokunulduğunda kayıtları açmanın yanında açık **`Bu noktaya kayıt ekle`** eylemi sunulur; bu eylem exact mevcut coordinate ve floor context'ini quick-create akışına taşır.
 - Aynı noktadaki birden fazla kayıt tek count-cluster/stack marker ile temsil edilir; cluster açıldığında tüm kayıtlar deterministik listelenir ve her biri ayrı detail'e açılabilir.
 - Marker overlap çözümü source koordinatlarını yapay olarak sağa/sola kaydırmaz; görsel ayrıştırma yalnız presentation state'tir.
 - Existing map boş-alan tap davranışı korunur; marker hit'in create'i tamamen bloke etmesi bu explicit add-another action ile giderilir.
 
-#### INV-08 — Q05 güvenlik ve kabul sınırı
+#### INV-08 — Q06 güvenlik ve kabul sınırı
 
 - Stable asset/block/floor/sketch/placement identity, optimistic revision, append-only placement/event history, autosave/finalize ve backup formatı korunur.
 - Bir asset'i birden fazla aktif placement'a bölme, stock ledger, CAD/GIS, gerçek ölçü veya yeni schema bu Q'nun doğal uzantısı değildir.
 - Toolbar sadeleştirmesiyle temel navigation/pan/zoom/open-line/closure capability kaybolamaz.
 - Exact create/edit-active ve same-point cluster davranışı focused automated test + owner device Acceptance ile doğrulanır.
 
-**Q05 bitiş tanımı:**
+**Q06 bitiş tanımı:**
 
 - Geri eylemi toolbox'tan ayrılmış ve üstte açık navigation action olmuştur;
 - `Taşı`, zoom `+/-`, fit, permanent `Çizgiyi bitir` ve permanent `Alanı kapat` ana toolbox'tan çıkmıştır, fakat karşılık gelen gerekli navigation/drawing capability kaybolmamıştır;
@@ -453,49 +567,49 @@ Bu Q, tamamlanmış Inventory v1'i yeniden tasarım programına açmaz. Yalnız 
 - source coordinate/identity/history/backup kontratları bozulmaz;
 - Inventory contract source implementation'dan önce yeni toolbar/gesture/same-point owner kararlarıyla truth-sync edilmiştir.
 
-### Q06 — KKD hızlı seçim
+### Q07 — KKD hızlı seçim
 
 **Kaynak:** #617 Phase 4 / item 21  
 **Durum:** `QUEUED`
 
-Amaç: günlük saha kullanımında mevcut canonical KKD semantiğini değiştirmeden hızlı, erişilebilir ve minimum dokunuşlu seçim/atama akışı.
+Amaç: günlük saha kullanımında mevcut canonical KKD semantiğini değiştirmeden hızlı, erişilebilir ve minimum dokunuşlu seçim/atama akışı. Q05 İş Gücü/Sicil first-class alanı canonical person/firma akışını netleştirdiği için KKD hızlı seçim bu person identity yüzeyi üzerine oturur.
 
-### Q07 — Beton tamamlanma / sonuç / detay / düzenleme akışı
+### Q08 — Beton tamamlanma / sonuç / detay / düzenleme akışı
 
 **Kaynak:** #617 Phase 5 / item 23  
 **Durum:** `QUEUED`
 
 Amaç: Beton Paketi'nin gerçek saha kullanımında create → sonuç → detail → edit/completion zincirini tamamlamak ve mevcut identity/attachment davranışını korumak.
 
-### Q08 — Malzemeler ortak UI/UX sistem uyumu
+### Q09 — Malzemeler ortak UI/UX sistem uyumu
 
 **Kaynak:** #617 Phase 5 / item 24  
 **Durum:** `QUEUED`
 
 Amaç: İstenecek Malzemeler ekranını shared project context, action, state, accessibility ve compact/adaptive görsel dile oturtmak; lifecycle source-of-truth'u değiştirmemek.
 
-### Q09 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
+### Q10 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
 
 **Kaynak:** #617 Phase 5 / item 25  
 **Durum:** `QUEUED`
 
 Amaç: supporting tools'ın final first-release information architecture ve erişim yerini netleştirmek; attachment/recovery güvenlik sınırlarını korumak.
 
-### Q10 — Minimum proje-geneli ortak arama
+### Q11 — Minimum proje-geneli ortak arama
 
 **Kaynak:** #617 Phase 6 / item 27  
 **Durum:** `QUEUED`
 
 İlk release için supported existing record families üzerinde basit, hızlı, project-safe ortak arama; enterprise/global index motoru değil.
 
-### Q11 — Kısa guided onboarding
+### Q12 — Kısa guided onboarding
 
 **Kaynak:** #617 Phase 6 / item 28  
 **Durum:** `QUEUED`
 
 Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günlük akış. Uzun tutorial yok.
 
-### Q12 — Puantaj tamamlanınca Ajanda'ya otomatik kayıt
+### Q13 — Puantaj tamamlanınca Ajanda'ya otomatik kayıt
 
 **Kaynak:** #617 owner decision `Puantaj → Ajanda automatic completion record`  
 **Durum:** `QUEUED — CRITICAL`
@@ -505,7 +619,7 @@ Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günl�
 - retry/reopen duplicate üretmez;
 - identity, transaction, failure, event/history ve rollback sözleşmeleri ayrı CRITICAL Issue'da kilitlenir.
 
-### Q13 — Şefim otomatik yedek klasörü
+### Q14 — Şefim otomatik yedek klasörü
 
 **Kaynak:** #617 owner decision `Backup destination folder`  
 **Durum:** `QUEUED — CRITICAL`
@@ -514,7 +628,7 @@ Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günl�
 - silent backup generation, overwrite, rotation/delete veya `.csebackup` format değişikliği bu kapsamın parçası değildir;
 - exact path/data-root, compatibility ve restore validation zorunludur.
 
-### Q14 — Otomatik personel kodu release kararı
+### Q15 — Otomatik personel kodu release kararı
 
 **Kaynak:** #617 Phase 4 / item 22  
 **Durum:** `DECISION GATE`
@@ -523,7 +637,7 @@ Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günl�
 - Fatih ilk genel yayın için gerekli görmezse açıkça `POST-RELEASE / DEFERRED` olarak işaretlenir.
 - Karar verilmeden sessiz implementation yapılmaz.
 
-### Q15 — Metraj V1 release kapsam kararı
+### Q16 — Metraj V1 release kapsam kararı
 
 **Kaynak:** #617 owner decision `Metraj scope expansion`  
 **Durum:** `DECISION GATE`
@@ -537,7 +651,7 @@ Yayın öncesi yapılacak karar:
 
 Fatih karar vermeden ChatGPT bu maddeyi sessizce atlamaz veya kapsamlı Metraj geliştirmesini başlatmaz.
 
-### Q16 — Global hızlı cetvel
+### Q17 — Global hızlı cetvel
 
 **Kaynak:** #617 owner decision `Quick Ruler global tool`  
 **Durum:** `QUEUED`
@@ -547,19 +661,20 @@ Fatih karar vermeden ChatGPT bu maddeyi sessizce atlamaz veya kapsamlı Metraj g
 - source/form/session mutation yok;
 - gerçek ölçü iddiasından önce device-aware physical calibration veya açık calibration fallback zorunludur.
 
-### Q17 — Minimum crash / ANR / fatal telemetry
+### Q18 — Minimum crash/ANR/fatal telemetry + Privacy/KVKK/store declarations
 
-**Kaynak:** #617 Phase 6 / item 29  
+**Kaynak:** #617 Phase 6 / items 29–30  
 **Durum:** `QUEUED`
 
-Release kalitesinde crash/ANR/fatal görünürlüğü; privacy/local-first ve store beyanlarıyla uyumlu minimum kapsam.
+Aynı release-observability ve beyan ailesi tek Q altında kapanır:
 
-### Q18 — Privacy / KVKK / store declarations
+- kişisel saha içeriğini gereksiz toplamayan minimum crash / ANR / fatal görünürlüğü sağlanır;
+- telemetry/provider/permission gerçek davranışı local-first ve privacy sınırlarıyla audit edilir;
+- Privacy / KVKK / store declarations uygulamanın gerçek izin, local data, backup, medya ve telemetry davranışıyla birebir eşleşir;
+- uygulamada olmayan claim, gizli analytics veya beyan edilmemiş veri transferi yoktur;
+- telemetry entegrasyonu security/privacy/dependency riski açarsa gerekli dar risk/gate tanımlanmadan merge edilmez.
 
-**Kaynak:** #617 Phase 6 / item 30  
-**Durum:** `QUEUED`
-
-Gerçek uygulama davranışı, izinler, local data, backup, medya ve telemetry ile birebir uyumlu privacy/KVKK/store açıklamaları. Uygulamada olmayan claim yok.
+Telemetry kapsamı önce kesinleşmeden ayrı privacy metni “tamamlandı” sayılmaz; aynı exact release davranışı üzerinden birlikte doğrulanırlar.
 
 ### Q19 — Recovery / backup owner acceptance
 
@@ -567,7 +682,7 @@ Gerçek uygulama davranışı, izinler, local data, backup, medya ve telemetry i
 **Durum:** `RELEASE GATE`
 
 - locked Restore Model A doğrulanır: exact backup state full replacement, restore öncesi safety backup, backup verification, etkilenecek kayıt açıklaması, restore sonrası geri alma ve safety backup retention;
-- backup folder işi Q13 pre-release yapıldıysa bu tur onun gerçek cihaz davranışını da kapsar;
+- backup folder işi Q14 pre-release yapıldıysa bu tur onun gerçek cihaz davranışını da kapsar;
 - gerçek kritik data/destructive operasyon yalnız açık owner authority ile yürür.
 
 ### Q20 — Adaptive cihaz / pencere matrisi
@@ -594,14 +709,15 @@ Primary navigation ve kritik create/edit/save/confirm akışlarında erişilebil
 
 ### Q22 — Release evidence + manuel kabul borçları + Inventory release-QA
 
-**Kaynak:** #617 Phase 7 / items 35–36; Issue #479; #709–#714; Q05 owner refinement  
+**Kaynak:** #617 Phase 7 / items 35–36; Issue #479; #709–#714; Q06 owner refinement  
 **Durum:** `RELEASE GATE`
 
 Aynı RC üzerinde tekrar eden evidence ve manual-debt işleri tek gate'te kapanır:
 
 - Baseline'da eksik kalan populated Puantaj, Beton result/detail/edit, attachment viewer, kayıtlı İSG/KKD ve gerekli motion/Back kanıtları tamamlanır.
 - Daily Log + Work Chain targeted evidence #698 ile kapanmıştır ve yeniden yapılmaz.
-- Inventory için #709–#714 baseline'ı ile Q05 Kroki refinement davranışları current RC üzerinde entegre regresyon/evidence kapsamında doğrulanır.
+- Inventory için #709–#714 baseline'ı ile Q06 Kroki refinement davranışları current RC üzerinde entegre regresyon/evidence kapsamında doğrulanır.
+- İş Gücü/Sicil için Q05 Firma → Personel, canonical person prerequisite ve first-class shell davranışı current RC evidence/manual debt kapsamında doğrulanır.
 - Release'e gerçekten dahil user-visible özelliklerde gerekli `PENDING/DEFERRED` manual test borcu PASS / N/A / superseded disposition ile kapanır; tarihsel gereksiz test sırf sayı için çalıştırılmaz.
 - Q23/Q25 sırasında aynı exact RC üzerinde üretilmiş yeterli kanıt yeniden kullanılır; sırf evidence sayısı için duplicate screenshot/test turu yoktur.
 
@@ -610,7 +726,7 @@ Aynı RC üzerinde tekrar eden evidence ve manual-debt işleri tek gate'te kapan
 **Kaynak:** #617 Phase 7 / item 37  
 **Durum:** `RELEASE GATE`
 
-Tek projede gerçek günlük akışı temsil eden bütünleşik senaryo: proje bağlamı → hatırlatma/ajanda → plan → puantaj → saha rehberi/İSG/KKD → beton/malzeme → envanter/medya → backup/recovery; tekrar veri girişi, context drift, dead end ve mutation sürprizi olmamalı. Inventory'de Q05 same-point cluster/create ve sade Kroki interaction'ı bu senaryonun doğal parçasıdır.
+Tek projede gerçek günlük akışı temsil eden bütünleşik senaryo: proje bağlamı → hatırlatma/ajanda → plan → İş Gücü/Sicil/Puantaj → İSG/KKD → beton/malzeme → envanter/medya → backup/recovery; tekrar veri girişi, context drift, dead end ve mutation sürprizi olmamalı. Q05 Firma → Personel prerequisite ve Q06 same-point Inventory cluster/create bu senaryonun doğal parçasıdır.
 
 ### Q24 — Otomatik milestone gate + analyze/build + artifact provenance
 
@@ -665,8 +781,8 @@ Bu kural, sıra ve numaraların tarihsel referans uğruna dondurulmasını engel
 Aşağıdakiler Q01–Q26 release kuyruğunu bloke etmez, ancak owner kararıyla daha sonra aktive edilebilir:
 
 - **DWG Viewer v1 / Issue #523:** `POST-RELEASE / DEFERRED`. DWG ve doküman viewer uzun vadeli ana ürün hedefidir; ilk genel yayın bağımlılığı değildir.
-- Q14'te V1 dışına alınırsa otomatik personel kodu.
-- Q15'te B seçilirse kapsamlı Metraj katalog/çalışma merkezi.
+- Q15'te V1 dışına alınırsa otomatik personel kodu.
+- Q16'da B seçilirse kapsamlı Metraj katalog/çalışma merkezi.
 - V2.12 Günlük Log v2 ve V2.13 Mini Hesap Makinesi: mevcut owner pause kararı sürer.
 - Ayrı ürün toplantısı/brainstorm kayıtları, owner tarafından pre-release queue'ya taşınmadıkça yayın blocker'ı değildir.
 - Büyük AI/semantic search, SaaS/multi-user, Primavera replacement ve geniş CAD/GIS hedefleri ilk genel yayın dışında kalır.
