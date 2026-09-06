@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui' show PointerDeviceKind;
+import 'dart:ui' show PointerDeviceKind, SemanticsAction;
 
 import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
@@ -222,9 +222,29 @@ void main() {
       }
 
       await tapControl('inventory-editor-mode-select');
+      expect(
+        find.byKey(const Key('inventory-editor-movement-wheel')),
+        findsNothing,
+      );
       await tapPoint(_point(1664, 512));
       expect(controller.editor!.selection?.segmentIndex, 0);
-      await tapControl('inventory-editor-nudge-up');
+      expect(
+        find.byKey(const Key('inventory-editor-movement-wheel')),
+        findsOneWidget,
+      );
+      await tapControl('inventory-editor-wheel-right');
+      expect(
+        controller.lastErrorCode,
+        'inventory_block_edge_nudge_direction_invalid',
+      );
+      expect(controller.editor!.geometry.canonicalJson, geometry.canonicalJson);
+      expect(controller.editor!.undoDepth, 0);
+      expect(fake.saveCalls, isEmpty);
+      expect(
+        find.byKey(const Key('inventory-editor-spatial-diagnostic')),
+        findsOneWidget,
+      );
+      await tapControl('inventory-editor-wheel-up');
       expect(controller.editor!.geometry.polylines.single.points, [
         _point(640, 448),
         _point(2688, 448),
@@ -233,7 +253,7 @@ void main() {
       ]);
       await tapPoint(_point(1664, 448));
       expect(controller.editor!.selection?.wholePolyline, isTrue);
-      await tapControl('inventory-editor-nudge-right');
+      await tapControl('inventory-editor-wheel-right');
       expect(controller.editor!.geometry.polylines.single.points, [
         _point(704, 448),
         _point(2752, 448),
@@ -243,7 +263,7 @@ void main() {
       await tapPoint(_point(2752, 1280));
       expect(controller.editor!.selection?.wholePolyline, isFalse);
       expect(controller.editor!.selection?.segmentIndex, 1);
-      await tapControl('inventory-editor-nudge-left');
+      await tapControl('inventory-editor-wheel-left');
       final reshaped = controller.editor!.geometry.polylines.single;
       expect(reshaped.points, [
         _point(704, 448),
@@ -2946,6 +2966,379 @@ void main() {
     },
   );
 
+  testWidgets(
+    'movement wheel keeps grid steps, history and the pending autosave on confirm',
+    (tester) async {
+      final blockId = _uuid(27000);
+      final geometry = _rectangleGeometry(
+        left: 640,
+        top: 512,
+        right: 2688,
+        bottom: 2048,
+      );
+      final fake = _FakeInventoryApplication.withMappedActive(
+        geometry: geometry,
+        blocks: [_blockRecord(id: blockId)],
+        floors: [_floorRecord(id: _uuid(27001), blockId: blockId)],
+        activeBlockPolygons: [
+          _blockPolygon(
+            revisionId: _activeId,
+            blockId: blockId,
+            polygonIndex: 0,
+          ),
+        ],
+      );
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(
+        tester,
+        fake,
+        _OrientationRecorder(),
+        pageKey,
+        intent: InventorySketchLaunchIntent.editActive,
+      );
+      final controller = pageKey.currentState!.controller;
+      final wheel = find.byKey(const Key('inventory-editor-movement-wheel'));
+
+      Future<void> tapControl(String name) async {
+        final control = find.byKey(Key('inventory-editor-$name'));
+        await tester.ensureVisible(control);
+        await tester.pump();
+        expect(control.hitTestable(), findsOneWidget);
+        await tester.tap(control);
+        await tester.pump();
+      }
+
+      Future<void> selectWholePolyline() async {
+        final points = controller.editor!.geometry.polylines.single.points;
+        final midpoint = _point((points[0].x + points[1].x) ~/ 2, points[0].y);
+        final canvas = find.byKey(const Key('inventory-sketch-canvas-gesture'));
+        final canvasState = tester.state<InventorySketchCanvasState>(
+          find.byType(InventorySketchCanvas),
+        );
+        final target =
+            tester.getTopLeft(canvas) +
+            canvasState.viewport!.virtualToView(midpoint);
+        await tester.tapAt(target);
+        await tester.pump();
+        expect(controller.editor!.selection?.wholePolyline, isFalse);
+        await tester.tapAt(target);
+        await tester.pump();
+        expect(controller.editor!.selection?.wholePolyline, isTrue);
+        expect(wheel, findsOneWidget);
+      }
+
+      await tapControl('mode-select');
+      expect(wheel, findsNothing);
+      await selectWholePolyline();
+      final selection = controller.editor!.selection;
+      final history = [geometry.canonicalJson];
+      var expectedPoints = geometry.polylines.single.points;
+      const step = InventoryGeometryContract.sketchGridStep;
+      for (final movement in [
+        ('up', 0, -step),
+        ('right', step, 0),
+        ('right', step, 0),
+        ('down', 0, step),
+        ('left', -step, 0),
+      ]) {
+        final beforeTap = controller.editor!;
+        await tapControl('wheel-${movement.$1}');
+        final actualPoints =
+            controller.editor!.geometry.polylines.single.points;
+        final beforePoints = beforeTap.geometry.polylines.single.points;
+        expect(controller.lastErrorCode, isNull, reason: movement.$1);
+        expect(
+          [
+            for (var index = 0; index < beforePoints.length; index += 1)
+              (
+                actualPoints[index].x - beforePoints[index].x,
+                actualPoints[index].y - beforePoints[index].y,
+              ),
+          ],
+          List.filled(beforePoints.length, (movement.$2, movement.$3)),
+          reason: '${movement.$1}: one tap moves every point one grid step',
+        );
+        expect(
+          controller.editor!.undoDepth - beforeTap.undoDepth,
+          1,
+          reason: '${movement.$1}: one tap records exactly one nudge',
+        );
+        expectedPoints = [
+          for (final point in expectedPoints)
+            _point(point.x + movement.$2, point.y + movement.$3),
+        ];
+        expect(
+          actualPoints.map((point) => (point.x, point.y)),
+          expectedPoints.map((point) => (point.x, point.y)),
+          reason: movement.$1,
+        );
+        expect(controller.editor!.selection, selection);
+        expect(controller.editor!.undoDepth, history.length);
+        expect(controller.editor!.redoDepth, 0);
+        expect(wheel, findsOneWidget);
+        history.add(controller.editor!.geometry.canonicalJson);
+      }
+
+      await tester.pump(const Duration(milliseconds: 200));
+      final beforeConfirm = controller.editor!;
+      final beforeProjection = fake.projection;
+      final beforeRevision = controller.expectedContentRevision;
+      final beforeSaveStatus = controller.saveStatus;
+      final beforeMappings = controller.existingBlockMappings
+          .map((mapping) => (mapping.blockId, mapping.polygonIndex))
+          .toList();
+      await tapControl('wheel-confirm');
+      expect(controller.editor!.selection, isNull);
+      expect(controller.editor!.mode, InventorySketchEditorMode.select);
+      expect(wheel, findsNothing);
+      expect(controller.editor!.geometry, same(beforeConfirm.geometry));
+      expect(controller.editor!.undoDepth, beforeConfirm.undoDepth);
+      expect(controller.editor!.redoDepth, beforeConfirm.redoDepth);
+      expect(
+        controller.editor!.workingPolylineIndex,
+        beforeConfirm.workingPolylineIndex,
+      );
+      expect(
+        controller.existingBlockMappings.map(
+          (mapping) => (mapping.blockId, mapping.polygonIndex),
+        ),
+        beforeMappings,
+      );
+      expect(controller.newBlocks, isEmpty);
+      expect(controller.expectedContentRevision, beforeRevision);
+      expect(controller.saveStatus, beforeSaveStatus);
+      expect(fake.projection, same(beforeProjection));
+      expect(controller.hasUnacknowledgedGeometry, isTrue);
+      expect(fake.saveCalls, isEmpty);
+      expect(fake.finalizeCalls, 0);
+      expect(controller.finalizing, isFalse);
+      expect(controller.finalizePersisted, isFalse);
+
+      // Confirmation neither flushes nor restarts the existing 500 ms debounce.
+      await tester.pump(const Duration(milliseconds: 299));
+      expect(fake.saveCalls, isEmpty);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(fake.saveCalls, hasLength(1));
+      expect(fake.saveCalls.single.geometry.canonicalJson, history.last);
+      expect(fake.finalizeCalls, 0);
+
+      for (var index = history.length - 2; index >= 0; index -= 1) {
+        await tapControl('undo');
+        expect(controller.editor!.geometry.canonicalJson, history[index]);
+        expect(controller.editor!.undoDepth, index);
+        expect(controller.editor!.selection, isNull);
+        expect(wheel, findsNothing);
+      }
+      for (var index = 1; index < history.length; index += 1) {
+        await tapControl('redo');
+        expect(controller.editor!.geometry.canonicalJson, history[index]);
+        expect(controller.editor!.undoDepth, index);
+        expect(wheel, findsNothing);
+      }
+      await selectWholePolyline();
+      await tapControl('delete');
+      expect(
+        find.byKey(const Key('inventory-block-lifecycle-dialog')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const Key('inventory-block-lifecycle-detach')),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.editor!.geometry.polylines, isEmpty);
+      expect(wheel, findsNothing);
+      await tapControl('undo');
+      expect(controller.editor!.geometry.canonicalJson, history.last);
+      await tapControl('redo');
+      expect(controller.editor!.geometry.polylines, isEmpty);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final size in [
+    const Size(320, 800),
+    const Size(390, 844),
+    const Size(320, 320),
+    const Size(390, 320),
+  ]) {
+    testWidgets(
+      'movement wheel is reachable and accessible at $size / text 2',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 16);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPadding);
+        final semantics = tester.ensureSemantics();
+        try {
+          final fake = _FakeInventoryApplication.withDraft(
+            _rectangleGeometry(left: 640, top: 512, right: 2688, bottom: 2048),
+            draftNewBlocks: _blockDrafts(),
+          );
+          final pageKey = GlobalKey<InventorySketchEditorPageState>();
+          await _openEditor(
+            tester,
+            fake,
+            _OrientationRecorder(),
+            pageKey,
+            textScale: 2,
+          );
+          final controller = pageKey.currentState!.controller;
+          final wheel = find.byKey(
+            const Key('inventory-editor-movement-wheel'),
+          );
+          final toolbar = find.byKey(
+            const Key('inventory-editor-right-toolbar'),
+          );
+          final canvas = find.byType(InventorySketchCanvas);
+          final canvasState = tester.state<InventorySketchCanvasState>(canvas);
+          final canvasRect = tester.getRect(canvas);
+          final viewport = canvasState.viewport!;
+          final originalGeometry = controller.editor!.geometry;
+          expect(wheel, findsNothing);
+          final select = find.byKey(const Key('inventory-editor-mode-select'));
+          await tester.ensureVisible(select);
+          await tester.tap(select);
+          await tester.pump();
+          expect(wheel, findsNothing);
+          controller.selectAt(
+            viewport.virtualToView(_point(1664, 512)),
+            viewport,
+          );
+          await tester.pump();
+          expect(controller.editor!.selection?.wholePolyline, isFalse);
+          expect(wheel, findsOneWidget);
+          final wheelRect = tester.getRect(wheel);
+          expect(wheelRect.size, const Size(160, 160));
+          expect(wheelRect.left, greaterThanOrEqualTo(canvasRect.left));
+          expect(wheelRect.top, greaterThanOrEqualTo(canvasRect.top));
+          expect(wheelRect.bottom, lessThanOrEqualTo(canvasRect.bottom));
+          expect(wheelRect.overlaps(tester.getRect(toolbar)), isFalse);
+          expect(
+            wheelRect.overlaps(
+              tester.getRect(
+                find.byKey(const Key('inventory-editor-save-status-overlay')),
+              ),
+            ),
+            isFalse,
+          );
+          expect(
+            wheelRect.contains(
+              canvasRect.topLeft + viewport.virtualToView(_point(640, 512)),
+            ),
+            isFalse,
+          );
+          expect(tester.getRect(canvas), canvasRect);
+          expect(canvasState.viewport!.zoom, viewport.zoom);
+          expect(tester.widget<Material>(wheel).shape, isA<CircleBorder>());
+          for (final oldDirection in ['up', 'right', 'down', 'left']) {
+            expect(
+              find.byKey(Key('inventory-editor-nudge-$oldDirection')),
+              findsNothing,
+            );
+          }
+          final controls = <String, String>{
+            'up': 'Yukarı taşı',
+            'right': 'Sağa taşı',
+            'down': 'Aşağı taşı',
+            'left': 'Sola taşı',
+            'confirm': 'Seçimi tamamla',
+          };
+          expect(
+            find.descendant(of: wheel, matching: find.byType(IconButton)),
+            findsNWidgets(5),
+          );
+          for (final entry in controls.entries) {
+            final control = find.byKey(
+              Key('inventory-editor-wheel-${entry.key}'),
+            );
+            expect(control.hitTestable(), findsOneWidget);
+            expect(tester.getSize(control).width, greaterThanOrEqualTo(48));
+            expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+            final data = tester.getSemantics(control).getSemanticsData();
+            expect(data.label, entry.value);
+            expect(data.flagsCollection.isButton, isTrue);
+            // The label wraps the native button's separate semantics boundary.
+            final button = find.descendant(
+              of: control,
+              matching: find.byType(IconButton),
+            );
+            final buttonSemantics = tester.getSemantics(button);
+            expect(
+              buttonSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+              isTrue,
+            );
+            final semanticBounds = buttonSemantics.rect.size;
+            expect(semanticBounds.width, greaterThanOrEqualTo(48));
+            expect(semanticBounds.height, greaterThanOrEqualTo(48));
+            expect(
+              tester
+                  .widget<Tooltip>(
+                    find.descendant(
+                      of: control,
+                      matching: find.byType(Tooltip),
+                    ),
+                  )
+                  .message,
+              entry.value,
+            );
+          }
+          final confirm = find.byKey(
+            const Key('inventory-editor-wheel-confirm'),
+          );
+          final confirmIcon = find.descendant(
+            of: confirm,
+            matching: find.byType(Icon),
+          );
+          Focus.of(tester.element(confirmIcon)).requestFocus();
+          await tester.pump();
+          await tester.sendKeyEvent(LogicalKeyboardKey.space);
+          await tester.pump();
+          expect(controller.editor!.selection, isNull);
+          expect(controller.editor!.mode, InventorySketchEditorMode.select);
+          expect(controller.editor!.geometry, same(originalGeometry));
+          expect(controller.editor!.undoDepth, 0);
+          expect(wheel, findsNothing);
+          await tester.pump(const Duration(milliseconds: 600));
+          expect(fake.saveCalls, isEmpty);
+          expect(fake.finalizeCalls, 0);
+
+          for (final mode in ['pan', 'draw']) {
+            controller.selectAt(
+              viewport.virtualToView(_point(1664, 512)),
+              viewport,
+            );
+            controller.selectAt(
+              viewport.virtualToView(_point(1664, 512)),
+              viewport,
+            );
+            await tester.pump();
+            expect(controller.editor!.selection?.wholePolyline, isTrue);
+            expect(wheel, findsOneWidget);
+            final modeControl = find.byKey(Key('inventory-editor-mode-$mode'));
+            await tester.ensureVisible(modeControl);
+            await tester.tap(modeControl);
+            await tester.pump();
+            expect(controller.editor!.selection, isNull);
+            expect(wheel, findsNothing);
+            expect(controller.editor!.geometry, same(originalGeometry));
+            await tester.ensureVisible(select);
+            await tester.tap(select);
+            await tester.pump();
+          }
+          expect(tester.takeException(), isNull);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
+
   testWidgets('full-screen editor uses accessible icon-only right toolbar', (
     tester,
   ) async {
@@ -2992,10 +3385,6 @@ void main() {
       Key('inventory-editor-close-block'): 'Alanı kapat',
       Key('inventory-editor-free-length'): 'Serbest uzunluk',
       Key('inventory-editor-delete'): 'Seçileni sil',
-      Key('inventory-editor-nudge-up'): 'Yukarı taşı',
-      Key('inventory-editor-nudge-right'): 'Sağa taşı',
-      Key('inventory-editor-nudge-down'): 'Aşağı taşı',
-      Key('inventory-editor-nudge-left'): 'Sola taşı',
       Key('inventory-editor-zoom-out'): 'Uzaklaştır',
       Key('inventory-editor-zoom-in'): 'Yakınlaştır',
       Key('inventory-editor-fit'): 'Tamamını göster',

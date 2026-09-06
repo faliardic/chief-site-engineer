@@ -534,6 +534,13 @@ class InventorySketchEditorController extends ChangeNotifier {
     _notify();
   }
 
+  void clearSelection() {
+    final current = editor;
+    if (current == null || current.selection == null) return;
+    editor = current.withSelection(null);
+    _notify();
+  }
+
   bool nudgeSelection(InventorySketchNudgeDirection direction) {
     final current = editor;
     final selection = current?.selection;
@@ -2247,6 +2254,16 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
               ),
             ),
           ),
+        if (editor.mode == InventorySketchEditorMode.select &&
+            editor.selection != null)
+          Positioned(
+            right: 80,
+            bottom: 80,
+            child: _SelectionMovementWheel(
+              onNudge: controller.nudgeSelection,
+              onConfirm: controller.clearSelection,
+            ),
+          ),
         Positioned(
           top: 8,
           right: 8,
@@ -2259,7 +2276,6 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
             onRedo: controller.redo,
             onFinish: controller.finishWorkingPolyline,
             onClose: () => unawaited(_closeCurrentBlock()),
-            onNudge: controller.nudgeSelection,
             onDelete: () => unawaited(_deleteSelection()),
             freeLengthNextSegment: controller.freeLengthNextSegment,
             onFreeLengthChanged: controller.setFreeLengthNextSegment,
@@ -2303,6 +2319,111 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
   };
 }
 
+class _SelectionMovementWheel extends StatelessWidget {
+  const _SelectionMovementWheel({
+    required this.onNudge,
+    required this.onConfirm,
+  });
+
+  final ValueChanged<InventorySketchNudgeDirection> onNudge;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    key: const Key('inventory-editor-movement-wheel'),
+    color: Theme.of(context).colorScheme.surfaceContainerHigh,
+    elevation: 4,
+    shape: const CircleBorder(),
+    child: SizedBox.square(
+      dimension: 160,
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Stack(
+          children: [
+            Align(
+              alignment: Alignment.topCenter,
+              child: _MovementWheelButton(
+                key: const Key('inventory-editor-wheel-up'),
+                label: 'Yukarı taşı',
+                icon: Icons.keyboard_arrow_up_rounded,
+                onPressed: () => onNudge(InventorySketchNudgeDirection.up),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: _MovementWheelButton(
+                key: const Key('inventory-editor-wheel-right'),
+                label: 'Sağa taşı',
+                icon: Icons.keyboard_arrow_right_rounded,
+                onPressed: () => onNudge(InventorySketchNudgeDirection.right),
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: _MovementWheelButton(
+                key: const Key('inventory-editor-wheel-down'),
+                label: 'Aşağı taşı',
+                icon: Icons.keyboard_arrow_down_rounded,
+                onPressed: () => onNudge(InventorySketchNudgeDirection.down),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _MovementWheelButton(
+                key: const Key('inventory-editor-wheel-left'),
+                label: 'Sola taşı',
+                icon: Icons.keyboard_arrow_left_rounded,
+                onPressed: () => onNudge(InventorySketchNudgeDirection.left),
+              ),
+            ),
+            Align(
+              alignment: Alignment.center,
+              child: _MovementWheelButton(
+                key: const Key('inventory-editor-wheel-confirm'),
+                label: 'Seçimi tamamla',
+                icon: Icons.check_rounded,
+                emphasized: true,
+                onPressed: onConfirm,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _MovementWheelButton extends StatelessWidget {
+  const _MovementWheelButton({
+    required super.key,
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: label,
+    button: true,
+    child: Tooltip(
+      message: label,
+      excludeFromSemantics: true,
+      child: SizedBox.square(
+        dimension: 48,
+        child: emphasized
+            ? IconButton.filled(onPressed: onPressed, icon: Icon(icon))
+            : IconButton(onPressed: onPressed, icon: Icon(icon)),
+      ),
+    ),
+  );
+}
+
 class _EditorToolbar extends StatelessWidget {
   const _EditorToolbar({
     required this.editor,
@@ -2312,7 +2433,6 @@ class _EditorToolbar extends StatelessWidget {
     required this.onRedo,
     required this.onFinish,
     required this.onClose,
-    required this.onNudge,
     required this.onDelete,
     required this.freeLengthNextSegment,
     required this.onFreeLengthChanged,
@@ -2331,7 +2451,6 @@ class _EditorToolbar extends StatelessWidget {
   final VoidCallback onRedo;
   final VoidCallback onFinish;
   final VoidCallback onClose;
-  final ValueChanged<InventorySketchNudgeDirection> onNudge;
   final VoidCallback onDelete;
   final bool freeLengthNextSegment;
   final ValueChanged<bool> onFreeLengthChanged;
@@ -2448,38 +2567,6 @@ class _EditorToolbar extends StatelessWidget {
                       label: 'Seçileni sil',
                       icon: const Icon(Icons.delete_outline_rounded),
                       onPressed: editor.selection == null ? null : onDelete,
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-nudge-up'),
-                      label: 'Yukarı taşı',
-                      icon: const Icon(Icons.keyboard_arrow_up_rounded),
-                      onPressed: editor.selection == null
-                          ? null
-                          : () => onNudge(InventorySketchNudgeDirection.up),
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-nudge-right'),
-                      label: 'Sağa taşı',
-                      icon: const Icon(Icons.keyboard_arrow_right_rounded),
-                      onPressed: editor.selection == null
-                          ? null
-                          : () => onNudge(InventorySketchNudgeDirection.right),
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-nudge-down'),
-                      label: 'Aşağı taşı',
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                      onPressed: editor.selection == null
-                          ? null
-                          : () => onNudge(InventorySketchNudgeDirection.down),
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-nudge-left'),
-                      label: 'Sola taşı',
-                      icon: const Icon(Icons.keyboard_arrow_left_rounded),
-                      onPressed: editor.selection == null
-                          ? null
-                          : () => onNudge(InventorySketchNudgeDirection.left),
                     ),
                     const Divider(height: 8),
                     _ToolbarIconButton(
