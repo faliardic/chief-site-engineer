@@ -36,7 +36,7 @@ Aşağıdaki alanlar yeni queue maddesi olarak tekrar açılmaz; yalnız release
 - #618 kanonik frictionless UI/UX sözleşmesi + V2/roadmap truth-sync.
 - #617 Phase 1 adaptive/accessibility foundation.
 - #617 Phase 2 ortak form/action, search/filter, loading/error/retry ve insan-okunur event dili temel işleri.
-- Reminder/Unutma, Ajanda ve Living Plan günlük akış sadeleştirmelerinin mevcut merged dalgaları; Q02 yalnız 6 Eylül owner saha kullanımında kalan yeni sürtünme/bağlam borcunu ele alır.
+- Reminder/Unutma, Ajanda ve Living Plan günlük akış sadeleştirmelerinin mevcut merged dalgaları; Q02 ve Q03 yalnız 6 Eylül owner saha kullanımında kalan yeni sürtünme/bağlam borcunu ele alır.
 - Daily Log + Work Chain targeted Acceptance evidence closure (#698).
 - Saha Rehberi/Sicil temel bilgi mimarisi ve Puantaj prerequisite/quick-result sadeleştirmeleri.
 - İSG model audit + 20A aktif checklist/tracking temeli.
@@ -137,7 +137,68 @@ Bu alt dilim background/reboot engine değişikliği gerektirirse aynı STANDARD
 - notification `Ertele` kolaylığı temel reminder güvenilirliğinin önüne geçmez;
 - uygulama restart/background/permission/reboot davranışı değişiyorsa gerekli ayrı risk/gate tanımlanmadan merge edilmez.
 
-### Q03 — Ana Sayfa / Proje Profili genişletme
+### Q03 — Ajanda takvimi aktif-proje ve okunabilir ay görünümü
+
+**Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi — `Ajanda — Takvim` başlığı; #617 daily-core ilkeleri.  
+**Durum:** `QUEUED`
+
+Ajanda, proje yönetimi menüsü değil **aktif projenin takvim tabanlı saha zaman çizgisi** olarak çalışır. Bu Q mevcut Ajanda source/history sözleşmesini yeniden yazmaz; ay görünümündeki proje izolasyonu, okunabilirlik ve bağlam dışı yönetim eylemlerini düzeltir.
+
+#### CAL-01 — Takvimi ekran genişliğine sığdır
+
+- Ay takviminin yedi gün sütunu kullanılabilir ekran genişliği içinde tamamen görünür olur; normal kullanımda yatay kaydırma gerekmez.
+- Layout cihaz modeline değil kullanılabilir pencere genişliğine göre ölçeklenir.
+- Tarih okunabilirliği, 48×48 etkileşim/Semantics alanları, yüksek text scale ve safe inset korunur.
+- Görsel hücrenin küçülmesi gerçek dokunma alanını erişilemez hale getirmez.
+
+#### CAL-02 — Kayıt yoğunluğunu bounded göstergelerle göster
+
+- Bir günde Ajanda kaydı varsa tarih altında görünür kayıt göstergesi bulunur.
+- `1–3` kayıt için aynı sayıda küçük nokta kullanılabilir.
+- `4+` kayıtta sınırsız nokta veya spiral çizilmez; bounded nokta + sayısal badge/count ile toplam yoğunluk görünür tutulur.
+- Örneğin 100 kayıtta 100 ayrı nokta üretilmez; tarih hücresi kayıt sayacı yüzünden okunamaz hale gelmez.
+- Gösterge yalnız kayıt yoğunluğunu anlatır; güne dokunulduğunda gerçek kayıt listesi açılır/görünür.
+
+#### CAL-03 — Yalnız aktif projenin Ajanda kayıtları
+
+- Normal Ajanda ay/gün görünümünde yalnız aktif projeye ait kayıtlar gösterilir.
+- Başka projelerin kayıtları aynı takvimde karışmaz.
+- Başka projeyi görmek için shared active-project context değiştirilir; Ajanda içinde ikinci bir bağımsız proje sistemi kurulmaz.
+- Aktif proje değişimi source kaydı mutate etmez; görünüm context'i değişir.
+- Seçili gün semantik olarak mümkünse korunabilir, fakat eski projenin kayıtları görünmez.
+- Legacy/global/projesiz kayıt varsa silinmez veya sessizce başka projeye bağlanmaz; implementation audit'i güvenli erişim/disposition yolunu tanımlar.
+
+#### CAL-04 — `Yeni Proje` eylemini Ajanda'dan kaldır
+
+- Ajanda ana ekranındaki `Yeni Proje` butonu kaldırılır.
+- Proje oluşturma onboarding / proje seçici / proje profili bağlamında kalır.
+- Ajanda proje oluşturma giriş kapısı olmaz.
+
+#### CAL-05 — `Mahal Kataloğu` yönetimini Ajanda'dan çıkar
+
+- Ajanda ana ekranındaki `Mahal Kataloğu` yönetim girişi kaldırılır.
+- Mahal yönetiminin ana konumu Proje Profili / proje bağlamıdır.
+- Ajanda kaydı oluşturma akışı mevcut stable Mahal bilgisini **kullanabilir/seçebilir**, fakat Ajanda ana ekranı Mahal yönetim merkezi olmaz.
+- Bu madde Q04/AP-06 ile uyumludur; aynı navigasyon davranışı iki ayrı source-of-truth üretmez.
+
+#### CAL-06 — Seçili gün ve empty-state davranışı
+
+- Kullanıcı güne dokunduğunda o günün kayıtları aynı Ajanda bağlamında doğrudan görünür; sırf günlük listeyi görmek için gereksiz ayrı navigasyon dayatılmaz.
+- `Bu ay için Ajanda kaydı bulunmuyor.` ile `Bugün için kayıt yok.` gibi ay ve seçili-gün empty state'leri ayrılır.
+- Boş seçili günde görünür `+ Ajanda kaydı` ana eylemi sunulabilir.
+
+**Q03 bitiş tanımı:**
+
+- takvim yatay kaydırma olmadan kullanılabilir pencereye sığar;
+- kayıt olan günler yoğunluğu anlaşılır biçimde gösterir;
+- çok yüksek kayıt sayısı sınırsız nokta/spiral ile UI'ı bozmaz;
+- yalnız aktif proje kayıtları görünür;
+- `Yeni Proje` Ajanda'da bulunmaz;
+- `Mahal Kataloğu` yönetimi proje profiline taşınır, Ajanda Mahal'i yalnız bağlam olarak kullanır;
+- proje değişimi kayıtları mutate etmez;
+- seçili günün kayıtları ve empty state kullanıcıya doğrudan anlaşılır.
+
+### Q04 — Ana Sayfa / Proje Profili genişletme
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi — `Ana Sayfa / Proje Profili` başlığı  
 **Durum:** `QUEUED`
@@ -235,7 +296,7 @@ Bütün proje alanları aynı anda açık bir form yığınına dönüştürülm
 
 Dashboard hâlâ canlı proje kontrol merkezi olmalı; bakım/form yoğunluğu günlük saha bilgisini bastırmamalıdır.
 
-**Q03 bitiş tanımı:**
+**Q04 bitiş tanımı:**
 
 - proje genel bilgisi tek profilden okunabilir;
 - çok bloklu projede bloklar ayrı incelenebilir;
@@ -248,49 +309,49 @@ Dashboard hâlâ canlı proje kontrol merkezi olmalı; bakım/form yoğunluğu g
 - ilk proje oluşturma onlarca zorunlu alana dönüşmez;
 - schema/stable identity/persistence değişikliği gerekiyorsa ayrı CRITICAL yetki olmadan yapılmaz.
 
-### Q04 — KKD hızlı seçim
+### Q05 — KKD hızlı seçim
 
 **Kaynak:** #617 Phase 4 / item 21  
 **Durum:** `QUEUED`
 
 Amaç: günlük saha kullanımında mevcut canonical KKD semantiğini değiştirmeden hızlı, erişilebilir ve minimum dokunuşlu seçim/atama akışı.
 
-### Q05 — Beton tamamlanma / sonuç / detay / düzenleme akışı
+### Q06 — Beton tamamlanma / sonuç / detay / düzenleme akışı
 
 **Kaynak:** #617 Phase 5 / item 23  
 **Durum:** `QUEUED`
 
 Amaç: Beton Paketi'nin gerçek saha kullanımında create → sonuç → detail → edit/completion zincirini tamamlamak ve mevcut identity/attachment davranışını korumak.
 
-### Q06 — Malzemeler ortak UI/UX sistem uyumu
+### Q07 — Malzemeler ortak UI/UX sistem uyumu
 
 **Kaynak:** #617 Phase 5 / item 24  
 **Durum:** `QUEUED`
 
 Amaç: İstenecek Malzemeler ekranını shared project context, action, state, accessibility ve compact/adaptive görsel dile oturtmak; lifecycle source-of-truth'u değiştirmemek.
 
-### Q07 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
+### Q08 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
 
 **Kaynak:** #617 Phase 5 / item 25  
 **Durum:** `QUEUED`
 
 Amaç: supporting tools'ın final first-release information architecture ve erişim yerini netleştirmek; attachment/recovery güvenlik sınırlarını korumak.
 
-### Q08 — Minimum proje-geneli ortak arama
+### Q09 — Minimum proje-geneli ortak arama
 
 **Kaynak:** #617 Phase 6 / item 27  
 **Durum:** `QUEUED`
 
 İlk release için supported existing record families üzerinde basit, hızlı, project-safe ortak arama; enterprise/global index motoru değil.
 
-### Q09 — Kısa guided onboarding
+### Q10 — Kısa guided onboarding
 
 **Kaynak:** #617 Phase 6 / item 28  
 **Durum:** `QUEUED`
 
 Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günlük akış. Uzun tutorial yok.
 
-### Q10 — Puantaj tamamlanınca Ajanda'ya otomatik kayıt
+### Q11 — Puantaj tamamlanınca Ajanda'ya otomatik kayıt
 
 **Kaynak:** #617 owner decision `Puantaj → Ajanda automatic completion record`  
 **Durum:** `QUEUED — CRITICAL`
@@ -300,7 +361,7 @@ Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günl�
 - retry/reopen duplicate üretmez;
 - identity, transaction, failure, event/history ve rollback sözleşmeleri ayrı CRITICAL Issue'da kilitlenir.
 
-### Q11 — Şefim otomatik yedek klasörü
+### Q12 — Şefim otomatik yedek klasörü
 
 **Kaynak:** #617 owner decision `Backup destination folder`  
 **Durum:** `QUEUED — CRITICAL`
@@ -309,7 +370,7 @@ Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günl�
 - silent backup generation, overwrite, rotation/delete veya `.csebackup` format değişikliği bu kapsamın parçası değildir;
 - exact path/data-root, compatibility ve restore validation zorunludur.
 
-### Q12 — Otomatik personel kodu release kararı
+### Q13 — Otomatik personel kodu release kararı
 
 **Kaynak:** #617 Phase 4 / item 22  
 **Durum:** `DECISION GATE`
@@ -318,7 +379,7 @@ Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günl�
 - Fatih ilk genel yayın için gerekli görmezse açıkça `POST-RELEASE / DEFERRED` olarak işaretlenir.
 - Karar verilmeden sessiz implementation yapılmaz.
 
-### Q13 — Metraj V1 release kapsam kararı
+### Q14 — Metraj V1 release kapsam kararı
 
 **Kaynak:** #617 owner decision `Metraj scope expansion`  
 **Durum:** `DECISION GATE`
@@ -332,7 +393,7 @@ Yayın öncesi yapılacak karar:
 
 Fatih karar vermeden ChatGPT bu maddeyi sessizce atlamaz veya kapsamlı Metraj geliştirmesini başlatmaz.
 
-### Q14 — Global hızlı cetvel
+### Q15 — Global hızlı cetvel
 
 **Kaynak:** #617 owner decision `Quick Ruler global tool`  
 **Durum:** `QUEUED`
@@ -342,49 +403,50 @@ Fatih karar vermeden ChatGPT bu maddeyi sessizce atlamaz veya kapsamlı Metraj g
 - source/form/session mutation yok;
 - gerçek ölçü iddiasından önce device-aware physical calibration veya açık calibration fallback zorunludur.
 
-### Q15 — Minimum crash / ANR / fatal telemetry
+### Q16 — Minimum crash / ANR / fatal telemetry
 
 **Kaynak:** #617 Phase 6 / item 29  
 **Durum:** `QUEUED`
 
 Release kalitesinde crash/ANR/fatal görünürlüğü; privacy/local-first ve store beyanlarıyla uyumlu minimum kapsam.
 
-### Q16 — Privacy / KVKK / store declarations
+### Q17 — Privacy / KVKK / store declarations
 
 **Kaynak:** #617 Phase 6 / item 30  
 **Durum:** `QUEUED`
 
 Gerçek uygulama davranışı, izinler, local data, backup, medya ve telemetry ile birebir uyumlu privacy/KVKK/store açıklamaları. Uygulamada olmayan claim yok.
 
-### Q17 — Recovery / backup owner acceptance
+### Q18 — Recovery / backup owner acceptance
 
 **Kaynak:** #617 Phase 6 / item 31  
 **Durum:** `RELEASE GATE`
 
 - locked Restore Model A doğrulanır: exact backup state full replacement, restore öncesi safety backup, backup verification, etkilenen kayıt açıklaması, restore sonrası geri alma ve safety backup retention;
-- backup folder işi Q11 pre-release yapıldıysa bu tur onun gerçek cihaz davranışını da kapsar;
+- backup folder işi Q12 pre-release yapıldıysa bu tur onun gerçek cihaz davranışını da kapsar;
 - gerçek kritik data/destructive operasyon yalnız açık owner authority ile yürür.
 
-### Q18 — Compact / medium / expanded window matrisi
+### Q19 — Adaptive cihaz / pencere matrisi
 
-**Kaynak:** #617 Phase 7 / item 32  
+**Kaynak:** #617 Phase 7 / items 32–33  
 **Durum:** `RELEASE GATE`
 
-Breakpoint ve adaptive shell/content davranışının sistematik regresyon matrisi.
+Eski ayrı `compact/medium/expanded` ve `telefon/tablet/portrait/landscape/split-screen` gate'leri aynı doğrulama ailesinde birleştirilmiştir:
 
-### Q19 — Telefon / tablet / portrait / landscape / split-screen
+- compact / medium / expanded breakpoint davranışı;
+- telefon ve tablet sınıfı;
+- portrait / landscape;
+- split-screen / resize;
+- kritik state retention, okunabilirlik, taşma ve adaptive navigation davranışı.
 
-**Kaynak:** #617 Phase 7 / item 33  
-**Durum:** `RELEASE GATE`
-
-Gerçek hedef cihaz sınıfları ve kullanılabilir pencere boyutlarında kritik akışların kontrolü.
+Aynı RC ve aynı senaryodan üretilebilen kanıt tekrar çalıştırılmaz; estetik mükemmellik değil işlevsel/adaptive yeterlilik aranır.
 
 ### Q20 — TalkBack / yüksek yazı / focus / grayscale
 
 **Kaynak:** #617 Phase 7 / item 34  
 **Durum:** `RELEASE GATE`
 
-Primary navigation ve kritik create/edit/confirm akışlarında erişilebilirlik kapanışı.
+Primary navigation ve kritik create/edit/save/confirm akışlarında erişilebilirlik kapanışı; yeni bir görsel redesign programına dönüşmez.
 
 ### Q21 — Eksik #616 evidence + Inventory release-QA kapanışı
 
@@ -463,8 +525,8 @@ Bu kural, sıra ve numaraların tarihsel referans uğruna dondurulmasını engel
 Aşağıdakiler Q01–Q26 release kuyruğunu bloke etmez, ancak owner kararıyla daha sonra aktive edilebilir:
 
 - **DWG Viewer v1 / Issue #523:** `POST-RELEASE / DEFERRED`. DWG ve doküman viewer uzun vadeli ana ürün hedefidir; ilk genel yayın bağımlılığı değildir.
-- Q12'de V1 dışına alınırsa otomatik personel kodu.
-- Q13'te B seçilirse kapsamlı Metraj katalog/çalışma merkezi.
+- Q13'te V1 dışına alınırsa otomatik personel kodu.
+- Q14'te B seçilirse kapsamlı Metraj katalog/çalışma merkezi.
 - V2.12 Günlük Log v2 ve V2.13 Mini Hesap Makinesi: mevcut owner pause kararı sürer.
 - Ayrı ürün toplantısı/brainstorm kayıtları, owner tarafından pre-release queue'ya taşınmadıkça yayın blocker'ı değildir.
 - Büyük AI/semantic search, SaaS/multi-user, Primavera replacement ve geniş CAD/GIS hedefleri ilk genel yayın dışında kalır.
