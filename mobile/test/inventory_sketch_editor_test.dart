@@ -3190,9 +3190,7 @@ void main() {
           final wheel = find.byKey(
             const Key('inventory-editor-movement-wheel'),
           );
-          final toolbar = find.byKey(
-            const Key('inventory-editor-right-toolbar'),
-          );
+          final toolbar = find.byKey(const Key('inventory-editor-top-toolbar'));
           final canvas = find.byType(InventorySketchCanvas);
           final canvasState = tester.state<InventorySketchCanvasState>(canvas);
           final canvasRect = tester.getRect(canvas);
@@ -3216,6 +3214,11 @@ void main() {
           expect(wheelRect.left, greaterThanOrEqualTo(canvasRect.left));
           expect(wheelRect.top, greaterThanOrEqualTo(canvasRect.top));
           expect(wheelRect.bottom, lessThanOrEqualTo(canvasRect.bottom));
+          expect(wheelRect.right, closeTo(canvasRect.right - 80, 0.01));
+          expect(
+            canvasRect.bottom - wheelRect.bottom,
+            size.height == 320 ? 64 : 80,
+          );
           expect(wheelRect.overlaps(tester.getRect(toolbar)), isFalse);
           expect(
             wheelRect.overlaps(
@@ -3339,123 +3342,269 @@ void main() {
     );
   }
 
-  testWidgets('full-screen editor uses accessible icon-only right toolbar', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(320, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final fake = _FakeInventoryApplication.withDraft(
-      _closedBlockGeometry(),
-      draftNewBlocks: _blockDrafts(),
-    );
-    final orientations = _OrientationRecorder();
-    final pageKey = GlobalKey<InventorySketchEditorPageState>();
-    await _openEditor(tester, fake, orientations, pageKey, textScale: 1.6);
-    expect(orientations.calls.single, [DeviceOrientation.portraitUp]);
+  for (final size in [
+    const Size(320, 800),
+    const Size(390, 844),
+    const Size(320, 320),
+    const Size(390, 320),
+  ]) {
+    testWidgets('horizontal top toolbar stays accessible at $size / text 2', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      tester.view.padding = const FakeViewPadding(top: 24, bottom: 16);
+      addTearDown(tester.view.resetPadding);
+      final semantics = tester.ensureSemantics();
+      try {
+        final fake = _FakeInventoryApplication.withDraft(
+          _closedBlockGeometry(),
+          draftNewBlocks: _blockDrafts(),
+        );
+        final orientations = _OrientationRecorder();
+        final pageKey = GlobalKey<InventorySketchEditorPageState>();
+        await _openEditor(tester, fake, orientations, pageKey, textScale: 2);
+        expect(orientations.calls.single, [DeviceOrientation.portraitUp]);
 
-    expect(find.byType(AppBar), findsNothing);
-    final workspace = find.byKey(
-      const Key('inventory-editor-fullscreen-workspace'),
-    );
-    final canvas = find.byKey(const Key('inventory-sketch-canvas-gesture'));
-    final toolbar = find.byKey(const Key('inventory-editor-right-toolbar'));
-    expect(workspace, findsOneWidget);
-    expect(canvas, findsOneWidget);
-    expect(toolbar, findsOneWidget);
-    expect(tester.getRect(canvas).size, tester.getRect(workspace).size);
-    expect(
-      tester.getRect(toolbar).right,
-      closeTo(tester.getRect(workspace).right - 8, 0.1),
-    );
-    expect(
-      find.descendant(of: toolbar, matching: find.byType(Text)),
-      findsNothing,
-    );
-
-    final controls = <Key, String>{
-      Key('inventory-editor-back'): 'Geri',
-      Key('inventory-editor-mode-draw'): 'Çiz',
-      Key('inventory-editor-mode-select'): 'Seç',
-      Key('inventory-editor-mode-pan'): 'Taşı',
-      Key('inventory-editor-undo'): 'Geri al',
-      Key('inventory-editor-redo'): 'İleri al',
-      Key('inventory-editor-finish-line'): 'Çizgiyi bitir',
-      Key('inventory-editor-close-block'): 'Alanı kapat',
-      Key('inventory-editor-free-length'): 'Serbest uzunluk',
-      Key('inventory-editor-delete'): 'Seçileni sil',
-      Key('inventory-editor-zoom-out'): 'Uzaklaştır',
-      Key('inventory-editor-zoom-in'): 'Yakınlaştır',
-      Key('inventory-editor-fit'): 'Tamamını göster',
-      Key('inventory-editor-finalize'): 'Krokiyi yayınla',
-    };
-    for (final entry in controls.entries) {
-      final control = find.byKey(entry.key);
-      expect(control, findsOneWidget);
-      await tester.ensureVisible(control);
-      await tester.pump();
-      expect(control.hitTestable(), findsOneWidget);
-      expect(tester.getSize(control).width, greaterThanOrEqualTo(40));
-      expect(tester.getSize(control).height, greaterThanOrEqualTo(40));
-      expect(
-        tester
-            .widgetList<Tooltip>(
-              find.descendant(of: control, matching: find.byType(Tooltip)),
+        expect(find.byType(AppBar), findsNothing);
+        final workspace = find.byKey(
+          const Key('inventory-editor-fullscreen-workspace'),
+        );
+        final canvas = find.byKey(const Key('inventory-sketch-canvas-gesture'));
+        final toolbar = find.byKey(const Key('inventory-editor-top-toolbar'));
+        expect(workspace, findsOneWidget);
+        expect(canvas, findsOneWidget);
+        expect(toolbar, findsOneWidget);
+        expect(
+          find.byKey(const Key('inventory-editor-right-toolbar')),
+          findsNothing,
+        );
+        expect(tester.getRect(canvas).size, tester.getRect(workspace).size);
+        final canvasRect = tester.getRect(canvas);
+        final viewportBefore = tester
+            .state<InventorySketchCanvasState>(
+              find.byType(InventorySketchCanvas),
             )
-            .map((tooltip) => tooltip.message),
-        contains(entry.value),
-      );
-      expect(
-        tester
-            .widgetList<Semantics>(
-              find.descendant(of: control, matching: find.byType(Semantics)),
+            .viewport!;
+        final geometryBefore =
+            pageKey.currentState!.controller.editor!.geometry;
+        final toolbarRect = tester.getRect(toolbar);
+        expect(
+          toolbarRect.top,
+          closeTo(tester.getRect(workspace).top + 8, 0.01),
+        );
+        expect(
+          toolbarRect.left,
+          closeTo(tester.getRect(workspace).left + 8, 0.01),
+        );
+        expect(toolbarRect.height, 48);
+        final scrollView = find.descendant(
+          of: toolbar,
+          matching: find.byType(SingleChildScrollView),
+        );
+        expect(scrollView, findsOneWidget);
+        expect(
+          tester.widget<SingleChildScrollView>(scrollView).scrollDirection,
+          Axis.horizontal,
+        );
+        expect(
+          tester.getRect(toolbar).right,
+          closeTo(tester.getRect(workspace).right - 8, 0.1),
+        );
+        expect(
+          find.descendant(of: toolbar, matching: find.byType(Text)),
+          findsNothing,
+        );
+
+        final controls = <Key, String>{
+          Key('inventory-editor-back'): 'Geri',
+          Key('inventory-editor-mode-draw'): 'Çiz',
+          Key('inventory-editor-mode-select'): 'Seç',
+          Key('inventory-editor-mode-pan'): 'Taşı',
+          Key('inventory-editor-undo'): 'Geri al',
+          Key('inventory-editor-redo'): 'İleri al',
+          Key('inventory-editor-finish-line'): 'Çizgiyi bitir',
+          Key('inventory-editor-close-block'): 'Alanı kapat',
+          Key('inventory-editor-free-length'): 'Serbest uzunluk',
+          Key('inventory-editor-delete'): 'Seçileni sil',
+          Key('inventory-editor-zoom-out'): 'Uzaklaştır',
+          Key('inventory-editor-zoom-in'): 'Yakınlaştır',
+          Key('inventory-editor-fit'): 'Tamamını göster',
+          Key('inventory-editor-finalize'): 'Krokiyi yayınla',
+        };
+        final disabled = {
+          const Key('inventory-editor-undo'),
+          const Key('inventory-editor-redo'),
+          const Key('inventory-editor-finish-line'),
+          const Key('inventory-editor-close-block'),
+          const Key('inventory-editor-free-length'),
+          const Key('inventory-editor-delete'),
+        };
+        var previousX = double.negativeInfinity;
+        for (final key in controls.keys) {
+          final center = tester.getCenter(find.byKey(key));
+          expect(center.dx, greaterThan(previousX));
+          expect(center.dy, closeTo(toolbarRect.center.dy, 0.01));
+          previousX = center.dx;
+        }
+        for (final entry in controls.entries) {
+          final control = find.byKey(entry.key);
+          expect(control, findsOneWidget);
+          await tester.ensureVisible(control);
+          await tester.pump();
+          expect(control.hitTestable(), findsOneWidget);
+          expect(tester.getSize(control).width, greaterThanOrEqualTo(48));
+          expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+          final button = find.descendant(
+            of: control,
+            matching: find.byType(IconButton),
+          );
+          expect(
+            tester.widget<IconButton>(button).onPressed != null,
+            !disabled.contains(entry.key),
+          );
+          final labelData = tester.getSemantics(control).getSemanticsData();
+          expect(labelData.label, entry.value);
+          expect(labelData.flagsCollection.isButton, isTrue);
+          final buttonSemantics = tester.getSemantics(button);
+          expect(
+            buttonSemantics.getSemanticsData().hasAction(SemanticsAction.tap),
+            !disabled.contains(entry.key),
+          );
+          expect(buttonSemantics.rect.width, greaterThanOrEqualTo(48));
+          expect(buttonSemantics.rect.height, greaterThanOrEqualTo(48));
+          expect(
+            tester
+                .widgetList<Tooltip>(
+                  find.descendant(of: control, matching: find.byType(Tooltip)),
+                )
+                .map((tooltip) => tooltip.message),
+            contains(entry.value),
+          );
+          expect(
+            tester
+                .widgetList<Semantics>(
+                  find.descendant(
+                    of: control,
+                    matching: find.byType(Semantics),
+                  ),
+                )
+                .map((semantics) => semantics.properties.label),
+            contains(entry.value),
+          );
+        }
+        final scrollState = tester.state<ScrollableState>(
+          find.descendant(of: toolbar, matching: find.byType(Scrollable)),
+        );
+        expect(scrollState.position.pixels, greaterThan(0));
+        expect(scrollState.position.maxScrollExtent, greaterThan(0));
+        expect(tester.getRect(canvas), canvasRect);
+        final afterScrollViewport = tester
+            .state<InventorySketchCanvasState>(
+              find.byType(InventorySketchCanvas),
             )
-            .map((semantics) => semantics.properties.label),
-        contains(entry.value),
-      );
-    }
+            .viewport!;
+        expect(afterScrollViewport.zoom, viewportBefore.zoom);
+        expect(afterScrollViewport.pan, viewportBefore.pan);
+        expect(
+          pageKey.currentState!.controller.editor!.geometry,
+          same(geometryBefore),
+        );
+        final saveStatus = find.byKey(
+          const Key('inventory-editor-save-status-overlay'),
+        );
+        expect(tester.getRect(saveStatus).left, canvasRect.left + 8);
+        expect(tester.getRect(saveStatus).bottom, canvasRect.bottom - 8);
+        expect(tester.getRect(saveStatus).overlaps(toolbarRect), isFalse);
 
-    expect(
-      find.byKey(const Key('inventory-editor-mode-selected-draw')),
-      findsOneWidget,
-    );
-    await tester.ensureVisible(
-      find.byKey(const Key('inventory-editor-mode-select')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('inventory-editor-mode-select')));
-    await tester.pump();
-    expect(
-      find.byKey(const Key('inventory-editor-mode-selected-draw')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const Key('inventory-editor-mode-selected-select')),
-      findsOneWidget,
-    );
-    final canvasState = tester.state<InventorySketchCanvasState>(
-      find.byType(InventorySketchCanvas),
-    );
-    final zoomBefore = canvasState.viewport!.zoom;
-    final zoomIn = find.byKey(const Key('inventory-editor-zoom-in'));
-    await tester.ensureVisible(zoomIn);
-    await tester.pump();
-    expect(zoomIn.hitTestable(), findsOneWidget);
-    await tester.tap(zoomIn);
-    await tester.pump();
-    expect(canvasState.viewport!.zoom, greaterThan(zoomBefore));
-    final fit = find.byKey(const Key('inventory-editor-fit'));
-    await tester.ensureVisible(fit);
-    await tester.pump();
-    await tester.tap(fit);
-    await tester.pump();
-    expect(canvasState.viewport!.zoom, zoomBefore);
-    expect(tester.takeException(), isNull);
+        expect(
+          find.byKey(const Key('inventory-editor-mode-selected-draw')),
+          findsOneWidget,
+        );
+        await tester.ensureVisible(
+          find.byKey(const Key('inventory-editor-mode-select')),
+        );
+        await tester.pump();
+        final selectIcon = find.descendant(
+          of: find.byKey(const Key('inventory-editor-mode-select')),
+          matching: find.byType(Icon),
+        );
+        Focus.of(tester.element(selectIcon)).requestFocus();
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.space);
+        await tester.pump();
+        expect(
+          find.byKey(const Key('inventory-editor-mode-selected-draw')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('inventory-editor-mode-selected-select')),
+          findsOneWidget,
+        );
+        final canvasState = tester.state<InventorySketchCanvasState>(
+          find.byType(InventorySketchCanvas),
+        );
+        final zoomBefore = canvasState.viewport!.zoom;
+        final zoomIn = find.byKey(const Key('inventory-editor-zoom-in'));
+        await tester.ensureVisible(zoomIn);
+        await tester.pump();
+        expect(zoomIn.hitTestable(), findsOneWidget);
+        await tester.tap(zoomIn);
+        await tester.pump();
+        expect(canvasState.viewport!.zoom, greaterThan(zoomBefore));
+        final fit = find.byKey(const Key('inventory-editor-fit'));
+        await tester.ensureVisible(fit);
+        await tester.pump();
+        await tester.tap(fit);
+        await tester.pump();
+        expect(canvasState.viewport!.zoom, zoomBefore);
+        pageKey.currentState!.controller.recordHandledError(
+          const InventoryFailure(
+            'inventory_block_edge_nudge_direction_invalid',
+          ),
+        );
+        await tester.pumpAndSettle();
+        final feedback = find.byKey(const Key('inventory-editor-feedback'));
+        final banner = find.byKey(
+          const Key('inventory-editor-spatial-diagnostic'),
+        );
+        expect(banner, findsOneWidget);
+        expect(
+          tester.getRect(banner).top,
+          greaterThanOrEqualTo(toolbarRect.bottom),
+        );
+        expect(
+          tester.getRect(feedback).top,
+          greaterThanOrEqualTo(toolbarRect.bottom),
+        );
+        expect(
+          tester.getRect(feedback).bottom,
+          lessThanOrEqualTo(tester.getRect(saveStatus).top),
+        );
+        final dismiss = find.byKey(
+          const Key('inventory-editor-spatial-diagnostic-dismiss'),
+        );
+        await tester.ensureVisible(dismiss);
+        await tester.pump();
+        expect(dismiss.hitTestable(), findsOneWidget);
+        await tester.tap(dismiss);
+        await tester.pump();
+        expect(banner, findsNothing);
+        expect(
+          pageKey.currentState!.controller.editor!.geometry,
+          same(geometryBefore),
+        );
+        expect(tester.takeException(), isNull);
 
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-  });
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+      } finally {
+        semantics.dispose();
+      }
+    });
+  }
 
   testWidgets(
     'closed block final icon drains pending autosave before create finalize',
@@ -3494,11 +3643,19 @@ void main() {
       expect(controller.hasUnacknowledgedGeometry, isTrue);
       expect(controller.isFinalizeEnabled, isTrue);
 
+      await tester.ensureVisible(
+        find.byKey(const Key('inventory-editor-finalize')),
+      );
+      await tester.pump();
       expect(
         find.byKey(const Key('inventory-editor-finalize')).hitTestable(),
         findsOneWidget,
       );
 
+      await tester.ensureVisible(
+        find.byKey(const Key('inventory-editor-finalize')),
+      );
+      await tester.pump();
       await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
       await tester.pumpAndSettle();
 
@@ -3540,6 +3697,10 @@ void main() {
 
       expect(fake.saveCalls, isEmpty);
       expect(controller.isFinalizeEnabled, isTrue);
+      await tester.ensureVisible(
+        find.byKey(const Key('inventory-editor-finalize')),
+      );
+      await tester.pump();
       await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
       await tester.pumpAndSettle();
 
@@ -3578,6 +3739,10 @@ void main() {
       onResult: (value) => result = value,
     );
 
+    await tester.ensureVisible(
+      find.byKey(const Key('inventory-editor-finalize')),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
     await tester.pumpAndSettle();
 
@@ -3674,6 +3839,10 @@ void main() {
         expect(find.text('Oluştur'), findsNothing);
         expect(find.text('Güncelle'), findsNothing);
 
+        await tester.ensureVisible(
+          find.byKey(const Key('inventory-editor-finalize')),
+        );
+        await tester.pump();
         await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
         await tester.pumpAndSettle();
 
@@ -3888,6 +4057,10 @@ void main() {
           InventorySketchEditorPage.portraitOrientations,
         );
 
+        await tester.ensureVisible(
+          find.byKey(const Key('inventory-editor-finalize')),
+        );
+        await tester.pump();
         await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
         await tester.pumpAndSettle();
         expect(fake.finalizeCalls, 1);

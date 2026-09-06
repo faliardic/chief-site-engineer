@@ -2088,208 +2088,236 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
         ? 'Krokiyi yayınla ve güncelle'
         : 'Krokiyi yayınla';
     final editorDiagnostic = _editorDiagnosticMessage(controller.lastErrorCode);
-    return Stack(
-      key: const Key('inventory-editor-fullscreen-workspace'),
-      fit: StackFit.expand,
-      children: [
-        MouseRegion(
-          onHover: (event) => _updatePreview(event.localPosition),
-          onExit: (_) {
-            if (_previewProposal != null) {
-              setState(() => _previewProposal = null);
-            }
-          },
-          child: Listener(
-            behavior: HitTestBehavior.translucent,
-            onPointerMove: (event) => _updatePreview(event.localPosition),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                InventorySketchCanvas(
-                  key: _canvasKey,
-                  snapshot: editor,
-                  onDrawPoint: _handleDrawPoint,
-                  onSelect: controller.selectAt,
-                ),
-                IgnorePointer(
-                  child: CustomPaint(
-                    key: const Key('inventory-editor-edge-preview'),
-                    painter: _InventoryProposedEdgePainter(
-                      viewport: _canvasKey.currentState?.viewport,
-                      start: _previewProposal?.start,
-                      end: _previewProposal?.end,
-                      alignmentGuide: _previewProposal?.alignmentGuide,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Keep the wheel's original offset unless the top toolbar would overlap.
+        final movementWheelBottom = (constraints.maxHeight - 56 - 160).clamp(
+          0.0,
+          80.0,
+        );
+        return Stack(
+          key: const Key('inventory-editor-fullscreen-workspace'),
+          fit: StackFit.expand,
+          children: [
+            MouseRegion(
+              onHover: (event) => _updatePreview(event.localPosition),
+              onExit: (_) {
+                if (_previewProposal != null) {
+                  setState(() => _previewProposal = null);
+                }
+              },
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerMove: (event) => _updatePreview(event.localPosition),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    InventorySketchCanvas(
+                      key: _canvasKey,
+                      snapshot: editor,
+                      onDrawPoint: _handleDrawPoint,
+                      onSelect: controller.selectAt,
                     ),
-                  ),
-                ),
-                if (_previewProposal?.alignmentGuide != null)
-                  IgnorePointer(
-                    child: Semantics(
-                      key: const Key('inventory-editor-smart-alignment-guide'),
-                      container: true,
-                      label: 'Akıllı hizalama kılavuzu',
-                      child: const SizedBox.expand(),
+                    IgnorePointer(
+                      child: CustomPaint(
+                        key: const Key('inventory-editor-edge-preview'),
+                        painter: _InventoryProposedEdgePainter(
+                          viewport: _canvasKey.currentState?.viewport,
+                          start: _previewProposal?.start,
+                          end: _previewProposal?.end,
+                          alignmentGuide: _previewProposal?.alignmentGuide,
+                        ),
+                      ),
                     ),
-                  ),
-              ],
+                    if (_previewProposal?.alignmentGuide != null)
+                      IgnorePointer(
+                        child: Semantics(
+                          key: const Key(
+                            'inventory-editor-smart-alignment-guide',
+                          ),
+                          container: true,
+                          label: 'Akıllı hizalama kılavuzu',
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
-        Positioned(
-          top: 8,
-          left: 8,
-          right: 72,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_exitBlockedBySave)
-                MaterialBanner(
-                  content: const Text(
-                    'Taslak kaydedilemedi. Şematik kroki açık bırakıldı.',
-                  ),
-                  actions: [
-                    TextButton(
-                      key: const Key('inventory-editor-retry-save'),
-                      onPressed: () => unawaited(_retryBlockedExit()),
-                      child: const Text('Tekrar dene'),
+            if (controller.saveLabel != null)
+              Positioned(
+                left: 8,
+                bottom: 8,
+                child: Material(
+                  key: const Key('inventory-editor-save-status-overlay'),
+                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(20),
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
                     ),
-                    TextButton(
-                      key: const Key('inventory-editor-discard-unsaved'),
-                      onPressed: () => unawaited(_discardAndExit()),
-                      child: const Text('Kaydedilmemiş değişiklikleri bırak'),
-                    ),
-                  ],
-                ),
-              if (_finalizeFailed)
-                MaterialBanner(
-                  key: const Key('inventory-editor-finalize-failure'),
-                  content: const Text(
-                    'Kroki yayınlanamadı. Dayanıklı taslak korundu; '
-                    'tekrar deneyebilirsiniz.',
-                  ),
-                  actions: [
-                    TextButton(
-                      key: const Key('inventory-editor-retry-finalize'),
-                      onPressed: () => unawaited(_finalizeAndExit()),
-                      child: const Text('Yayınlamayı tekrar dene'),
-                    ),
-                  ],
-                ),
-              if (controller.lastErrorCode ==
-                  InventorySketchEditorController.lockedBaseGeometryCode)
-                MaterialBanner(
-                  key: const Key('inventory-editor-locked-geometry-message'),
-                  content: const Text(
-                    'Mevcut alanın şekli henüz değiştirilemez. '
-                    'Krokiyi güncelle ekranında yeni bir alan çizebilirsiniz; '
-                    'kayıt değiştirilmedi.',
-                  ),
-                  actions: [
-                    TextButton(
-                      key: const Key(
-                        'inventory-editor-locked-geometry-dismiss',
+                    child: Semantics(
+                      liveRegion: true,
+                      label: 'Taslak durumu: ${controller.saveLabel}',
+                      child: Text(
+                        controller.saveLabel!,
+                        key: const Key('inventory-editor-save-status'),
                       ),
-                      onPressed: controller.dismissLockedGeometryMessage,
-                      child: const Text('Anladım'),
                     ),
-                  ],
-                ),
-              if (editorDiagnostic != null)
-                MaterialBanner(
-                  key: const Key('inventory-editor-spatial-diagnostic'),
-                  content: Text(editorDiagnostic),
-                  actions: [
-                    TextButton(
-                      key: const Key(
-                        'inventory-editor-spatial-diagnostic-dismiss',
-                      ),
-                      onPressed: controller.dismissHandledError,
-                      child: const Text('Anladım'),
-                    ),
-                  ],
-                ),
-              if (_orientationFailed)
-                MaterialBanner(
-                  content: const Text(
-                    'Ekran yönü güvenle doğrulanamadı. '
-                    'Kayıt durumu değiştirilmedi.',
                   ),
-                  actions: [
-                    TextButton(
-                      key: const Key('inventory-editor-retry-orientation'),
-                      onPressed: () => unawaited(
-                        _orientationRestoreFailed
-                            ? _attemptExit(_pendingPopResult)
-                            : _enterEditor(),
-                      ),
-                      child: const Text('Tekrar dene'),
-                    ),
-                  ],
                 ),
-            ],
-          ),
-        ),
-        if (controller.saveLabel != null)
-          Positioned(
-            left: 8,
-            bottom: 8,
-            child: Material(
-              key: const Key('inventory-editor-save-status-overlay'),
-              color: Theme.of(context).colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(20),
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
+              ),
+            if (editor.mode == InventorySketchEditorMode.select &&
+                editor.selection != null)
+              Positioned(
+                right: 80,
+                bottom: movementWheelBottom,
+                child: _SelectionMovementWheel(
+                  onNudge: controller.nudgeSelection,
+                  onConfirm: controller.clearSelection,
                 ),
-                child: Semantics(
-                  liveRegion: true,
-                  label: 'Taslak durumu: ${controller.saveLabel}',
-                  child: Text(
-                    controller.saveLabel!,
-                    key: const Key('inventory-editor-save-status'),
+              ),
+            Positioned(
+              top: 64,
+              left: 8,
+              right: 8,
+              bottom: 72,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: SingleChildScrollView(
+                  key: const Key('inventory-editor-feedback'),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_exitBlockedBySave)
+                        MaterialBanner(
+                          content: const Text(
+                            'Taslak kaydedilemedi. Şematik kroki açık bırakıldı.',
+                          ),
+                          actions: [
+                            TextButton(
+                              key: const Key('inventory-editor-retry-save'),
+                              onPressed: () => unawaited(_retryBlockedExit()),
+                              child: const Text('Tekrar dene'),
+                            ),
+                            TextButton(
+                              key: const Key(
+                                'inventory-editor-discard-unsaved',
+                              ),
+                              onPressed: () => unawaited(_discardAndExit()),
+                              child: const Text(
+                                'Kaydedilmemiş değişiklikleri bırak',
+                              ),
+                            ),
+                          ],
+                        ),
+                      if (_finalizeFailed)
+                        MaterialBanner(
+                          key: const Key('inventory-editor-finalize-failure'),
+                          content: const Text(
+                            'Kroki yayınlanamadı. Dayanıklı taslak korundu; '
+                            'tekrar deneyebilirsiniz.',
+                          ),
+                          actions: [
+                            TextButton(
+                              key: const Key('inventory-editor-retry-finalize'),
+                              onPressed: () => unawaited(_finalizeAndExit()),
+                              child: const Text('Yayınlamayı tekrar dene'),
+                            ),
+                          ],
+                        ),
+                      if (controller.lastErrorCode ==
+                          InventorySketchEditorController
+                              .lockedBaseGeometryCode)
+                        MaterialBanner(
+                          key: const Key(
+                            'inventory-editor-locked-geometry-message',
+                          ),
+                          content: const Text(
+                            'Mevcut alanın şekli henüz değiştirilemez. '
+                            'Krokiyi güncelle ekranında yeni bir alan çizebilirsiniz; '
+                            'kayıt değiştirilmedi.',
+                          ),
+                          actions: [
+                            TextButton(
+                              key: const Key(
+                                'inventory-editor-locked-geometry-dismiss',
+                              ),
+                              onPressed:
+                                  controller.dismissLockedGeometryMessage,
+                              child: const Text('Anladım'),
+                            ),
+                          ],
+                        ),
+                      if (editorDiagnostic != null)
+                        MaterialBanner(
+                          key: const Key('inventory-editor-spatial-diagnostic'),
+                          content: Text(editorDiagnostic),
+                          actions: [
+                            TextButton(
+                              key: const Key(
+                                'inventory-editor-spatial-diagnostic-dismiss',
+                              ),
+                              onPressed: controller.dismissHandledError,
+                              child: const Text('Anladım'),
+                            ),
+                          ],
+                        ),
+                      if (_orientationFailed)
+                        MaterialBanner(
+                          content: const Text(
+                            'Ekran yönü güvenle doğrulanamadı. '
+                            'Kayıt durumu değiştirilmedi.',
+                          ),
+                          actions: [
+                            TextButton(
+                              key: const Key(
+                                'inventory-editor-retry-orientation',
+                              ),
+                              onPressed: () => unawaited(
+                                _orientationRestoreFailed
+                                    ? _attemptExit(_pendingPopResult)
+                                    : _enterEditor(),
+                              ),
+                              child: const Text('Tekrar dene'),
+                            ),
+                          ],
+                        ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ),
-        if (editor.mode == InventorySketchEditorMode.select &&
-            editor.selection != null)
-          Positioned(
-            right: 80,
-            bottom: 80,
-            child: _SelectionMovementWheel(
-              onNudge: controller.nudgeSelection,
-              onConfirm: controller.clearSelection,
+            Positioned(
+              top: 8,
+              left: 8,
+              right: 8,
+              child: _EditorToolbar(
+                editor: editor,
+                onBack: () => unawaited(_attemptExit()),
+                onModeChanged: controller.setMode,
+                onUndo: controller.undo,
+                onRedo: controller.redo,
+                onFinish: controller.finishWorkingPolyline,
+                onClose: () => unawaited(_closeCurrentBlock()),
+                onDelete: () => unawaited(_deleteSelection()),
+                freeLengthNextSegment: controller.freeLengthNextSegment,
+                onFreeLengthChanged: controller.setFreeLengthNextSegment,
+                onZoomOut: () => _canvasKey.currentState?.zoomOut(),
+                onZoomIn: () => _canvasKey.currentState?.zoomIn(),
+                onFit: () => _canvasKey.currentState?.fitCanvas(),
+                finalizeLabel: finalizeLabel,
+                finalizing: controller.finalizing,
+                onFinalize: controller.isFinalizeEnabled
+                    ? () => unawaited(_finalizeAndExit())
+                    : null,
+              ),
             ),
-          ),
-        Positioned(
-          top: 8,
-          right: 8,
-          bottom: 8,
-          child: _EditorToolbar(
-            editor: editor,
-            onBack: () => unawaited(_attemptExit()),
-            onModeChanged: controller.setMode,
-            onUndo: controller.undo,
-            onRedo: controller.redo,
-            onFinish: controller.finishWorkingPolyline,
-            onClose: () => unawaited(_closeCurrentBlock()),
-            onDelete: () => unawaited(_deleteSelection()),
-            freeLengthNextSegment: controller.freeLengthNextSegment,
-            onFreeLengthChanged: controller.setFreeLengthNextSegment,
-            onZoomOut: () => _canvasKey.currentState?.zoomOut(),
-            onZoomIn: () => _canvasKey.currentState?.zoomIn(),
-            onFit: () => _canvasKey.currentState?.fitCanvas(),
-            finalizeLabel: finalizeLabel,
-            finalizing: controller.finalizing,
-            onFinalize: controller.isFinalizeEnabled
-                ? () => unawaited(_finalizeAndExit())
-                : null,
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -2468,144 +2496,137 @@ class _EditorToolbar extends StatelessWidget {
         editor.geometry.polylines[editor.workingPolylineIndex!].points.length >=
             3;
     return Material(
-      key: const Key('inventory-editor-right-toolbar'),
+      key: const Key('inventory-editor-top-toolbar'),
       color: Theme.of(context).colorScheme.surfaceContainerHigh,
       elevation: 4,
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(24),
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
-        width: 56,
-        child: Column(
-          children: [
-            const SizedBox(height: 4),
-            _ToolbarIconButton(
-              key: const Key('inventory-editor-back'),
-              label: 'Geri',
-              icon: const Icon(Icons.arrow_back_rounded),
-              onPressed: onBack,
-            ),
-            const Divider(height: 8),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  key: const Key('inventory-editor-modes'),
-                  children: [
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-mode-draw'),
-                      label: 'Çiz',
-                      selected: editor.mode == InventorySketchEditorMode.draw,
-                      selectedIndicatorKey: const Key(
-                        'inventory-editor-mode-selected-draw',
-                      ),
-                      icon: const Icon(Icons.polyline_rounded),
-                      onPressed: () =>
-                          onModeChanged(InventorySketchEditorMode.draw),
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-mode-select'),
-                      label: 'Seç',
-                      selected: editor.mode == InventorySketchEditorMode.select,
-                      selectedIndicatorKey: const Key(
-                        'inventory-editor-mode-selected-select',
-                      ),
-                      icon: const Icon(Icons.ads_click_rounded),
-                      onPressed: () =>
-                          onModeChanged(InventorySketchEditorMode.select),
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-mode-pan'),
-                      label: 'Taşı',
-                      selected: editor.mode == InventorySketchEditorMode.pan,
-                      selectedIndicatorKey: const Key(
-                        'inventory-editor-mode-selected-pan',
-                      ),
-                      icon: const Icon(Icons.pan_tool_alt_outlined),
-                      onPressed: () =>
-                          onModeChanged(InventorySketchEditorMode.pan),
-                    ),
-                    const Divider(height: 8),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-undo'),
-                      label: 'Geri al',
-                      icon: const Icon(Icons.undo_rounded),
-                      onPressed: editor.canUndo ? onUndo : null,
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-redo'),
-                      label: 'İleri al',
-                      icon: const Icon(Icons.redo_rounded),
-                      onPressed: editor.canRedo ? onRedo : null,
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-finish-line'),
-                      label: 'Çizgiyi bitir',
-                      icon: const Icon(Icons.stop_rounded),
-                      onPressed: editor.hasWorkingPolyline ? onFinish : null,
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-close-block'),
-                      label: 'Alanı kapat',
-                      icon: const Icon(Icons.polyline_rounded),
-                      onPressed: canClose ? onClose : null,
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-free-length'),
-                      label: 'Serbest uzunluk',
-                      selected: freeLengthNextSegment,
-                      selectedIndicatorKey: const Key(
-                        'inventory-editor-free-length-selected',
-                      ),
-                      icon: const Icon(Icons.straighten_rounded),
-                      onPressed:
-                          editor.mode == InventorySketchEditorMode.draw &&
-                              editor.hasWorkingPolyline
-                          ? () => onFreeLengthChanged(!freeLengthNextSegment)
-                          : null,
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-delete'),
-                      label: 'Seçileni sil',
-                      icon: const Icon(Icons.delete_outline_rounded),
-                      onPressed: editor.selection == null ? null : onDelete,
-                    ),
-                    const Divider(height: 8),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-zoom-out'),
-                      label: 'Uzaklaştır',
-                      icon: const Icon(Icons.remove_rounded),
-                      onPressed: onZoomOut,
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-zoom-in'),
-                      label: 'Yakınlaştır',
-                      icon: const Icon(Icons.add_rounded),
-                      onPressed: onZoomIn,
-                    ),
-                    _ToolbarIconButton(
-                      key: const Key('inventory-editor-fit'),
-                      label: 'Tamamını göster',
-                      icon: const Icon(Icons.fit_screen_rounded),
-                      onPressed: onFit,
-                    ),
-                  ],
-                ),
+        height: 48,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            key: const Key('inventory-editor-modes'),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-back'),
+                label: 'Geri',
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: onBack,
               ),
-            ),
-            const Divider(height: 8),
-            _ToolbarIconButton(
-              key: const Key('inventory-editor-finalize'),
-              label: finalizeLabel,
-              emphasized: true,
-              icon: finalizing
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.check_circle_rounded),
-              onPressed: onFinalize,
-            ),
-            const SizedBox(height: 4),
-          ],
+              const SizedBox(height: 32, child: VerticalDivider(width: 8)),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-mode-draw'),
+                label: 'Çiz',
+                selected: editor.mode == InventorySketchEditorMode.draw,
+                selectedIndicatorKey: const Key(
+                  'inventory-editor-mode-selected-draw',
+                ),
+                icon: const Icon(Icons.polyline_rounded),
+                onPressed: () => onModeChanged(InventorySketchEditorMode.draw),
+              ),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-mode-select'),
+                label: 'Seç',
+                selected: editor.mode == InventorySketchEditorMode.select,
+                selectedIndicatorKey: const Key(
+                  'inventory-editor-mode-selected-select',
+                ),
+                icon: const Icon(Icons.ads_click_rounded),
+                onPressed: () =>
+                    onModeChanged(InventorySketchEditorMode.select),
+              ),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-mode-pan'),
+                label: 'Taşı',
+                selected: editor.mode == InventorySketchEditorMode.pan,
+                selectedIndicatorKey: const Key(
+                  'inventory-editor-mode-selected-pan',
+                ),
+                icon: const Icon(Icons.pan_tool_alt_outlined),
+                onPressed: () => onModeChanged(InventorySketchEditorMode.pan),
+              ),
+              const SizedBox(height: 32, child: VerticalDivider(width: 8)),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-undo'),
+                label: 'Geri al',
+                icon: const Icon(Icons.undo_rounded),
+                onPressed: editor.canUndo ? onUndo : null,
+              ),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-redo'),
+                label: 'İleri al',
+                icon: const Icon(Icons.redo_rounded),
+                onPressed: editor.canRedo ? onRedo : null,
+              ),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-finish-line'),
+                label: 'Çizgiyi bitir',
+                icon: const Icon(Icons.stop_rounded),
+                onPressed: editor.hasWorkingPolyline ? onFinish : null,
+              ),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-close-block'),
+                label: 'Alanı kapat',
+                icon: const Icon(Icons.polyline_rounded),
+                onPressed: canClose ? onClose : null,
+              ),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-free-length'),
+                label: 'Serbest uzunluk',
+                selected: freeLengthNextSegment,
+                selectedIndicatorKey: const Key(
+                  'inventory-editor-free-length-selected',
+                ),
+                icon: const Icon(Icons.straighten_rounded),
+                onPressed:
+                    editor.mode == InventorySketchEditorMode.draw &&
+                        editor.hasWorkingPolyline
+                    ? () => onFreeLengthChanged(!freeLengthNextSegment)
+                    : null,
+              ),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-delete'),
+                label: 'Seçileni sil',
+                icon: const Icon(Icons.delete_outline_rounded),
+                onPressed: editor.selection == null ? null : onDelete,
+              ),
+              const SizedBox(height: 32, child: VerticalDivider(width: 8)),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-zoom-out'),
+                label: 'Uzaklaştır',
+                icon: const Icon(Icons.remove_rounded),
+                onPressed: onZoomOut,
+              ),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-zoom-in'),
+                label: 'Yakınlaştır',
+                icon: const Icon(Icons.add_rounded),
+                onPressed: onZoomIn,
+              ),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-fit'),
+                label: 'Tamamını göster',
+                icon: const Icon(Icons.fit_screen_rounded),
+                onPressed: onFit,
+              ),
+              const SizedBox(height: 32, child: VerticalDivider(width: 8)),
+              _ToolbarIconButton(
+                key: const Key('inventory-editor-finalize'),
+                label: finalizeLabel,
+                emphasized: true,
+                icon: finalizing
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_circle_rounded),
+                onPressed: onFinalize,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2661,7 +2682,7 @@ class _ToolbarIconButton extends StatelessWidget {
       selected: selected,
       child: Tooltip(
         message: label,
-        child: SizedBox.square(dimension: 44, child: button),
+        child: SizedBox.square(dimension: 48, child: button),
       ),
     );
   }
