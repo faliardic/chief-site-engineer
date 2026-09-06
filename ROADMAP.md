@@ -1,592 +1,310 @@
 # CSE V2 — Kanonik Ürün Yol Haritası
 
-**Durum:** Güncel yürütme sırası
-**Tarih:** 4 Eylül 2026
-**V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Inventory v1 closure complete → #616 evidence baseline → #617 frictionless release-readiness program → UXF-002..018 complete → #657 visual-first truth-sync → Project Profile/Home visual transformation
-**Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
-
-## 1. Güncel ürün durumu
-
-CSE V1 tamamlanmış ve proje sahibi tarafından yaklaşık bir ay gerçek sahada
-kullanılmıştır. V2 Items 1–4 tamamlanmış; schedule runtime, immutable
-reference-schedule snapshots, Living Plan MVP/ilk cihaz kabulü, actual-progress
-core, progress UI/isolated cihaz kabulü, deterministic forecast core, immutable
-snapshot dependency graph persistence ve read-only downstream impact PR #475'e
-kadar, Living Plan intelligence UI PR #480'e, Deterministic Günlük Log v1 ise
-PR #482'ye, İş Zinciri v1 PR #484'e, İstenecek Malzemeler v1 PR #486'ya
-bounded-memory backup package correction PR #489'a, deterministic kişi/firma
-önerileri Slice 1 PR #491'e, manuel telefon görüşmesi sonucu Slice 1 PR #493'e,
-proje fotoğraf/video albümü Slice 1 PR #498'e ve P0 recovery surface PR #505'e
-kadar merge edilmiştir. PR #505 owner recovery verification'ı değildir.
-Güncel teknik ve ürün durumu:
-
-| Alan | Değer |
-| --- | --- |
-| V1 baseline commit | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
-| Current repository truth | GitHub `master` ve current Issue; exact task snapshot'ı task/result evidence'ındadır |
-| Mobil sürüm | `0.1.0+1` |
-| SQLite schema | `22` |
-| `.csebackup` formatı | `1` |
-| Canonical timezone | `Europe/Istanbul` |
-| Android compile/target SDK | `36 / 36` |
-| Saha durumu | Owner tarafından yaklaşık bir ay kullanıldı |
-| Store/public release | İlan edilmedi |
-
-V1'in tamamlanması, modüllerin dondurulduğu anlamına gelmez. V2 aynı
-offline-first mobil ürün üzerinde ilerler. Issue #472 / PR #473 yalnız bundan
-sonra oluşturulan immutable schedule snapshot'ların resolved dependency edge
-setini manifest/count/hash ile saklayan merged schema 17 temelidir. Issue #474 /
-PR #475 exact forecast/snapshot/dependency-graph binding'inden salt-okunur
-downstream impact üreten merged predecessor'dır. Issue #476 / PR #480 bu exact
-read-only intelligence katmanlarını Living Plan UI'da görünür kılan merged
-`IMPLEMENTED — MANUAL TEST PENDING` predecessor'dır; Item 5 final completion
-ilanı değildir. Issue #481 / PR #482 mevcut source kayıtlarından salt-okunur
-Deterministic Günlük Log v1'i `IMPLEMENTED — MANUAL TEST DEFERRED` olarak
-merge etmiştir. Issue #483 / PR #484 exact Ajanda–takip bağından read-only İş
-Zinciri projection'ını, Issue #485 / PR #486 additive schema `18` material
-request source-of-truth ve lifecycle UI'yı merged temele eklemiştir. Issue #488 /
-PR #489 backup formatını değiştirmeyen bounded-memory package correction'ıdır.
-Issue #490 / PR #491 deterministic kişi/firma önerileri Slice 1'i merged temele
-eklemiştir; V2.9 complete değildir. Issue #492 / PR #493 Telefon görüşmesi
-sonucu → Ajanda Slice 1'i schema `19` temeline merge etmiştir; manual testleri
-deferred kalır ve V2.10 complete değildir. Issue #497 / PR #498 Proje
-fotoğraf/video albümü Slice 1'i merge etmiştir; manual testleri pending ve
-V2.11 complete değildir. Inventory Map v1'in Issue #507 ile başlayan contract
-ve production Slice zinciri, Inventory Spatial v1 Slice 7 / Issue #604'ün
-repository, backup/restore, attachment ve owner field acceptance kapılarıyla
-tamamlanıp kapatılmasıyla Inventory v1 closure'a ulaşmıştır. Issue #535 / Draft
-PR #536 yalnız superseded tarihsel girişimdir ve current ancestry değildir.
-Issue #540 UI/UX Wave 0 ile loading blocker #580 tamamlanıp kapatılmıştır.
-Issue #586 implementation'ı PR #589 ile merge edilmiş ve Issue kapatılmıştır.
-4 Eylül 2026 owner kararıyla #616 sanitize evidence paketi manuel kabul PASS'i
-değil, yeterli ürün değerlendirme baseline'ıdır. Issue #617 güncel frictionless
-release-readiness programıdır; Issue #618 kanonik UI/UX sistem sözleşmesi olarak
-merge edilmiştir. UXF-002..018 tamamlanmıştır; adaptive/accessibility, ortak
-aktif proje, form/primary-action, Agenda search/filter ve retryable
-error/detail/reload altyapısı geçerli merged temeldir. #657 visual-first owner
-kararı kalan empty/loading/error/success ve history/event borcunu silmeden
-görsel dönüşümün ardına alır. Güncel sonraki production dalgası Project
-Profile/Home görsel dönüşümü; ardından ortak görsel dil/sağ ekran-tool rail ve
-yüksek sürtünmeli form/ekran dilimleridir. Inventory genel sağ rail dilinin
-kompakt üst araç alanı istisnasıdır. DWG Viewer
-v1 / Issue #523
-`POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır ve ilk genel yayının
-bağımlılığı değildir. Public/store production release ilan edilmemiştir.
-
-## 2. Kaynak otoritesi
-
-- Kalıcı ürün amacı ve veri ilkeleri:
-  `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
-- UI/UX sistem sözleşmesi:
-  `docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md`
-- Visual-first owner ürün ve sıra kararları:
-  `docs/v2/CSE_VISUAL_FIRST_OWNER_DECISIONS_2026-09-04.md`
-- Güncel V2 kapsamı:
-  `docs/v2/CSE_V2_SCOPE.md`
-- Güncel yürütme sırası:
-  bu `ROADMAP.md`
-- Operasyon ve güvenlik:
-  `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-- Aktif teknik kapsam:
-  güncel GitHub Issue
-
-Eski roadmap fazları, Epic #97/#105/#127–#140, Orchestrator O0–O10 programı,
-Bridge, Work Mode ve PR #259 tarihsel kayıttır. Bunlar güncel V2 sırasını
-override etmez ve aktif ürün blocker'ı sayılmaz.
-
-## 3. V2 ana bağımlılık zinciri
-
-```text
-Proje/Mahal — complete
-→ Saha Rehberi — complete
-→ Attachment v2 — complete
-→ Ajanda v2 — complete
-→ schedule runtime + persistent reference snapshots — merged foundation
-→ 7 Günlük Yaşayan İş Programı — implemented / manual test pending
-→ Günlük Log v1 — implemented / manual test deferred
-→ İş Zinciri — implemented / manual test deferred
-→ Proje albümü Slice 1 — implemented / manual test pending
-→ Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
-→ Issue #616 — evidence baseline accepted; manual acceptance PASS değil
-→ Issue #617 — current frictionless release-readiness program
-→ Issue #618 — canonical UI/UX contract merged
-→ Phase 1 — adaptive/accessibility foundation complete
-→ Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
-→ Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
-→ Phase 2 Step 10 — UXF-016..018 retryable error/detail/reload slices complete; remaining debt preserved
-→ UXF-002..018 — completed foundation; no rollback
-→ Issue #657 — visual-first owner decision truth-sync
-→ Current next — Project Profile/Home visual transformation
-→ Then — shared visual language/right-side screen-tool rail; Inventory top-tool exception
-→ Then — high-friction forms/screens
-→ Return — remaining empty/loading/error/success, history/event, adaptive/accessibility and recovery release debt
-→ Phase 6 — independent recovery/backup/search/onboarding/telemetry/privacy gates
-→ Phase 7 — integrated quality + missing evidence/manual acceptance closure
-→ Phase 8 — release candidate + explicit owner release decision
-→ DWG Viewer v1 / Issue #523 — post-release/deferred future integration; not a release dependency
-```
+**Durum:** Güncel yürütme sırası ve ilk genel yayın öncesi tek kanonik kuyruk  
+**Güncelleme:** 6 Eylül 2026  
+**V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`  
+**Değişken repository gerçeği:** Güncel SHA, açık Issue/PR, merge ve gate durumu her görevde GitHub `master` üzerinden doğrulanır.
 
-Temel kural:
+## 1. Bu dosyanın görevi
 
-> Teknik sistem binlerce aktivite ve deterministik bağımlılık taşıyabilir;
-> şantiye şefinin ana akışı ise aktiviteyi bulup yakın plana birkaç işlemle
-> eklemek ve yalnız önündeki yedi günü güncel tutmak kadar sade kalır.
+Bu `ROADMAP.md`, CSE için **güncel yürütme sırasının tek kanonik dosyasıdır**.
 
-## 4. Dalga 1 — Kimlik ve bağlam omurgası
+- Ürün kapsamının ayrıntısı `docs/v2/CSE_V2_SCOPE.md` içindedir.
+- Kalıcı ürün/veri ilkeleri `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` içindedir.
+- Çalışma, test, güvenlik ve publication kuralları `AGENTS.md` ve `docs/protocols/` altındaki bağlayıcı protokollerdedir.
+- **Sıradaki ürün/release işi bu dosyadaki `İlk genel yayın öncesi tek kanonik yürütme kuyruğu`ndan seçilir.**
+- Aynı anda açık bir production Issue/PR varsa önce onun required gate'leri tamamlanır; sonraki queue maddesine geçilmez.
+- Queue sırası ancak Fatih'in yeni owner kararıyla değişir. Sıra değişikliği production işe başlamadan önce GitHub'da bu dosyaya yansıtılır.
+- Queue üzerindeki durum notları yön gösterir; gerçek `OPEN/CLOSED`, PR head, test ve Acceptance durumu her zaman current GitHub gerçeğinden okunur.
+- Eski Issue/PR, sohbet özeti, handoff, ZIP veya tarihsel roadmap metni bu sırayı override edemez.
 
-### V2.1 — Proje ve Mahal omurgası
+## 2. Güncel ürün durumu — kısa özet
 
-Öncelik: `P0 foundation`
+CSE owner-only, local-first ve mobile-first kişisel saha asistanıdır. V1 sahada kullanılmış; V2'nin kimlik, attachment, Ajanda, schedule/Living Plan, Günlük Log, İş Zinciri, Malzemeler, telefon görüşmesi sonucu, Proje Albümü, recovery ve Inventory omurgaları merged temeldir.
 
-Durum: `complete`
+Frictionless Release Readiness programı Issue #617 ile yürür. UI/UX sözleşmesi, adaptive shell, ortak aktif proje, 48×48 erişilebilirlik tabanı, form/primary-action standardı, temel search/filter/error state altyapısı ve visual-first dönüşümün ana dilimleri merged durumdadır.
 
-Teslimatlar:
+Son Inventory refinement zinciri #709/#710 → #711/#712 → #713/#714 ile tamamlanmış ve owner manuel kabulünden geçmiştir. DWG Viewer / Issue #523 ilk genel yayın için blocker değildir ve `POST-RELEASE / DEFERRED` kalır.
 
-- Proje düzenleme ve recoverable archive/restore
-- Stable mahal/konum kimliği
-- Duplicate/normalization kuralları
-- Eski kayıtların kontrollü migration'ı
-- Ajanda, Hatırlatıcı, Puantaj ve Beton bağlarının korunması
-- Backup/restore compatibility
+Değişmeyen teknik baseline değerleri ilgili source/protokol ve current master'dan okunur; bu dosya sabit master SHA tutmaz.
 
-Geçiş kapısı:
+## 3. Tamamlanmış yayın-hazırlık temeli
 
-- Proje veya mahal adı değişse dahi source bağlantısı bozulmaz.
-- Eski schema'dan yükseltme atomik ve testlidir.
-- Saha kullanıcısı aktif/arşivli bağlamı güvenle yönetebilir.
+Aşağıdaki alanlar yeni queue maddesi olarak tekrar açılmaz; yalnız release QA sırasında regresyon bulunursa dar bug Issue'su açılır:
 
-Önerilen child Issue sırası:
+- #616 sanitize full-product evidence baseline.
+- #618 kanonik frictionless UI/UX sözleşmesi + V2/roadmap truth-sync.
+- #617 Phase 1 adaptive/accessibility foundation.
+- #617 Phase 2 ortak form/action, search/filter, loading/error/retry ve insan-okunur event dili temel işleri.
+- Reminder/Unutma, Ajanda ve Living Plan günlük akış sadeleştirmelerinin mevcut merged dalgaları.
+- Daily Log + Work Chain targeted Acceptance evidence closure (#698).
+- Saha Rehberi/Sicil temel bilgi mimarisi ve Puantaj prerequisite/quick-result sadeleştirmeleri.
+- İSG model audit + 20A aktif checklist/tracking temeli.
+- Inventory compact top tools + D-pad + iki sıralı sketch-editor toolbar (#709–#714).
 
-1. Domain ve migration preflight
-2. Schema/repository/application
-3. Yönetim UI'sı
-4. Mevcut modül adoption'ı
-5. Backup/restore ve saha kabulü
+Bu tamamlanmış temel, ilerideki queue maddelerinde sessizce geri alınmaz.
 
-### V2.2 — Sicil / Puantaj V2 / Saha Rehberi
+## 4. İlk genel yayın öncesi tek kanonik yürütme kuyruğu
 
-Öncelik: `P0 data identity`
+### Durum etiketleri
 
-Durum: `complete`
+- `ACTIVE` — current production child; önce bunun gate'leri kapanır.
+- `NEXT` — active child tamamlanınca başlanacak ilk iş.
+- `QUEUED` — sırayla bekleyen pre-release işi.
+- `DECISION GATE` — uygulama öncesi owner V1/post-release kararı gerekir.
+- `RELEASE GATE` — yeni ürün özelliği değil, yayın yeterliliği kapısıdır.
+- `DONE / RELEASE QA ONLY` — production refinement tamamlandı; yalnız entegre regresyon/Acceptance kontrolü kalır.
 
-Teslimatlar:
+### Q01 — İSG Geçmiş / Arşiv ve lifecycle event görünürlüğü
 
-- Ortak kişi ve firma kimliği
-- Taşeron → ekip → personel hiyerarşisi
-- Puantajın canonical personel ID kullanması
-- Aktif/arşiv yaşam döngüsü
-- İletişim ve saha rehberi görünümü
-- Mevcut belge/KKD/İSG/SGK bağlarının korunması
-
-Geçiş kapısı:
+**Kaynak:** #617 Phase 4 / item 20B, Issue #708, current PR #715  
+**Durum:** `ACTIVE` — source/test/independent review PASS; exact Acceptance manual gate tamamlanmadan Ready/merge yok.
 
-- Aynı kişi farklı modüllerde duplicate kimlik oluşturmaz.
-- Arşivlenen kişi geçmiş Puantajda kalır, yeni güne varsayılan eklenmez.
-- Saha rehberi gerçek kullanımda hızlı ve filtrelenebilir durumdadır.
+Bitiş tanımı:
 
-## 5. Dalga 2 — Ortak dosya ve günlük kayıt omurgası
+- arşiv kayıtları aktif İSG özeti/checklist'inden ayrı;
+- existing event sequence insan-okunur Türkçe görünür;
+- edit/restore/backfill yok;
+- exact kişi/proje isolation ve zero-mutation read davranışı korunur;
+- Fatih exact Acceptance build'de PASS verir ve PR merge edilir.
 
-### V2.3 — Attachment / Fotoğraf / Medya V2
+### Q02 — KKD hızlı seçim
 
-Öncelik: `P0 integrity`
-
-Durum: `complete`
-
-Teslimatlar:
-
-- Ortak attachment ve entity-link sözleşmesi
-- Fotoğraf, video, ses ve belge desteği
-- Çoklu seçim
-- MIME/hash/size/path doğrulaması
-- Atomik staging ve orphan diagnostic
-- Tek dosya, çoklu kayıt bağlantısı
-- Backup/restore bütünlüğü
-
-Geçiş kapısı:
-
-- Aynı binary farklı modüller için yeniden kopyalanmaz.
-- Kırık bağlantı ve bozuk dosya görünürdür.
-- Source kayıt ve exact attachment bağı korunur.
-
-### V2.4 — Ajanda V2 ve kontrollü Ajanda–Hatırlatıcı senkronu
-
-Öncelik: `P0 daily flow`
-
-Durum: `complete`
-
-Teslimatlar:
-
-- Saha olay zaman çizgisi
-- Kaynaklı Hatırlatıcı oluşturma
-- Çift yönlü navigasyon ve durum görünürlüğü
-- Kullanıcı kontrollü metin/durum senkronu
-- Attachment görünürlüğü
-- Revision/event geçmişi
-- Duplicate/stale/rollback güvenliği
-
-Geçiş kapısı:
-
-- Ajanda ve Hatırlatıcı ayrı source-of-truth olarak kalır.
-- Kullanıcı onayı olmadan sessiz yeniden yazma yoktur.
-- Archive/trash sonrasında kaynak bağı kaybolmaz.
-
-Kapanış durumu:
-
-- Issue #432 / #434 / #437 dilimleri ve Issue #439 final closure merged
-  `master` üzerindedir.
-- Items 1–4 complete'tir; revised Item 5 current direction'dır.
-
-## 6. Dalga 3 — Günlük iş yönetimi
-
-### V2.5 — 7 Günlük Yaşayan İş Programı / İş ve Gün Planı
-
-Öncelik: `P0 current site-management loop`
-
-Durum: `implemented — manual test pending; final completion ilan edilmedi`
-
-- Projeye özgü güncel yedi günlük pencere
-- İnşaat aktivite kataloğunda arama ve birkaç işlemle plana ekleme
-- Aktivite adı ile blok/kat/mahal bağlamı
-- Onaylı baseline gibi sunulmayan öneri tarih ve süre
-- Minimum durumlar: `Planlandı`, `Başladı`, `Tamamlandı`, `Ertelendi`
-- Kısa saha notu, offline persistence ve normal backup/restore
-- Immutable reference schedule'dan ayrı mutable/evented kullanıcı karar katmanı
-- Stable project/activity-instance/snapshot kimliklerine referans
-- Kullanıcı işlemiyle reference schedule'ı sessizce yeniden yazmama
-
-Issue #466 / PR #467 ile merged schema 16 actual-progress source-of-truth
-temelinde `NULL` raporlanmamış/bilinmeyen ilerleme, açık item için explicit
-`0..99`, tamamlanan item için exact `100` anlamındadır. Optimistic revision,
-durable idempotency/no-op receipt ve append-only event sözleşmesi korunur.
-
-Issue #468 / PR #469 bu progress gerçeğini kartlarda görünür kılan, yalnız
-`STARTED`/`DEFERRED` item için `0..99` editini açan ve isolated acceptance
-paketinde lifecycle/relaunch persistence'ı kanıtlayan merged predecessor'dır.
-Issue #470 / PR #471 item'ın exact bound reference snapshot süresinden read-only
-deterministic kalan süre/finish tahmini üreten, Issue #472 / PR #473 ise yalnız
-yeni schedule snapshot'ların exact resolved dependency graph'ını immutable ve
-fingerprint'li saklayan merged predecessor'lardır. Historical snapshot'lara
-graph backfill yapılmaz; manifest yokluğu zero-edge değil typed unavailable'dır.
-Issue #474 / PR #475 exact origin forecast/snapshot/graph binding'iyle deterministic
-topological sırada bütün incoming constraint'lerin maksimumunu uygulayan
-salt-okunur downstream impact merged predecessor'dır. Aktiviteyi reference
-tarihinden erkene çekmez; source finish-only gecikmesi outgoing SS constraint'ini
-yanlış kaydırmaz. Issue #476 / PR #480 exact historical binding'i koruyarak
-forecast ve positive downstream impact'i sade kart/detail UI olarak gösteren
-merged implementation'dır. Manual Test Register #479 borcu görünür kalır;
-V2.5 final completion ilan edilmez. Schedule/Living Plan/reference mutation ve
-reforecast, actual quantity ile project-specific productivity learning başlamaz.
-
-### V2.6 — Günlük Log Çıktısı v1
-
-Öncelik: `P1 reporting after usable living plan`
-
-Durum: `implemented — manual test deferred; completion not declared`
-
-- Ajanda, Puantaj, Beton, açık takip ve living-plan/progress kaynaklı günlük
-  taslak
-- Proje/gün filtresi
-- Deterministik sıra
-- Private/project kapsam kontrolü
-- Kaynak kayda geri bağlantı
-- İlk insan okunabilir çıktı
-- Issue #481 yalnız read-only projection, typed section-unavailable davranışı,
-  deterministic plain-text preview ve `Metni kopyala` yüzeyini kapsar
-- Yeni persistence table, migration, event/receipt, PDF/file/share artifact,
-  AI summary veya source mutation yoktur
-- Issue #481 / PR #482 `IMPLEMENTED — MANUAL TEST DEFERRED` olarak merge
-  edilmiştir; MT-481-001..012 borcu #479'da korunur
-- V2.6 completion ayrı owner kararı gerektirir
-
-### V2.7 — İş Zinciri / Bağlı Log v1
-
-Öncelik: `P1 traceability`
-
-Durum: `implemented — manual test deferred; completion not declared`
-
-- Başlangıç, takip, bekleme, kontrol ve sonuç bağlantıları
-- Source-of-truth kayıtları değiştirmeyen read-model
-- Kırık bağlantı diagnostic'i
-- İşin neden açık/kapalı olduğunun görünürlüğü
-- Issue #483 yalnız exact `field_observations.id` → `follow_up_items.observation_id`
-  bağını, append-only follow-up lifecycle'ını ve current sonucu read-only
-  projekte eder; iki exact entry point aynı canonical zincire gider
-- Kırık/mismatched ilişki typed diagnostic üretir; repair, inference, schema,
-  notification/sync mutation veya generic workflow graph eklenmez
-
-Dalga 3 kapanış kapısı:
-
-- Kullanıcı gün içindeki işi, kanıtı ve sonucu tekrar yazmadan izleyebilir.
-- Günlük taslak kaynak kayıtlarla açıklanabilir.
-- Ağır workflow motoru veya otomatik saha kararı eklenmemiştir.
-
-## 7. Dalga 4 — Yardımcı saha akışları
-
-### V2.8 — İstenecek Malzemeler
-
-- Malzeme, miktar/birim, ihtiyaç tarihi, öncelik ve açıklama
-- `İhtiyaç var → İstendi → Geldi / İptal`
-- Proje/mahal/iş bağlantısı
-- Tam satın alma, teklif, sipariş ve ERP kapsam dışı
-- Issue #485 / PR #486 schema `17 → 18` additive migration ile material request
-  source-of-truth, optimistic revision, atomic append-only lifecycle
-  eventleri ve Home'dan sade açık/geçmiş UI kuran merged Slice'tır
-- Backup format `1` ve version `0.1.0+1` değişmez; manual testler #479'da PENDING izlenir
-
-### V2.9 — Deterministik kişi/firma/etiket önerileri
-
-- Mevcut kayıtlardan açıklanabilir öneri
-- Offline, deterministik ve kullanıcı onaylı
-- Yeni kişi/firma uydurmama
-- Kalıcı mutation öncesi açık seçim
-- Issue #490 / PR #491 merged Slice 1 exact seçili projedeki aktif Saha Rehberi kişileri
-  ve aktif firma/işveren kayıtlarını canonical source olarak kullanır
-- Aynı projedeki exact-string Reminder geçmişi yalnız provenance'ı görünür
-  secondary source'tur; cross-project/private leakage yoktur
-- Bounded sıra match kalitesi, canonical öncelik, güvenli usage/recency ve stable
-  tie-breaker ile deterministiktir
-- Öneri seçimi yalnız mevcut form alanını doldurur; Save ayrı mutation
-  sınırıdır ve query/read failure capture'ı bloke etmez
-- Reusable canonical tag kaynağı henüz yoktur; Slice 1 tag üretmez ve V2.9'u
-  complete ilan etmez
-
-### V2.10 — Telefon görüşmesi sonucu → Ajanda
-
-- Kullanıcı tarafından başlatılan hızlı görüşme sonucu kaydı
-- Kişi/firma/proje/mahal bağlamı
-- Hatırlatıcı yalnız kayıt detayındaki ayrı mevcut kullanıcı işlemi
-- Çağrı geçmişi ve rehber için gereksiz izin yok
-- Gönderildi/okundu iddiası yok
-- Issue #492 / PR #493 merged Slice 1 Agenda row, create event ve opsiyonel immutable
-  phone-call taraf context'ini exact bir SQLite transaction içinde yazar
-- Schema `19` yalnız additive `agenda_phone_call_contexts` tablosunu ekler;
-  backup format `1` ve version `0.1.0+1` olarak kalır
-- Canonical kişi/firma exact project ve active source ile fail-closed
-  doğrulanır; manual edit veya historical değer serbest metindir
-- Otomatik Reminder, notification veya çağrı entegrasyonu yoktur
-- Manual testler #479'da deferred kalır; V2.10 completion ilanı değildir
-
-## 8. Dalga 5 — Medya ve yayımlanmış günlük
-
-### V2.11 — Proje fotoğraf/video albümü
-
-- Ortak attachment read-modeli
-- Proje, mahal, tarih, kategori ve kaynak filtreleri
-- Thumbnail/player sınırı
-- Depolama ve backup boyutu görünürlüğü
-- Kaynak kayda hızlı geçiş
-- Issue #497 / PR #498 merged Slice 1 mevcut `managed_attachments + attachment_links`
-  gerçeğini exact project-scoped ve physical-deduplicated read-model olarak
-  projekte eder; yalnız JPEG/PNG/HEIC/MP4 albüme girer
-- CSE'ye eklenme tarihi, stable mahal/context ve Ajanda/Beton source filtreleri
-  kombinlenebilir; JPEG/PNG preview ve MP4/HEIC open seçilen item için lazy ve
-  integrity-gated'dir
-- Kırık medya ve okunamayan/arşivli source/link görünür kalır; preview/open veya
-  sahte source navigation yapılmaz
-- Schema `19`, backup format `1`, version `0.1.0+1` değişmez; yeni binary,
-  persistence, cache, capture/import veya source/link mutation yoktur
-
-Durum: `implemented — manual test pending; completion not declared`
-
-### Current priority — frictionless release-readiness wave
-
-- Inventory Spatial v1 Slice 7 / Issue #604 completed/closed ile Inventory v1
-  closure tamamlanmıştır.
-- UI/UX Wave 0 / Issue #540 ve loading blocker #580 completed/closed'dur.
-- Issue #586 edge controls, portrait sketch editor ve gesture auto-hide
-  implementation'ı PR #589 ile merge edilmiş; Issue #586 completed/closed'dur.
-- Issue #616'nın 82 ekranlık sanitize paketi evidence baseline olarak kabul
-  edilmiştir; manuel kabul PASS'i değildir ve eksik akışlar evidence debt'tir.
-- Issue #617 güncel frictionless release-readiness program otoritesidir.
-- Issue #618 kanonik
-  `docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md` ve Roadmap/V2 Scope
-  truth-sync'iyle merge edilmiştir.
-- UXF-002..018; adaptive shell, ortak aktif proje, accessibility,
-  form/primary-action, search/filter ve retryable error/detail/reload
-  altyapısını tamamlamıştır. Bu merged temel geri alınmaz.
-- Issue #657 ve
-  `docs/v2/CSE_VISUAL_FIRST_OWNER_DECISIONS_2026-09-04.md`, görünür dönüşümü
-  kalan görünmez polish borcundan önceye alır.
-- Güncel sonraki dalga Project Profile/Home görsel dönüşümüdür. Home artık
-  live-control-center Dashboard değil, seçili projenin düzenlenebilir profilidir;
-  modüllere kompakt `Araçlar` girişiyle ulaşılır.
-- Sonraki dalgalar ortak görsel dil/genel sağ ekran-tool rail ve yüksek
-  sürtünmeli form/ekranlardır. Inventory sağ rail kullanmaz; kompakt üst araç
-  alanı istisnasını ve soldaki Kroki/Katlar/Liste rail'ini korur.
-- Kalan empty/loading/error/success, history/event, adaptive/accessibility,
-  recovery, Issue #479 manual acceptance, backup, ortak arama, onboarding,
-  telemetry, gizlilik/KVKK ve bütünleşik kalite/release-candidate kapıları
-  silinmez; visual-first dalganın ardından geri döner.
-- Public/store release ayrıca owner kararına bağlıdır.
-
-### Future/post-release — DWG Viewer v1 (Issue #523)
-
-- Issue #523 `POST-RELEASE / DEFERRED` durumundadır; DWG Viewer ilk genel yayın
-  kapsamı veya bağımlılığı değildir.
-- DWG-001/002/003 teknik belgeleri gelecekteki entegrasyon temeli olarak
-  korunur.
-- Yeni CSE DWG implementation dilimi yalnız yeni açık owner kararıyla
-  başlayabilir; ayrı DWG ürün/engine Ar-Ge hattı aktif CSE release sırasını
-  bloke etmez.
-
-### V2.12 — Günlük Log Çıktısı v2
-
-Durum: `paused by owner decision`
-
-- v1 saha bulgularına dayalı geliştirme
-- Seçilebilir bölümler
-- İş zinciri, malzeme ve medya ilişkileri
-- Canlı taslak ile yayımlanmış immutable snapshot ayrımı
-- Revision/ek modeli
-- Private veri sızıntısı regresyonu
-
-## 9. Dalga 6 — Dar saha aracı
-
-### V2.13 — Mini hesap makinesi
-
-Durum: `paused by owner decision`
-
-- Temel dört işlem
-- Oran ve yüzde
-- Decimal separator ve hata durumları
-- Sonucun ilgili alana kullanıcı onayıyla aktarılması
-- `eval`, arbitrary code ve ileri mühendislik hesapları yok
-
-## 10. V2 dışında kalanlar
-
-Aşağıdaki başlıklar V2 milestone'una alınmaz:
-
-- Universal Capture
-- Voice Capture / Asistan Gelen Kutusu
-- Open Loop
-- Sabah Brifingi / Akşam Kapanışı
-- Büyük Resim / Saha Nabzı
-- Beton Paketi V2
-- Kalite / İSG özel dikeyleri
-- Doküman Hafızası
-- Inventory Map v1 dışındaki ölçülü CAD/GIS/full saha haritası
-- Gömülü AI ve semantik arama
-- Full-project Gantt editing ve Primavera replacement
-- Approved/contractual baseline, critical path ve float hesapları
-- Resource/material/machine optimization
-- PC senkronizasyonu
-- Multi-user, tenant, firma portalı ve SaaS
-- Orchestrator, Bridge ve Work Mode geliştirmeleri
-
-Bu başlıklar ayrı post-V2 backlog'da tarihsel olarak korunur.
-
-## 11. Yürütme disiplini
-
-1. Aynı anda yalnız bir production implementation Issue'su aktiftir.
-2. Her Issue tek V2 maddesine ve dar değişen sözleşmeye bağlıdır.
-3. `P0` veri kaybı, yanlış bağlama ve backup bozulması yeni özellikten önce
-   çözülür.
-4. Migration varsa eski schema ve backup compatibility test edilir.
-5. Gerçek kullanıcı data root'u otomasyona açılmaz.
-6. Değişmeyen release/device kapıları gereksiz tekrar edilmez.
-7. Merge, release ve store yayını ayrı kullanıcı kararı gerektirir.
-8. Geçmiş Issue/PR/test/podcast kayıtları geriye dönük yeniden yazılmaz.
-9. Living Plan için yalnız tek dar MVP Core dilimi UI'dan önce gelebilir;
-   immediate successor 7-day UI + APK/device kabulüdür.
-
-## 12. Güncel işlem
-
-Güncel canonical faz:
-
-```text
-Living 7-Day Plan — implemented / manual test pending; final completion yok
-→ Issue #466 / PR #467 actual-progress source-of-truth core — merged
-→ Issue #468 / PR #469 progress UI + isolated device acceptance — merged
-→ Issue #470 / PR #471 deterministic read-only forecast core — merged
-→ Issue #472 / PR #473 immutable snapshot dependency graph persistence — merged
-→ Issue #474 / PR #475 read-only downstream dependency impact core — merged
-→ Issue #476 / PR #480 Living Plan intelligence UI — merged / manual test pending
-→ Issue #481 / PR #482 Deterministic Günlük Log v1 — merged / manual test deferred
-→ Issue #483 / PR #484 Agenda–Takip İş Zinciri v1 — merged / manual test deferred
-→ Issue #485 / PR #486 İstenecek Malzemeler v1 — merged / manual test pending
-→ Issue #488 / PR #489 bounded-memory backup package correction — merged
-→ Issue #490 / PR #491 deterministic kişi/firma önerileri Slice 1 — merged / manual test pending
-→ Issue #492 / PR #493 Telefon görüşmesi sonucu → Ajanda Slice 1 — merged / manual test deferred
-→ Issue #497 / PR #498 Proje fotoğraf/video albümü Slice 1 — merged / manual test pending
-→ Issue #504 / PR #505 recovery surface — merged / owner recovery verification pending
-→ Epic #506 / Issue #507 Inventory Map v1 contract — historical normative foundation
-→ Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
-→ Issue #616 — evidence baseline accepted; manual acceptance PASS değil
-→ Issue #617 — current frictionless release-readiness program
-→ Issue #618 — canonical UI/UX contract merged
-→ Phase 1 — adaptive/accessibility foundation complete
-→ Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
-→ Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
-→ Phase 2 Step 10 — UXF-016..018 retryable error/detail/reload slices complete; remaining debt preserved
-→ UXF-002..018 — completed foundation; no rollback
-→ Issue #657 — visual-first owner decision truth-sync
-→ Current next — Project Profile/Home visual transformation
-→ Then — shared visual language/right-side screen-tool rail; Inventory top-tool exception
-→ Then — high-friction forms/screens
-→ Return — remaining empty/loading/error/success, history/event, adaptive/accessibility and recovery release debt
-→ Phase 6 — independent release gates, including recovery/backup
-→ Phase 7 — integrated quality + missing evidence/manual acceptance closure
-→ Phase 8 — release candidate + explicit owner release decision
-→ DWG Viewer v1 / Issue #523 — post-release/deferred future integration; not a release dependency
-```
-
-Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
-Dependency Catalog, Project Activity Instance Graph, deterministic Schedule
-Date Engine ve immutable persistent reference-schedule snapshots PR #444, #446,
-#448, #456 ve #459 zinciriyle merged temeldir.
-
-Issue #466 / PR #467 nullable actual-progress source-of-truth foundation'ını,
-optimistic revision ve durable idempotency/no-op receipt sözleşmesini merged
-temele ekler. Issue #468 / PR #469 progress UI ve isolated device acceptance,
-Issue #470 / PR #471 exact origin snapshot duration'ını progress ile read-only
-yorumlayan deterministic forecast core, Issue #472 / PR #473 ise yalnız yeni
-snapshot'ların exact dependency graph'ını immutable saklayan merged
-predecessor'lardır; legacy graph backfill yapılmaz. Issue #474 / PR #475 bu exact
-immutable girdilerden schedule mutation üretmeden downstream projected impact
-hesaplayan merged predecessor'dır. Issue #476 / PR #480 exact item snapshot'ından
-forecast/impact'i read-only gösteren merged implementation'dır; manual testleri
-#479'da pending kalır. Issue #481 / PR #482 exact project ve İstanbul günü için
-read-only, deterministic Günlük Log v1 projection'ını `IMPLEMENTED — MANUAL
-TEST DEFERRED` olarak merge etmiştir. Issue #483 / PR #484 explicit stable
-Ajanda–takip bağını lifecycle ve sonuçla read-only görünür kılan merged V2.7
-Slice'ıdır. Issue #485 / PR #486 material request source-of-truth ve lifecycle
-UI'yı schema `18` additive temeline eklemiştir; manual testleri pending kalır.
-Issue #490 / PR #491 V2.9 Slice 1 yalnız read-only deterministic kişi/firma öneri
-sınırını ve Reminder first-consumer wiring'ini merged temele ekler. Issue #492 /
-PR #493 V2.10 Slice 1 manual phone-call result capture ve immutable taraf
-provenance'ını schema `19` ile merged temele eklemiştir; manual testleri deferred
-ve V2.10 completion kararı ayrıdır. Issue #497 / PR #498 V2.11 Slice 1 existing
-attachment truth'tan salt-okunur project media album ve source navigation kurar;
-manual testleri pending ve V2.11 completion ilanı değildir.
-
-Issue #540 UI/UX Wave 0 ve loading blocker #580 completed/closed'dur. Inventory
-Map v1 contract ve production Slice zinciri Issue #604'ün repository ve field
-acceptance kapanışıyla tamamlanmıştır. Issue #535 / Draft PR #536 superseded
-tarihsel girişim olarak kalır ve current ancestry değildir. Issue #586'nın
-Inventory final UI/UX implementation'ı PR #589 ile merge edilmiş, Issue #586
-completed/closed'dur.
-
-Current product-development otoritesi #617'dir. #618 kanonik UI/UX sözleşmesi
-merge edilmiş, UXF-002..018 tamamlanmış altyapı olarak korunmuştur. #657
-visual-first owner kararına göre güncel sonraki yön Project Profile/Home görsel
-dönüşümü; ardından ortak görsel dil/genel sağ screen-tool rail, Inventory
-kompakt üst araç istisnası ve yüksek sürtünmeli form/ekran dilimleridir. Kalan
-empty/loading/error/success, history/event, adaptive/accessibility ve recovery
-borcu görsel dalgadan sonra release kapısı olarak geri döner. Issue #523 açık
-kalır fakat
-`POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır; ilk genel yayını bloke
-etmez ve yeni DWG implementation dilimi açık owner kararı olmadan başlamaz.
-Issue #501 recovery, Issue #502 external verified backup/update, Issue #503
-newer-live-data-safe restore ve Issue #499 MAIN-only owner-phone kuralları
-silinmez. V2.12 ve sonraki eski planlı ürün işleri ayrı owner resume kararına
-kadar paused; V2.5–V2.11 completion ve bütün release kararları ayrı owner
-onayına bağlıdır.
-
-## 13. Tarihsel roadmap sınırı
-
-31 Temmuz 2026 ve öncesindeki geniş Asistan-Öncelikli roadmap, Orchestrator
-O0–O10 programı ve eski Faz 1–12 Epic'leri Git geçmişinde ve ilgili
-Issue'larda korunur. Tamamlanmamış maddeler tamamlanmış sayılmaz. Güncel
-production sırası yalnız bu roadmap ve `docs/v2/CSE_V2_SCOPE.md` üzerinden
-belirlenir.
+**Kaynak:** #617 Phase 4 / item 21  
+**Durum:** `NEXT`
+
+Amaç: günlük saha kullanımında mevcut canonical KKD semantiğini değiştirmeden hızlı, erişilebilir ve minimum dokunuşlu seçim/atama akışı.
+
+### Q03 — Otomatik personel kodu release kararı
+
+**Kaynak:** #617 Phase 4 / item 22  
+**Durum:** `DECISION GATE`
+
+- Fatih V1 için tutarsa ayrı CRITICAL child açılır; identity/revision/compatibility sınırları açıkça test edilir.
+- Fatih ilk genel yayın için gerekli görmezse açıkça `POST-RELEASE / DEFERRED` olarak işaretlenir.
+- Karar verilmeden sessiz implementation yapılmaz.
+
+### Q04 — Beton tamamlanma / sonuç / detay / düzenleme akışı
+
+**Kaynak:** #617 Phase 5 / item 23  
+**Durum:** `QUEUED`
+
+Amaç: Beton Paketi'nin gerçek saha kullanımında create → sonuç → detail → edit/completion zincirini tamamlamak ve mevcut identity/attachment davranışını korumak.
+
+### Q05 — Malzemeler ortak UI/UX sistem uyumu
+
+**Kaynak:** #617 Phase 5 / item 24  
+**Durum:** `QUEUED`
+
+Amaç: İstenecek Malzemeler ekranını shared project context, action, state, accessibility ve compact/adaptive görsel dile oturtmak; lifecycle source-of-truth'u değiştirmemek.
+
+### Q06 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
+
+**Kaynak:** #617 Phase 5 / item 25  
+**Durum:** `QUEUED`
+
+Amaç: supporting tools'ın final first-release information architecture ve erişim yerini netleştirmek; attachment/recovery güvenlik sınırlarını korumak.
+
+### Q07 — Inventory release-level entegre doğrulama
+
+**Kaynak:** #617 Phase 5 / item 26; #709–#714  
+**Durum:** `DONE / RELEASE QA ONLY`
+
+- yeni Inventory redesign açılmaz;
+- Kroki/Katlar/Liste, compact top tools, D-pad ve 7+7 iki sıralı toolbar release QA'da korunur;
+- yalnız entegre test/device turunda gerçek regresyon çıkarsa dar bug child açılır.
+
+### Q08 — Bildirim panelinde `Ertele` aksiyonu
+
+**Kaynak:** #617 owner decision `Notification panel snooze action`  
+**Durum:** `QUEUED`
+
+- collapsed notification sade;
+- expanded notification'da görünür `Ertele` action'ı;
+- süre seçenekleri ayrı child'ta netleşir;
+- background scheduling/exact-alarm/persistence semantics sessizce değiştirilmez.
+
+### Q09 — Puantaj tamamlanınca Ajanda'ya otomatik kayıt
+
+**Kaynak:** #617 owner decision `Puantaj → Ajanda automatic completion record`  
+**Durum:** `QUEUED — CRITICAL`
+
+- yalnız kullanıcı Puantaj gününü açıkça tamamladığında;
+- generated Ajanda kaydı exact proje/gün/Puantaj source'una traceable;
+- retry/reopen duplicate üretmez;
+- identity, transaction, failure, event/history ve rollback sözleşmeleri ayrı CRITICAL Issue'da kilitlenir.
+
+### Q10 — Şefim otomatik yedek klasörü
+
+**Kaynak:** #617 owner decision `Backup destination folder`  
+**Durum:** `QUEUED — CRITICAL`
+
+- uygulama gerektiğinde dedicated local Şefim backup folder oluşturur ve default backup destination/source olarak kullanır;
+- silent backup generation, overwrite, rotation/delete veya `.csebackup` format değişikliği bu kapsamın parçası değildir;
+- exact path/data-root, compatibility ve restore validation zorunludur.
+
+### Q11 — Global hızlı cetvel
+
+**Kaynak:** #617 owner decision `Quick Ruler global tool`  
+**Durum:** `QUEUED`
+
+- ekranın sol-alt köşesinden tek dokunuşla geçici tam ekran cetvel;
+- tekrar dokunuşla exact önceki ekran/context geri gelir;
+- source/form/session mutation yok;
+- gerçek ölçü iddiasından önce device-aware physical calibration veya açık calibration fallback zorunludur.
+
+### Q12 — Metraj V1 release kapsam kararı
+
+**Kaynak:** #617 owner decision `Metraj scope expansion`  
+**Durum:** `DECISION GATE`
+
+Nihai ürün yönü: Metraj birkaç örnek kalemle sınırlı olmayacak; ana metraj kalemlerini kategori/iş grubu + arama/filtre ile kapsayacak.
+
+Yayın öncesi yapılacak karar:
+
+- **A — V1 blocker:** exact kalem kataloğu çıkarılır, persistence/schema etkisi incelenir ve ayrı implementation zinciri bu noktada tamamlanır.
+- **B — Post-release expansion:** mevcut V1 metraj güvenli/işlevsel bırakılır; kapsamlı katalog açıkça post-release backlog'a alınır ve ilk genel yayını bloke etmez.
+
+Fatih karar vermeden ChatGPT bu maddeyi sessizce atlamaz veya kapsamlı Metraj geliştirmesini başlatmaz.
+
+### Q13 — Minimum proje-geneli ortak arama
+
+**Kaynak:** #617 Phase 6 / item 27  
+**Durum:** `QUEUED`
+
+İlk release için supported existing record families üzerinde basit, hızlı, project-safe ortak arama; enterprise/global index motoru değil.
+
+### Q14 — Kısa guided onboarding
+
+**Kaynak:** #617 Phase 6 / item 28  
+**Durum:** `QUEUED`
+
+Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günlük akış. Uzun tutorial yok.
+
+### Q15 — Minimum crash / ANR / fatal telemetry
+
+**Kaynak:** #617 Phase 6 / item 29  
+**Durum:** `QUEUED`
+
+Release kalitesinde crash/ANR/fatal görünürlüğü; privacy/local-first ve store beyanlarıyla uyumlu minimum kapsam.
+
+### Q16 — Privacy / KVKK / store declarations
+
+**Kaynak:** #617 Phase 6 / item 30  
+**Durum:** `QUEUED`
+
+Gerçek uygulama davranışı, izinler, local data, backup, medya ve telemetry ile birebir uyumlu privacy/KVKK/store açıklamaları. Uygulamada olmayan claim yok.
+
+### Q17 — Recovery / backup owner acceptance
+
+**Kaynak:** #617 Phase 6 / item 31  
+**Durum:** `RELEASE GATE`
+
+- locked Restore Model A doğrulanır: exact backup state full replacement, restore öncesi safety backup, backup verification, etkilenen kayıt açıklaması, restore sonrası geri alma ve safety backup retention;
+- backup folder işi Q10 pre-release yapıldıysa bu tur onun gerçek cihaz davranışını da kapsar;
+- gerçek kritik data/destructive operasyon yalnız açık owner authority ile yürür.
+
+### Q18 — Compact / medium / expanded window matrisi
+
+**Kaynak:** #617 Phase 7 / item 32  
+**Durum:** `RELEASE GATE`
+
+Breakpoint ve adaptive shell/content davranışının sistematik regresyon matrisi.
+
+### Q19 — Telefon / tablet / portrait / landscape / split-screen
+
+**Kaynak:** #617 Phase 7 / item 33  
+**Durum:** `RELEASE GATE`
+
+Gerçek hedef cihaz sınıfları ve kullanılabilir pencere boyutlarında kritik akışların kontrolü.
+
+### Q20 — TalkBack / yüksek yazı / focus / grayscale
+
+**Kaynak:** #617 Phase 7 / item 34  
+**Durum:** `RELEASE GATE`
+
+Primary navigation ve kritik create/edit/confirm akışlarında erişilebilirlik kapanışı.
+
+### Q21 — Eksik #616 evidence kapanışı
+
+**Kaynak:** #617 Phase 7 / item 35  
+**Durum:** `RELEASE GATE`
+
+Baseline'da eksik kalan populated Puantaj, Beton result/detail/edit, attachment viewer, kayıtlı İSG/KKD ve gerekli motion/Back kanıtları current release candidate davranışıyla tamamlanır. Daily Log + Work Chain targeted evidence #698 ile kapanmıştır ve yeniden yapılmaz.
+
+### Q22 — Manuel kabul borçlarının kapanışı
+
+**Kaynak:** #617 Phase 7 / item 36 + Issue #479  
+**Durum:** `RELEASE GATE`
+
+Release'e gerçekten dahil olan user-visible özelliklerde gerekli `PENDING/DEFERRED` manual test borcu çözülür. Tarihsel gereksiz testler sırf sayı kapatmak için çalıştırılmaz; current release behavior'a göre PASS / N/A / superseded disposition verilir.
+
+### Q23 — Entegre “bir şantiye şefi günü” senaryosu
+
+**Kaynak:** #617 Phase 7 / item 37  
+**Durum:** `RELEASE GATE`
+
+Tek projede gerçek günlük akışı temsil eden bütünleşik senaryo: proje bağlamı → hatırlatma/ajanda → plan → puantaj → saha rehberi/İSG/KKD → beton/malzeme → envanter/medya → backup/recovery; tekrar veri girişi, context drift, dead end ve mutation sürprizi olmamalı.
+
+### Q24 — Otomatik milestone gate + analyze/build + artifact provenance
+
+**Kaynak:** #617 Phase 8 / item 38  
+**Durum:** `RELEASE GATE`
+
+Release candidate exact revision için gerekli birleşik test/analyze/build, package/signing/entrypoint ve artifact SHA/provenance kanıtı.
+
+### Q25 — Owner telefon + tablet Release Candidate kabulü
+
+**Kaynak:** #617 Phase 8 / item 39  
+**Durum:** `RELEASE GATE`
+
+Fatih exact RC artifact'ını en az telefon + tablet sınıfında kritik günlük akış ve görsel/ergonomi açısından kabul eder.
+
+### Q26 — Açık genel yayın kararı
+
+**Kaynak:** #617 Phase 8 / item 40  
+**Durum:** `FINAL OWNER GATE`
+
+Tüm zorunlu gate'ler geçtikten sonra public/store release ancak Fatih'in ayrı ve açık genel yayın kararıyla başlar. Release/store standing auto-merge yetkisinin dışındadır.
+
+## 5. Queue çalışma kuralı
+
+ChatGPT her yeni görevde veya `devam` talebinde:
+
+1. current GitHub `master`, `AGENTS.md`, açık production Issue/PR ve bu queue'yu okur;
+2. açık production Issue/PR varsa önce onu required gate'lerine kadar tamamlar;
+3. aksi halde Q01→Q26 içinde current GitHub'a göre tamamlanmamış ilk uygulanabilir maddeyi seçer;
+4. `DECISION GATE` maddesinde Fatih kararı yoksa implementation başlatmaz;
+5. CRITICAL etiketi taşıyan maddede exact Issue/allowlist/compatibility/manual gate olmadan değişiklik yaptırmaz;
+6. Fatih yeni sıra kararı verirse önce ROADMAP truth-sync yapılır, sonra production iş başlar;
+7. aynı anda ikinci production implementation child açmaz;
+8. tamamlanmış bir queue maddesini tekrar geliştirme işi gibi açmaz; yalnız kanıtlanmış regresyonda dar bug Issue açar.
+
+Bu kural, ChatGPT'nin sohbet hafızasından veya eski SHA'lardan “sıradaki işi” tahmin etmesini engeller.
+
+## 6. İlk genel yayın sonrası / deferred backlog
+
+Aşağıdakiler Q01–Q26 release kuyruğunu bloke etmez, ancak owner kararıyla daha sonra aktive edilebilir:
+
+- **DWG Viewer v1 / Issue #523:** `POST-RELEASE / DEFERRED`. DWG ve doküman viewer uzun vadeli ana ürün hedefidir; ilk genel yayın bağımlılığı değildir.
+- Q03'te V1 dışına alınırsa otomatik personel kodu.
+- Q12'de B seçilirse kapsamlı Metraj katalog/çalışma merkezi.
+- V2.12 Günlük Log v2 ve V2.13 Mini Hesap Makinesi: mevcut owner pause kararı sürer.
+- Ayrı ürün toplantısı/brainstorm kayıtları, owner tarafından pre-release queue'ya taşınmadıkça yayın blocker'ı değildir.
+- Büyük AI/semantic search, SaaS/multi-user, Primavera replacement ve geniş CAD/GIS hedefleri ilk genel yayın dışında kalır.
+
+## 7. Korunan ürün ve güvenlik ilkeleri
+
+- CSE modül koleksiyonu değil, local-first/mobile-first kişisel saha asistanıdır.
+- Aynı bilgi ikinci kez girdirilmez; project context mümkün olduğunca korunur.
+- Sürtünme azaltılırken stable identity, optimistic revision, append-only event/history, attachment ve backup bütünlüğü zayıflatılmaz.
+- UI kendiliğinden hukuki uygunluk, resmî kabul/ret veya `blocked` kararı üretmez.
+- Gerçek kullanıcı data root'u ve destructive restore/release işlemleri ayrı owner authority ister.
+- Force-push, destructive reset/clean/stash ve beklenmeyen kullanıcı değişikliğini silme yoktur.
+- Public/store release Q26'dan önce yapılmaz.
+
+## 8. Tarihsel kaynaklar
+
+Daha ayrıntılı V2 tarihçesi Git geçmişinde, `docs/v2/CSE_V2_SCOPE.md`, Issue #617 yorumları ve ilgili child Issue/PR'larda korunur. Eski roadmap fazları, Epic #97/#105/#127–#140, Orchestrator O0–O10, Bridge/Work Mode ve superseded UI programları current queue değildir.
+
+Tarihsel kayıtlar silinmiş sayılmaz; yalnız yürütme otoritesi bu dosyadaki Q01–Q26 kuyruğuna merkezileştirilmiştir.
