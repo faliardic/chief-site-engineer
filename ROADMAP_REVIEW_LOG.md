@@ -321,3 +321,71 @@ Küçük görsel kusurlar ve yardımcı kolaylıklar post-release'e kalabilir. K
 ### ROADMAP etkisi
 
 `YOK` — bu rapor yalnız değerlendirme hafızasıdır. Q01–Q26 sırası veya status etiketleri bu kayıtla değiştirilmedi. Fatih daha sonra önerilerden herhangi birini owner kararı olarak kabul ederse, yeni production iş başlamadan önce ilgili değişiklik `ROADMAP.md` içine truth-sync edilmelidir.
+
+## 9. REVIEW-003 — Hatırlatıcı geri bildirimi ve tam kuyruk yeniden sıralaması
+
+**Tarih:** 2026-09-06  
+**Amaç:** Owner'ın Hatırlatıcı kullanım geri bildirimini kanonik pre-release kuyruğa eklemek ve “Q numaraları kayabilir; her yeni kabul edilen geri bildirimde tüm liste yeniden değerlendirilsin ve baştan sıralansın” kararını uygulamak.  
+**Değerlendirilen Q'lar:** Güncel pre-release kuyruğun tamamı.
+
+### Current GitHub gerçeği
+
+- Toplantı sırasında current `master` yeniden doğrulandı.
+- Açık production işi Issue #708 / Draft PR #715 / Q01 İSG Geçmiş-Arşiv işidir.
+- PR #715 source/test/independent review kanıtına sahip olmakla birlikte exact Fatih Acceptance gate'i kapanmadan Ready/merge olamaz.
+- Bu nedenle reprioritization Q01'i yerinden oynatmaz; yeni production implementation Q01 kapanmadan başlamaz.
+
+### Owner kararları
+
+1. Q numaraları tarihsel referans uğruna sabit tutulmayacak.
+2. Fatih yeni bir kullanım/ürün geri bildirimini pre-release roadmap'e aldığında ChatGPT yalnız araya `Q01.5` benzeri ara numara eklemeyecek.
+3. Her seferinde bütün current Q listesi saha değeri, release değeri, bağımlılık, sürtünme, teknik risk ve kapsam şişmesi açısından yeniden değerlendirilecek.
+4. Gerekirse aynı iş ailesindeki Q'lar birleştirilecek ve tüm kalan kuyruk Q01'den itibaren yeniden numaralandırılacak.
+5. Eski Q numarası current gerçek olmayacak; current sıra her zaman `ROADMAP.md` üzerinden okunacak.
+
+### Yeniden sıralama gerekçesi
+
+- **Hatırlatıcı yeni Q02:** Başka projeye ait reminder'ların karışması bir görsel polish değil günlük doğruluk/context problemidir. Hızlı `Unutma` yakalaması da CSE'nin temel saha döngüsüdür. Shared active-project altyapısı zaten mevcut olduğundan proje profili genişletmesine teknik olarak bağımlı değildir ve daha dar çözülebilir.
+- **Ana Sayfa / Proje Profili Q03:** Çok yüksek ürün değeri korunur; ancak blok/proje alanları ve olası schema/stable-ID ihtiyacı nedeniyle Hatırlatıcı'ya göre daha geniş audit/implementation zinciri açabilir.
+- **Arama Q08 ve onboarding Q09 öne çekildi:** REVIEW-002'de ikisi de yüksek release değeri taşıyan dar işler olarak değerlendirilmişti. Kullanıcının biriken saha hafızasını geri bulması ve ürünü geliştirme geçmişini bilmeyen yeni kullanıcının ilk akışa ulaşması, düşük değerli yardımcı araçlardan önce gelir.
+- **Bildirim panelinde `Ertele` ayrı Q olmaktan çıkarıldı:** Aynı Reminder iş ailesinde Q02/REM-06 altına taşındı. Böylece notification kolaylığı temel Reminder doğruluğundan ayrı ve daha yüksek öncelikli iş gibi davranmaz.
+- **Inventory release-level doğrulama ayrı Q olmaktan çıkarıldı:** Inventory production refinement zaten tamamlanmıştır. Yeni redesign açılmadan release-QA yükümlülüğü Q21 evidence kapanışı ve Q23 entegre günlük senaryo içine taşındı.
+- **Q10 Puantaj→Ajanda, Q11 backup folder, Q12 otomatik personel kodu, Q13 Metraj ve Q14 global cetvel:** Pre-release kapsamdan owner tarafından henüz çıkarılmadıkları için korunurlar; ancak daha yüksek günlük/release değerli Reminder, Proje Profili, Beton, supporting IA, arama ve onboarding sonrasına sıralanırlar.
+- **Q15–Q26:** Telemetry/privacy/recovery ve entegre release gate zinciri sıralı bağımlılık olarak korunur.
+
+### Yeni kanonik sıra özeti
+
+1. Q01 — İSG Geçmiş / Arşiv
+2. Q02 — Hatırlatıcı aktif-proje bağlamı + hızlı Unutma
+3. Q03 — Ana Sayfa / Proje Profili
+4. Q04 — KKD hızlı seçim
+5. Q05 — Beton completion/detail/edit
+6. Q06 — Malzemeler UI/UX uyumu
+7. Q07 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
+8. Q08 — Minimum proje-geneli arama
+9. Q09 — Kısa guided onboarding
+10. Q10 — Puantaj → Ajanda otomatik kayıt
+11. Q11 — Şefim otomatik yedek klasörü
+12. Q12 — Otomatik personel kodu decision gate
+13. Q13 — Metraj V1 decision gate
+14. Q14 — Global hızlı cetvel
+15. Q15 — Minimum crash/ANR/fatal telemetry
+16. Q16 — Privacy/KVKK/store declarations
+17. Q17 — Recovery/backup owner acceptance
+18. Q18 — Window matrix
+19. Q19 — Telefon/tablet/orientation/split-screen
+20. Q20 — TalkBack/yüksek yazı/focus/grayscale
+21. Q21 — Eksik evidence + Inventory release-QA
+22. Q22 — Manuel kabul borçları
+23. Q23 — Entegre şantiye şefi günü
+24. Q24 — Automated milestone/build/provenance
+25. Q25 — Owner telefon+tablet RC kabulü
+26. Q26 — Açık genel yayın kararı
+
+### REVIEW-002 ile ilişki
+
+`REVIEW-002` **KISMEN SUPERSEDED** durumundadır: içindeki saha değeri, risk ve post-release önerileri danışma bağlamı olarak korunur; ancak o rapordaki Q numaraları ve sıra artık current değildir. Current sıra yalnız ROADMAP'in yeniden numaralandırılmış Q01–Q26 kuyruğudur.
+
+### ROADMAP etkisi
+
+`VAR` — `ROADMAP.md` tam liste yeniden değerlendirilerek Q01–Q26 biçiminde baştan numaralandırılır; yeni Hatırlatıcı Q02 eklenir, Proje Profili Q03 olur, notification `Ertele` Q02'ye birleştirilir, tamamlanmış Inventory release-QA ayrı sıra maddesi olmaktan çıkarılıp Q21/Q23'e taşınır ve sonraki Q'lar yeni öncelik sırasına göre yeniden numaralandırılır.
