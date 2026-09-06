@@ -40,7 +40,7 @@ MobileReminder reminder({
   String? deadlineAt,
   String? trashedAt,
   bool isImportant = false,
-  String? projectId,
+  String? projectId = agendaProjectId,
   String? projectName,
   String? sourceLogId,
   String? attendanceDayId,
@@ -643,7 +643,12 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           key: ValueKey('reminder-list-$textScale'),
-          home: Scaffold(body: RemindersPage(agenda: agenda)),
+          home: Scaffold(
+            body: RemindersPage(
+              agenda: agenda,
+              preferredProjectId: agendaProjectId,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -658,7 +663,7 @@ void main() {
       expect(create.hitTestable(), findsOneWidget);
       expect(inbox.hitTestable(), findsOneWidget);
       expect(find.text('Yeni hatırlatıcı'), findsOneWidget);
-      expect(find.text('Unutma Kutusu'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '+ Unutma'), findsOneWidget);
       expect(
         find.descendant(
           of: create,
@@ -1054,6 +1059,10 @@ void main() {
   testWidgets(
     'Today is default and renders overdue all-day and timed sections once in priority order',
     (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final semantics = tester.ensureSemantics();
       final overdue = reminder(
         id: widgetReminderId(1),
@@ -1083,7 +1092,12 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: RemindersPage(agenda: agenda)),
+          home: Scaffold(
+            body: RemindersPage(
+              agenda: agenda,
+              preferredProjectId: agendaProjectId,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -1099,16 +1113,19 @@ void main() {
           false,
         ),
         (
-          Key('reminder-primary-other'),
-          'Diğer',
-          Icons.more_horiz_rounded,
+          Key('reminder-primary-after'),
+          'Sonrası',
+          Icons.date_range_outlined,
           false,
         ),
       ]) {
         final finder = find.byKey(action.$1);
-        expect(tester.getSize(finder), const Size.square(48));
-        expect(_iconButtonByKey(tester, action.$1).tooltip, action.$2);
-        expect(_iconButtonByKey(tester, action.$1).isSelected, action.$4);
+        expect(tester.getSize(finder).height, greaterThanOrEqualTo(48));
+        expect(tester.getSize(finder).width, greaterThanOrEqualTo(48));
+        expect(
+          find.descendant(of: finder, matching: find.text(action.$2)),
+          findsOneWidget,
+        );
         expect(
           _semanticsByKey(tester, action.$1).properties.selected,
           action.$4,
@@ -1163,13 +1180,18 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: RemindersPage(agenda: agenda)),
+        home: Scaffold(
+          body: RemindersPage(
+            agenda: agenda,
+            preferredProjectId: agendaProjectId,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('reminder-today-empty')), findsOneWidget);
-    expect(find.text('Bugün için açık hatırlatıcı yok.'), findsOneWidget);
+    expect(find.text('Bugün için hatırlatıcın yok.'), findsOneWidget);
     expect(find.byKey(const Key('reminder-section-overdue')), findsNothing);
     expect(find.byKey(const Key('reminder-section-timed-today')), findsNothing);
     expect(find.byKey(const Key('reminder-section-all-day')), findsNothing);
@@ -1180,6 +1202,13 @@ void main() {
   ) async {
     final semantics = tester.ensureSemantics();
     final agenda = FakeAgendaApplication(
+      reminders: [
+        for (var index = 0; index < 3; index++)
+          reminder(
+            id: widgetReminderId(index + 900),
+            status: ReminderStatus.inbox,
+          ),
+      ],
       todayOverview: const ReminderTodayOverview(
         istanbulDay: '2026-07-20',
         overdue: [],
@@ -1190,7 +1219,12 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: RemindersPage(agenda: agenda)),
+        home: Scaffold(
+          body: RemindersPage(
+            agenda: agenda,
+            preferredProjectId: agendaProjectId,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1257,7 +1291,12 @@ void main() {
     final agenda = FakeAgendaApplication();
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: RemindersPage(agenda: agenda)),
+        home: Scaffold(
+          body: RemindersPage(
+            agenda: agenda,
+            preferredProjectId: agendaProjectId,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1296,7 +1335,12 @@ void main() {
         MediaQuery(
           data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
           child: MaterialApp(
-            home: Scaffold(body: RemindersPage(agenda: agenda)),
+            home: Scaffold(
+              body: RemindersPage(
+                agenda: agenda,
+                preferredProjectId: agendaProjectId,
+              ),
+            ),
           ),
         ),
       );
@@ -1319,6 +1363,7 @@ void main() {
       expect(find.textContaining('Şantiye A • Ajanda'), findsOneWidget);
       final restore = find.byKey(Key('restore-reminder-${item.id}'));
       await tester.ensureVisible(restore);
+      await tester.pumpAndSettle();
       expect(tester.getSize(restore), const Size.square(48));
       expect(
         _iconButtonByKey(tester, Key('restore-reminder-${item.id}')).tooltip,
@@ -2262,7 +2307,12 @@ void main() {
       ..mutateReminderCompleter = completer;
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: RemindersPage(agenda: agenda)),
+        home: Scaffold(
+          body: RemindersPage(
+            agenda: agenda,
+            preferredProjectId: agendaProjectId,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -2294,7 +2344,12 @@ void main() {
       final agenda = FakeAgendaApplication(reminders: [item]);
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: RemindersPage(agenda: agenda)),
+          home: Scaffold(
+            body: RemindersPage(
+              agenda: agenda,
+              preferredProjectId: agendaProjectId,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -2306,14 +2361,7 @@ void main() {
         "Yarın 08:00'a ertele",
       );
       expect(find.text('Yarın 08:00'), findsNothing);
-      expect(
-        _iconButtonByKey(
-          tester,
-          const Key('reminder-primary-tomorrow'),
-        ).tooltip,
-        'Yarın',
-      );
-      expect(find.text('Yarın'), findsNothing);
+      expect(find.text('Yarın'), findsOneWidget);
       await tester.tap(todayAction);
       await tester.pumpAndSettle();
       expect(agenda.reminders.single.nextAttentionAt, '2026-07-21T05:00:00Z');
@@ -2341,7 +2389,12 @@ void main() {
     final agenda = FakeAgendaApplication(reminders: [item]);
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: RemindersPage(agenda: agenda)),
+        home: Scaffold(
+          body: RemindersPage(
+            agenda: agenda,
+            preferredProjectId: agendaProjectId,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -2381,7 +2434,12 @@ void main() {
       final agenda = FakeAgendaApplication(reminders: [today, overdue, future]);
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: RemindersPage(agenda: agenda)),
+          home: Scaffold(
+            body: RemindersPage(
+              agenda: agenda,
+              preferredProjectId: agendaProjectId,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -2428,7 +2486,11 @@ void main() {
           child: MaterialApp(
             theme: ThemeData(brightness: Brightness.dark),
             home: Scaffold(
-              body: RemindersPage(agenda: agenda, attendance: attendance),
+              body: RemindersPage(
+                agenda: agenda,
+                attendance: attendance,
+                preferredProjectId: agendaProjectId,
+              ),
             ),
           ),
         ),
@@ -2479,7 +2541,12 @@ void main() {
       ..mutateReminderFailure = StateError('forced failure');
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: RemindersPage(agenda: agenda)),
+        home: Scaffold(
+          body: RemindersPage(
+            agenda: agenda,
+            preferredProjectId: agendaProjectId,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -2497,7 +2564,12 @@ void main() {
     final agenda = FakeAgendaApplication();
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: RemindersPage(agenda: agenda)),
+        home: Scaffold(
+          body: RemindersPage(
+            agenda: agenda,
+            preferredProjectId: agendaProjectId,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -2514,13 +2586,6 @@ void main() {
       isFalse,
     );
     expect(
-      _iconButtonByKey(
-        tester,
-        const Key('reminder-primary-tomorrow'),
-      ).isSelected,
-      isTrue,
-    );
-    expect(
       _semanticsByKey(
         tester,
         const Key('reminder-primary-tomorrow'),
@@ -2530,7 +2595,7 @@ void main() {
     expect(
       _semanticsByKey(
         tester,
-        const Key('reminder-primary-other'),
+        const Key('reminder-primary-after'),
       ).properties.selected,
       isFalse,
     );
@@ -2558,7 +2623,12 @@ void main() {
           data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
           child: MaterialApp(
             theme: ThemeData(brightness: configuration.brightness),
-            home: Scaffold(body: RemindersPage(agenda: agenda)),
+            home: Scaffold(
+              body: RemindersPage(
+                agenda: agenda,
+                preferredProjectId: agendaProjectId,
+              ),
+            ),
           ),
         ),
       );
@@ -2566,7 +2636,8 @@ void main() {
 
       final tomorrowGroup = find.byKey(const Key('reminder-primary-tomorrow'));
       expect(tomorrowGroup, findsOneWidget);
-      expect(tester.getSize(tomorrowGroup), const Size.square(48));
+      expect(tester.getSize(tomorrowGroup).height, greaterThanOrEqualTo(48));
+      expect(tester.getSize(tomorrowGroup).width, greaterThanOrEqualTo(48));
       await tester.tap(tomorrowGroup);
       await tester.pumpAndSettle();
       expect(agenda.lastReminderGroup, ReminderViewGroup.tomorrow);
@@ -2574,6 +2645,7 @@ void main() {
 
       final reminderCard = find.byKey(Key('reminder-${item.id}'));
       await tester.ensureVisible(reminderCard);
+      await tester.pumpAndSettle();
       await tester.tap(reminderCard);
       await tester.pumpAndSettle();
       expect(find.byType(ReminderDetailPage), findsOneWidget);
@@ -3763,7 +3835,12 @@ void main() {
       final agenda = _DelayedReminderAgenda(reminders);
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: RemindersPage(agenda: agenda)),
+          home: Scaffold(
+            body: RemindersPage(
+              agenda: agenda,
+              preferredProjectId: agendaProjectId,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -3831,7 +3908,12 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           navigatorObservers: [observer],
-          home: Scaffold(body: RemindersPage(agenda: agenda)),
+          home: Scaffold(
+            body: RemindersPage(
+              agenda: agenda,
+              preferredProjectId: agendaProjectId,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();

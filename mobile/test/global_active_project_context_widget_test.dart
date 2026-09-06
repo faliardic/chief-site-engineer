@@ -195,19 +195,23 @@ void main() {
 
       await _openTab(tester, 'Hatırlatıcı');
       _expectIndicator('Proje seçilmedi');
-      await tester.tap(find.byKey(const Key('quick-reminder')));
-      await tester.pumpAndSettle();
-      expect(find.byType(ReminderFormPage), findsOneWidget);
       expect(
         tester
-            .widget<DropdownButtonFormField<String?>>(
-              find.byKey(const Key('reminder-project')),
-            )
-            .initialValue,
+            .widget<FilledButton>(find.byKey(const Key('new-reminder')))
+            .onPressed,
         isNull,
       );
-      _popRoute(tester, find.byType(ReminderFormPage));
-      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.byKey(const Key('quick-inbox-reminder')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(find.byType(ReminderFormPage), findsNothing);
+      expect(find.textContaining('bir proje seçin'), findsOneWidget);
+      expect(agenda.createReminderCalls, 0);
 
       await _openTab(tester, 'Ajanda');
       _expectIndicator('Proje seçilmedi');
@@ -259,25 +263,15 @@ void main() {
 
       await _openTab(tester, 'Hatırlatıcı');
       _expectIndicator(_projectB.name);
-      await tester.tap(find.byKey(const Key('quick-reminder')));
+      await tester.tap(find.byKey(const Key('new-reminder')));
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<DropdownButtonFormField<String?>>(
-              find.byKey(const Key('reminder-project')),
-            )
-            .initialValue,
-        _projectB.id,
-      );
-      await tester.tap(find.byKey(const Key('reminder-project')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(_projectA.name).last);
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('reminder-project')), findsNothing);
+      expect(find.text('Aktif proje: ${_projectB.name}'), findsOneWidget);
       _popRoute(tester, find.byType(ReminderFormPage));
       await tester.pumpAndSettle();
       _expectIndicator(_projectB.name);
 
-      await tester.tap(find.byKey(const Key('quick-reminder')));
+      await tester.tap(find.byKey(const Key('new-reminder')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('reminder-title')),
@@ -375,16 +369,10 @@ void main() {
       await tester.pumpAndSettle();
 
       _expectIndicator(_projectB.name);
-      await tester.tap(find.byKey(const Key('quick-reminder')));
+      await tester.tap(find.byKey(const Key('new-reminder')));
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<DropdownButtonFormField<String?>>(
-              find.byKey(const Key('reminder-project')),
-            )
-            .initialValue,
-        _projectB.id,
-      );
+      expect(find.byKey(const Key('reminder-project')), findsNothing);
+      expect(find.text('Aktif proje: ${_projectB.name}'), findsOneWidget);
       _popRoute(tester, find.byType(ReminderFormPage));
       await tester.pumpAndSettle();
 
@@ -651,25 +639,14 @@ void _popRoute(WidgetTester tester, Finder routeContent) {
 
 Future<void> _submitReminder(WidgetTester tester) async {
   final submit = find.byKey(const Key('submit-reminder'));
-  final scrollable = find.ancestor(
-    of: submit,
-    matching: find.byType(Scrollable),
-  );
-  expect(scrollable, findsOneWidget);
-  await tester.scrollUntilVisible(submit, 200, scrollable: scrollable);
-  await tester.pumpAndSettle();
-  for (
-    var dragCount = 0;
-    dragCount < 6 && submit.hitTestable().evaluate().isEmpty;
-    dragCount += 1
-  ) {
-    await tester.drag(scrollable, const Offset(0, -48));
-    await tester.pumpAndSettle();
-  }
   final hitTestableSubmit = submit.hitTestable();
   expect(hitTestableSubmit, findsOneWidget);
   await tester.tap(hitTestableSubmit);
   await tester.pumpAndSettle();
+  if (find.text('Anladım').evaluate().isNotEmpty) {
+    await tester.tap(find.text('Anladım'));
+    await tester.pumpAndSettle();
+  }
 }
 
 class _ContextInventory extends UnavailableInventoryApplication {

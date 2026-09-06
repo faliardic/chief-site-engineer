@@ -34,7 +34,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: agenda)));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('next-day')));
+    await tester.tap(find.byKey(const Key('agenda-calendar-next-period')));
     await tester.pumpAndSettle();
     final search = find.byKey(const Key('agenda-literal-search'));
     await tester.enterText(search, 'korunacak arama');
@@ -68,7 +68,7 @@ void main() {
         .onRefresh();
     await tester.pumpAndSettle();
 
-    _expectRetryAction(tester, const Key('agenda-read-error-retry'));
+    await _expectRetryAction(tester, const Key('agenda-read-error-retry'));
     expect(
       find.text('Ajanda kayıtları güvenli biçimde okunamadı.'),
       findsOneWidget,
@@ -84,7 +84,7 @@ void main() {
     failedRetry();
     await tester.pumpAndSettle();
     expect(agenda.listAgendaCalls, failedCalls + 1);
-    _expectRetryAction(tester, const Key('agenda-read-error-retry'));
+    await _expectRetryAction(tester, const Key('agenda-read-error-retry'));
     _expectAgendaQuery(agenda.lastAgendaQuery!, expected);
 
     agenda.agendaFailure = null;
@@ -122,7 +122,9 @@ void main() {
     final agenda = _ScriptedReminderAgenda(reminders: const [_trashedReminder]);
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: RemindersPage(agenda: agenda)),
+        home: Scaffold(
+          body: RemindersPage(agenda: agenda, preferredProjectId: _projectId),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -148,7 +150,7 @@ void main() {
         .onRefresh();
     await tester.pumpAndSettle();
 
-    _expectRetryAction(tester, const Key('reminder-read-error-retry'));
+    await _expectRetryAction(tester, const Key('reminder-read-error-retry'));
     expect(
       find.text('Hatırlatıcılar güvenli biçimde okunamadı.'),
       findsOneWidget,
@@ -166,7 +168,7 @@ void main() {
     failedRetry();
     await tester.pumpAndSettle();
     expect(agenda.listReminderCalls, failedCalls + 1);
-    _expectRetryAction(tester, const Key('reminder-read-error-retry'));
+    await _expectRetryAction(tester, const Key('reminder-read-error-retry'));
     expect(agenda.lastReminderGroup, ReminderViewGroup.trash);
 
     agenda.reminderFailure = null;
@@ -205,7 +207,7 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: agenda)));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('next-day')));
+      await tester.tap(find.byKey(const Key('agenda-calendar-next-period')));
       await tester.pumpAndSettle();
       final search = find.byKey(const Key('agenda-literal-search'));
       await tester.enterText(search, 'korunacak arama');
@@ -220,6 +222,11 @@ void main() {
         420,
         scrollable: _scrollableWithin(const Key('agenda-day-list')),
       );
+      await Scrollable.ensureVisible(
+        tester.element(targetFinder),
+        alignment: 0.25,
+      );
+      await tester.pumpAndSettle();
       final before = _scrollOffset(tester, const Key('agenda-day-list'));
       expect(before, greaterThan(300));
 
@@ -263,7 +270,9 @@ void main() {
       final agenda = _ScriptedReminderAgenda(reminders: reminders);
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: RemindersPage(agenda: agenda)),
+          home: Scaffold(
+            body: RemindersPage(agenda: agenda, preferredProjectId: _projectId),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -317,18 +326,23 @@ void main() {
     final agenda = _ScriptedAgenda()..agendaFailure = StateError('agenda read');
     await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: agenda)));
     await tester.pumpAndSettle();
-    _expectRetryAction(tester, const Key('agenda-read-error-retry'));
+    await _expectRetryAction(tester, const Key('agenda-read-error-retry'));
     expect(find.text('Bu günde Ajanda kaydı yok.'), findsNothing);
 
     final reminders = _ScriptedReminderAgenda()
       ..todayFailure = StateError('reminder read');
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: RemindersPage(agenda: reminders)),
+        home: Scaffold(
+          body: RemindersPage(
+            agenda: reminders,
+            preferredProjectId: _projectId,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
-    _expectRetryAction(tester, const Key('reminder-read-error-retry'));
+    await _expectRetryAction(tester, const Key('reminder-read-error-retry'));
     expect(find.byKey(const Key('reminder-today-empty')), findsNothing);
   });
 
@@ -353,7 +367,12 @@ void main() {
       ..mutateReminderFailure = StateError('mutation failure');
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: RemindersPage(agenda: reminders)),
+        home: Scaffold(
+          body: RemindersPage(
+            agenda: reminders,
+            preferredProjectId: _projectId,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -373,7 +392,12 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: RemindersPage(agenda: FakeAgendaApplication())),
+        home: Scaffold(
+          body: RemindersPage(
+            agenda: FakeAgendaApplication(),
+            preferredProjectId: _projectId,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -382,8 +406,17 @@ void main() {
   });
 }
 
-void _expectRetryAction(WidgetTester tester, Key key) {
+Future<void> _expectRetryAction(WidgetTester tester, Key key) async {
   final action = find.byKey(key);
+  final listKey = key == const Key('agenda-read-error-retry')
+      ? const Key('agenda-day-list')
+      : const Key('reminder-list');
+  await tester.scrollUntilVisible(
+    action,
+    220,
+    scrollable: _scrollableWithin(listKey),
+  );
+  await tester.pumpAndSettle();
   expect(action, findsOneWidget);
   expect(tester.widget(action), isA<FilledButton>());
   final size = tester.getSize(action);
@@ -539,7 +572,7 @@ AgendaLog _agendaLog(int index) => AgendaLog(
 
 const _activeReminder = MobileReminder(
   id: _reminderId,
-  projectId: null,
+  projectId: _projectId,
   projectName: null,
   sourceLogId: null,
   captureText: 'Kontrolü hatırla',
@@ -554,7 +587,7 @@ const _activeReminder = MobileReminder(
 
 const _trashedReminder = MobileReminder(
   id: _reminderId,
-  projectId: null,
+  projectId: _projectId,
   projectName: null,
   sourceLogId: null,
   captureText: 'Silinen hatırlatıcı',
@@ -570,7 +603,7 @@ const _trashedReminder = MobileReminder(
 
 MobileReminder _reminder(int index) => MobileReminder(
   id: 'bbbbbbbb-bbbb-4bbb-8bbb-${index.toString().padLeft(12, '0')}',
-  projectId: null,
+  projectId: _projectId,
   projectName: null,
   sourceLogId: null,
   captureText: 'Korunacak hatırlatıcı $index',

@@ -8,7 +8,7 @@ import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:flutter/material.dart';
 
-enum _ReminderPrimaryView { today, tomorrow, other }
+enum _ReminderPrimaryView { today, tomorrow, after, other, projectless }
 
 enum _ReminderTodaySection { overdue, timedToday, allDayToday }
 
@@ -51,6 +51,12 @@ class _RemindersPageState extends State<RemindersPage> {
   final Set<String> _restoreBusy = {};
   bool _detailNavigationBusy = false;
   bool _preservingDetailReload = false;
+  int _readGeneration = 0;
+  bool _captureNavigationBusy = false;
+
+  bool get _hasActiveProject =>
+      widget.preferredProjectId != null &&
+      widget.preferredProjectId!.trim().isNotEmpty;
 
   Future<void> _moveToTomorrow(MobileReminder reminder) async {
     if (_tomorrowBusy.contains(reminder.id)) return;
@@ -101,39 +107,111 @@ class _RemindersPageState extends State<RemindersPage> {
   }
 
   @override
+  void didUpdateWidget(covariant RemindersPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.preferredProjectId != widget.preferredProjectId ||
+        oldWidget.agenda != widget.agenda) {
+      _reload();
+    }
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
   }
 
   Future<void> _reload({double? restoreOffset}) async {
+    final generation = ++_readGeneration;
+    final projectId = widget.preferredProjectId;
+    final view = _primaryView;
+    bool current() => mounted && generation == _readGeneration;
     setState(() {
       _loading = true;
       _error = null;
       _readError = null;
       _preservingDetailReload = restoreOffset != null;
     });
+    if (!_hasActiveProject && view != _ReminderPrimaryView.projectless) {
+      setState(() {
+        _items = const [];
+        _loading = false;
+        _preservingDetailReload = false;
+      });
+      return;
+    }
     try {
-      if (_primaryView == _ReminderPrimaryView.today) {
+      if (view == _ReminderPrimaryView.today) {
         final application = widget.agenda;
         if (application is! ReminderTodayApplication) {
           throw StateError('Today reminder read-model is unavailable.');
         }
         final overview = await (application as ReminderTodayApplication)
             .getReminderTodayOverview();
-        if (!mounted) return;
+        final inbox = await widget.agenda.listReminders(
+          ReminderViewGroup.inbox,
+        );
+        if (!current()) return;
         setState(() {
-          _todayOverview = overview;
+          _todayOverview = ReminderTodayOverview(
+            istanbulDay: overview.istanbulDay,
+            overdue: overview.overdue
+                .where((r) => r.projectId == projectId)
+                .toList(),
+            timedToday: overview.timedToday
+                .where((r) => r.projectId == projectId)
+                .toList(),
+            allDayToday: overview.allDayToday
+                .where((r) => r.projectId == projectId)
+                .toList(),
+            inboxCount: inbox.where((r) => r.projectId == projectId).length,
+          );
           _items = const [];
           _loading = false;
           _preservingDetailReload = false;
         });
       } else {
-        final group = _primaryView == _ReminderPrimaryView.tomorrow
+        final group = view == _ReminderPrimaryView.tomorrow
             ? ReminderViewGroup.tomorrow
+            : view == _ReminderPrimaryView.after
+            ? ReminderViewGroup.upcoming
             : _otherGroup;
-        final items = await widget.agenda.listReminders(group);
-        if (!mounted) return;
+        List<MobileReminder> items;
+        if (view == _ReminderPrimaryView.projectless) {
+          // Groups overlap; index only repeated reads of the same stored ID.
+          final records = <String, MobileReminder>{};
+          for (final legacyGroup in ReminderViewGroup.values) {
+            for (final reminder in await widget.agenda.listReminders(
+              legacyGroup,
+            )) {
+              if (reminder.projectId == null) records[reminder.id] = reminder;
+            }
+          }
+          items = records.values.toList()..sort((a, b) => a.id.compareTo(b.id));
+        } else {
+          items = (await widget.agenda.listReminders(
+            group,
+          )).where((r) => r.projectId == projectId).toList();
+          if (view == _ReminderPrimaryView.after) {
+            final application = widget.agenda;
+            if (application is! ReminderTodayApplication) {
+              throw StateError('Today reminder read-model is unavailable.');
+            }
+            final overview = await (application as ReminderTodayApplication)
+                .getReminderTodayOverview();
+            final tomorrow = CseTimeCodec.shiftIstanbulDay(
+              overview.istanbulDay,
+              1,
+            );
+            items = items.where((r) {
+              final day = r.nextAttentionAt == null
+                  ? r.allDayLocalDate
+                  : CseTimeCodec.istanbulDayKey(r.nextAttentionAt!);
+              return day != null && day.compareTo(tomorrow) > 0;
+            }).toList();
+          }
+        }
+        if (!current()) return;
         setState(() {
           _items = items;
           _loading = false;
@@ -141,7 +219,7 @@ class _RemindersPageState extends State<RemindersPage> {
         });
       }
     } on Object {
-      if (!mounted) return;
+      if (!current()) return;
       setState(() {
         _loading = false;
         _preservingDetailReload = false;
@@ -210,17 +288,13 @@ class _RemindersPageState extends State<RemindersPage> {
   };
 
   Future<void> _selectPrimary(_ReminderPrimaryView view) async {
-    if (view == _ReminderPrimaryView.other) {
-      await _showOtherViews();
-      return;
-    }
     if (_primaryView == view) return;
     setState(() => _primaryView = view);
     await _reload();
   }
 
   Future<void> _showOtherViews() async {
-    final selected = await showModalBottomSheet<ReminderViewGroup>(
+    final selected = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
       builder: (context) => SafeArea(
@@ -244,16 +318,27 @@ class _RemindersPageState extends State<RemindersPage> {
                 trailing: group == _otherGroup
                     ? const Icon(Icons.check_rounded)
                     : null,
-                onTap: () => Navigator.pop(context, group),
+                onTap: () => Navigator.pop(context, group.name),
               ),
+            ListTile(
+              key: const Key('reminder-other-projectless'),
+              minTileHeight: 48,
+              leading: const Icon(Icons.folder_off_outlined),
+              title: const Text('Projesiz eski kayıtlar'),
+              onTap: () => Navigator.pop(context, 'projectless'),
+            ),
           ],
         ),
       ),
     );
     if (selected == null || !mounted) return;
     setState(() {
-      _primaryView = _ReminderPrimaryView.other;
-      _otherGroup = selected;
+      _primaryView = selected == 'projectless'
+          ? _ReminderPrimaryView.projectless
+          : _ReminderPrimaryView.other;
+      if (selected != 'projectless') {
+        _otherGroup = ReminderViewGroup.values.byName(selected);
+      }
     });
     await _reload();
   }
@@ -267,27 +352,58 @@ class _RemindersPageState extends State<RemindersPage> {
   }
 
   Future<void> _openCreate(ReminderScheduleKind initialSchedule) async {
-    final created = await Navigator.of(context).push<MobileReminder>(
-      MaterialPageRoute(
-        builder: (_) => ReminderFormPage(
-          agenda: widget.agenda,
-          contextSuggestions: widget.contextSuggestions,
-          projectLocations: widget.projectLocations,
-          preferredProjectId: widget.preferredProjectId,
-          initialSchedule: initialSchedule,
+    if (!_hasActiveProject || _captureNavigationBusy) return;
+    final projectId = widget.preferredProjectId!;
+    _captureNavigationBusy = true;
+    try {
+      final created = await Navigator.of(context).push<MobileReminder>(
+        MaterialPageRoute(
+          builder: (_) => ReminderFormPage(
+            agenda: widget.agenda,
+            contextSuggestions: widget.contextSuggestions,
+            projectLocations: widget.projectLocations,
+            preferredProjectId: projectId,
+            requirePreferredProject: true,
+            initialSchedule: initialSchedule,
+          ),
         ),
-      ),
-    );
-    if (created == null || !mounted) return;
-    setState(() {
-      if (created.status == ReminderStatus.inbox) {
-        _primaryView = _ReminderPrimaryView.other;
-        _otherGroup = ReminderViewGroup.inbox;
-      } else {
-        _primaryView = _ReminderPrimaryView.today;
-      }
-    });
-    await _reload();
+      );
+      if (created == null || !mounted) return;
+      setState(() {
+        if (created.status == ReminderStatus.inbox) {
+          _primaryView = _ReminderPrimaryView.other;
+          _otherGroup = ReminderViewGroup.inbox;
+        } else {
+          _primaryView = _ReminderPrimaryView.today;
+        }
+      });
+      await _reload();
+    } finally {
+      _captureNavigationBusy = false;
+    }
+  }
+
+  Future<void> _openQuickCapture() async {
+    if (!_hasActiveProject || _captureNavigationBusy) return;
+    final projectId = widget.preferredProjectId!;
+    final offset = _currentScrollOffset;
+    _captureNavigationBusy = true;
+    try {
+      final created = await showModalBottomSheet<MobileReminder>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        isDismissible: false,
+        enableDrag: false,
+        builder: (_) => ReminderQuickCaptureSheet(
+          agenda: widget.agenda,
+          projectId: projectId,
+        ),
+      );
+      if (created != null && mounted) await _reload(restoreOffset: offset);
+    } finally {
+      _captureNavigationBusy = false;
+    }
   }
 
   IconData _otherIcon(ReminderViewGroup group) => switch (group) {
@@ -311,7 +427,9 @@ class _RemindersPageState extends State<RemindersPage> {
           FilledButton.icon(
             key: const Key('new-reminder'),
             style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-            onPressed: () => _openCreate(ReminderScheduleKind.in15Minutes),
+            onPressed: _hasActiveProject
+                ? () => _openCreate(ReminderScheduleKind.in15Minutes)
+                : null,
             icon: const Icon(Icons.add_alert_outlined),
             label: const Text('Yeni hatırlatıcı'),
           ),
@@ -319,13 +437,14 @@ class _RemindersPageState extends State<RemindersPage> {
           OutlinedButton.icon(
             key: const Key('quick-inbox-reminder'),
             style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-            onPressed: () => _openCreate(ReminderScheduleKind.inbox),
+            onPressed: _hasActiveProject ? _openQuickCapture : null,
             icon: const Icon(Icons.inbox_outlined),
-            label: const Text('Unutma Kutusu'),
+            label: const Text('+ Unutma'),
           ),
           const SizedBox(height: 12),
           Wrap(
             key: const Key('reminder-primary-filters'),
+            alignment: WrapAlignment.end,
             spacing: 8,
             runSpacing: 8,
             children: [
@@ -342,12 +461,22 @@ class _RemindersPageState extends State<RemindersPage> {
                 view: _ReminderPrimaryView.tomorrow,
               ),
               _primaryChip(
-                key: const Key('reminder-primary-other'),
-                label: 'Diğer',
-                icon: Icons.more_horiz_rounded,
-                view: _ReminderPrimaryView.other,
+                key: const Key('reminder-primary-after'),
+                label: 'Sonrası',
+                icon: Icons.date_range_outlined,
+                view: _ReminderPrimaryView.after,
               ),
             ],
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: const Key('reminder-primary-other'),
+              style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+              onPressed: _showOtherViews,
+              icon: const Icon(Icons.more_horiz),
+              label: const Text('Diğer görünümler'),
+            ),
           ),
           if (_primaryView == _ReminderPrimaryView.other) ...[
             const SizedBox(height: 12),
@@ -357,6 +486,11 @@ class _RemindersPageState extends State<RemindersPage> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ],
+          if (_primaryView == _ReminderPrimaryView.projectless)
+            Text(
+              'Projesiz eski kayıtlar',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
           const SizedBox(height: 12),
           if (_loading && !_preservingDetailReload)
             const Center(
@@ -388,12 +522,21 @@ class _RemindersPageState extends State<RemindersPage> {
                 ),
               ),
             )
+          else if (!_hasActiveProject &&
+              _primaryView != _ReminderPrimaryView.projectless)
+            _emptyCard(
+              'Hatırlatıcı eklemek ve görmek için üstteki aktif proje alanından bir proje seçin veya Projeler bölümünden proje oluşturun.',
+            )
           else if (_primaryView == _ReminderPrimaryView.today)
             ..._buildTodayContent()
           else if (_items.isEmpty)
             _emptyCard(
               _primaryView == _ReminderPrimaryView.tomorrow
                   ? 'Yarın için planlanmış hatırlatıcı yok.'
+                  : _primaryView == _ReminderPrimaryView.after
+                  ? 'Yarından sonrası için hatırlatıcın yok.'
+                  : _primaryView == _ReminderPrimaryView.projectless
+                  ? 'Projesiz eski kayıt yok.'
                   : '${_label(_otherGroup)} boş.',
             )
           else
@@ -404,8 +547,10 @@ class _RemindersPageState extends State<RemindersPage> {
                     _primaryView == _ReminderPrimaryView.other &&
                     _otherGroup == ReminderViewGroup.upcoming,
                 showRestore:
-                    _primaryView == _ReminderPrimaryView.other &&
-                    _otherGroup == ReminderViewGroup.trash,
+                    (_primaryView == _ReminderPrimaryView.other &&
+                        _otherGroup == ReminderViewGroup.trash) ||
+                    (_primaryView == _ReminderPrimaryView.projectless &&
+                        reminder.trashedAt != null),
               ),
             ),
         ],
@@ -420,15 +565,25 @@ class _RemindersPageState extends State<RemindersPage> {
     required _ReminderPrimaryView view,
   }) {
     final selected = _primaryView == view;
-    return _ReminderIconAction(
-      actionKey: key,
-      icon: icon,
+    return Semantics(
       label: label,
+      button: true,
       selected: selected,
-      kind: selected
-          ? _ReminderIconActionKind.filled
-          : _ReminderIconActionKind.outlined,
-      onPressed: () => _selectPrimary(view),
+      excludeSemantics: true,
+      onTap: () => _selectPrimary(view),
+      child: OutlinedButton.icon(
+        key: key,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(48, 48),
+          shape: const StadiumBorder(),
+          backgroundColor: selected
+              ? Theme.of(context).colorScheme.secondaryContainer
+              : null,
+        ),
+        onPressed: () => _selectPrimary(view),
+        icon: Icon(icon, size: 20),
+        label: Text(label),
+      ),
     );
   }
 
@@ -444,8 +599,15 @@ class _RemindersPageState extends State<RemindersPage> {
                 const Icon(Icons.notifications_none_rounded, size: 44),
                 const SizedBox(height: 8),
                 const Text(
-                  'Bugün için açık hatırlatıcı yok.',
+                  'Bugün için hatırlatıcın yok.',
                   textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  key: const Key('reminder-empty-quick-capture'),
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                  onPressed: _openQuickCapture,
+                  child: const Text('+ Unutma'),
                 ),
                 if (_todayOverview.inboxCount > 0) ...[
                   const SizedBox(height: 12),
@@ -697,7 +859,6 @@ class _ReminderIconAction extends StatelessWidget {
     this.actionKey,
     this.kind = _ReminderIconActionKind.standard,
     this.badgeText,
-    this.selected,
   });
 
   final Key? actionKey;
@@ -706,7 +867,6 @@ class _ReminderIconAction extends StatelessWidget {
   final VoidCallback? onPressed;
   final _ReminderIconActionKind kind;
   final String? badgeText;
-  final bool? selected;
 
   @override
   Widget build(BuildContext context) {
@@ -725,7 +885,6 @@ class _ReminderIconAction extends StatelessWidget {
         key: actionKey,
         tooltip: label,
         style: style,
-        isSelected: selected,
         selectedIcon: iconWidget,
         onPressed: onPressed,
         icon: iconWidget,
@@ -734,7 +893,6 @@ class _ReminderIconAction extends StatelessWidget {
         key: actionKey,
         tooltip: label,
         style: style,
-        isSelected: selected,
         selectedIcon: iconWidget,
         onPressed: onPressed,
         icon: iconWidget,
@@ -743,7 +901,6 @@ class _ReminderIconAction extends StatelessWidget {
         key: actionKey,
         tooltip: label,
         style: style,
-        isSelected: selected,
         selectedIcon: iconWidget,
         onPressed: onPressed,
         icon: iconWidget,
@@ -752,7 +909,6 @@ class _ReminderIconAction extends StatelessWidget {
         key: actionKey,
         tooltip: label,
         style: style,
-        isSelected: selected,
         selectedIcon: iconWidget,
         onPressed: onPressed,
         icon: iconWidget,
@@ -762,7 +918,6 @@ class _ReminderIconAction extends StatelessWidget {
       label: label,
       button: true,
       enabled: onPressed != null,
-      selected: selected,
       excludeSemantics: true,
       child: button,
     );
