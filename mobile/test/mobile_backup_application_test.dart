@@ -147,6 +147,18 @@ void main() {
           ),
         );
       }
+      final restoredBeforeBackup = await attendance.restoreComplianceRecord(
+        RestoreComplianceRecordCommand(
+          id: uuid(3),
+          eventId: uuid(403),
+          memberId: person,
+          projectId: project,
+          expectedRevision: 3,
+        ),
+      );
+      expect(restoredBeforeBackup.id, uuid(3));
+      expect(restoredBeforeBackup.revision, 4);
+      expect(restoredBeforeBackup.archivedAt, isNull);
       Future<List<List<Map<String, Object?>>>> snapshot() async {
         final raw = await _openRaw(directories);
         try {
@@ -198,29 +210,41 @@ void main() {
       );
       expect(await snapshot(), before);
       final detail = await attendance.getPersonDetail(person);
-      expect(detail.compliance.map((r) => r.id).toSet(), {uuid(1), uuid(2)});
-      expect(detail.archivedCompliance.map((r) => r.id).toSet(), {
+      expect(detail.compliance.map((r) => r.id).toSet(), {
+        uuid(1),
+        uuid(2),
         uuid(3),
-        uuid(4),
       });
+      expect(detail.archivedCompliance.map((r) => r.id).toSet(), {uuid(4)});
       expect(detail.validComplianceCount, 1);
       expect(detail.expiringComplianceCount, 1);
-      expect(detail.expiredComplianceCount + detail.missingComplianceCount, 0);
-      final archived = detail.archivedCompliance.firstWhere(
-        (r) => r.id == uuid(3),
-      );
-      expect(archived.revision, 3);
-      expect(archived.reason, 'Korunan gerekçe');
-      expect(archived.note, 'Korunan not');
-      expect(archived.documentNumber, 'Güncel belge');
-      expect(archived.sourceStatus, ComplianceSourceStatus.notApplicable);
+      expect(detail.expiredComplianceCount, 0);
+      expect(detail.missingComplianceCount, 0);
+      final restored = detail.compliance.firstWhere((r) => r.id == uuid(3));
+      expect(restored.revision, 4);
+      expect(restored.archivedAt, isNull);
+      expect(restored.reason, 'Korunan gerekçe');
+      expect(restored.note, 'Korunan not');
+      expect(restored.documentNumber, 'Güncel belge');
+      expect(restored.sourceStatus, ComplianceSourceStatus.notApplicable);
       expect(
         detail.complianceEvents
             .where((e) => e.recordId == uuid(3))
             .map((e) => e.sequence),
-        [1, 2, 3],
+        [1, 2, 3, 4],
       );
-      expect(detail.complianceEvents, hasLength(7));
+      expect(
+        detail.complianceEvents
+            .where((e) => e.recordId == uuid(3))
+            .map((e) => e.eventType),
+        [
+          'compliance.created',
+          'compliance.updated',
+          'compliance.archived',
+          'compliance.reopened',
+        ],
+      );
+      expect(detail.complianceEvents, hasLength(8));
       expect(await snapshot(), before);
     },
   );

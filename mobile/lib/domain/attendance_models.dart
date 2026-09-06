@@ -879,6 +879,22 @@ class ArchiveComplianceRecordCommand {
   final int expectedRevision;
 }
 
+class RestoreComplianceRecordCommand {
+  const RestoreComplianceRecordCommand({
+    required this.id,
+    required this.eventId,
+    required this.memberId,
+    required this.projectId,
+    required this.expectedRevision,
+  });
+
+  final String id;
+  final String eventId;
+  final String memberId;
+  final String projectId;
+  final int expectedRevision;
+}
+
 class SavePpeAssignmentCommand {
   const SavePpeAssignmentCommand({
     required this.id,

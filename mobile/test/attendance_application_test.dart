@@ -252,6 +252,192 @@ void main() {
     },
   );
 
+  test(
+    'compliance restore is same-record atomic isolated and fail-closed',
+    () async {
+      await _createMember(attendance, id: member1, name: 'Ayşe', team: 'A');
+      await _createMember(attendance, id: member2, name: 'Ali', team: 'A');
+      await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: 'Şantiye B'),
+      );
+      final created = await attendance.saveComplianceRecord(
+        const SaveComplianceRecordCommand(
+          id: '44444444-4444-4444-8444-444444444451',
+          eventId: '55555555-5555-4555-8555-555555555551',
+          memberId: member1,
+          expectedRevision: 0,
+          documentType: ComplianceDocumentType.healthReport,
+          sourceStatus: ComplianceSourceStatus.valid,
+          documentNumber: 'R-51',
+        ),
+      );
+      final sibling = await attendance.saveComplianceRecord(
+        const SaveComplianceRecordCommand(
+          id: '44444444-4444-4444-8444-444444444452',
+          eventId: '55555555-5555-4555-8555-555555555552',
+          memberId: member1,
+          expectedRevision: 0,
+          documentType: ComplianceDocumentType.healthReport,
+          sourceStatus: ComplianceSourceStatus.valid,
+        ),
+      );
+      final archived = await attendance.archiveComplianceRecord(
+        ArchiveComplianceRecordCommand(
+          id: created.id,
+          eventId: '55555555-5555-4555-8555-555555555553',
+          expectedRevision: created.revision,
+        ),
+      );
+
+      Future<int> eventCount() async {
+        final raw = await databaseFactoryFfi.openDatabase(
+          directories.databaseFile,
+          options: OpenDatabaseOptions(singleInstance: false),
+        );
+        try {
+          return Sqflite.firstIntValue(
+            await raw.rawQuery(
+              'SELECT count(*) FROM workforce_events WHERE aggregate_id = ?',
+              [created.id],
+            ),
+          )!;
+        } finally {
+          await raw.close();
+        }
+      }
+
+      final beforeRejected = await eventCount();
+      for (final command in [
+        RestoreComplianceRecordCommand(
+          id: archived.id,
+          eventId: '55555555-5555-4555-8555-555555555554',
+          memberId: member2,
+          projectId: project1,
+          expectedRevision: archived.revision,
+        ),
+        RestoreComplianceRecordCommand(
+          id: archived.id,
+          eventId: '55555555-5555-4555-8555-555555555555',
+          memberId: member1,
+          projectId: project2,
+          expectedRevision: archived.revision,
+        ),
+        RestoreComplianceRecordCommand(
+          id: archived.id,
+          eventId: '55555555-5555-4555-8555-555555555551',
+          memberId: member1,
+          projectId: project1,
+          expectedRevision: archived.revision,
+        ),
+      ]) {
+        await expectLater(
+          attendance.restoreComplianceRecord(command),
+          throwsA(anything),
+        );
+        final unchanged = (await attendance.getPersonDetail(
+          member1,
+        )).archivedCompliance.singleWhere((record) => record.id == archived.id);
+        expect(unchanged.revision, archived.revision);
+        expect(unchanged.archivedAt, archived.archivedAt);
+        expect(await eventCount(), beforeRejected);
+      }
+
+      now = now.add(const Duration(minutes: 1));
+      final restored = await attendance.restoreComplianceRecord(
+        RestoreComplianceRecordCommand(
+          id: archived.id,
+          eventId: '55555555-5555-4555-8555-555555555556',
+          memberId: member1,
+          projectId: project1,
+          expectedRevision: archived.revision,
+        ),
+      );
+      expect(restored.id, created.id);
+      expect(restored.revision, archived.revision + 1);
+      expect(restored.archivedAt, isNull);
+      expect(restored.updatedAt, CseTimeCodec.encodeUtc(now));
+      final detail = await attendance.getPersonDetail(member1);
+      expect(detail.archivedCompliance, isEmpty);
+      expect(detail.compliance.map((record) => record.id), [
+        created.id,
+        sibling.id,
+      ]);
+      final lifecycle = detail.complianceEvents
+          .where((event) => event.recordId == created.id)
+          .toList(growable: false);
+      expect(lifecycle.map((event) => event.sequence), [1, 2, 3]);
+      expect(lifecycle.map((event) => event.eventType), [
+        'compliance.created',
+        'compliance.archived',
+        'compliance.reopened',
+      ]);
+
+      for (final command in [
+        RestoreComplianceRecordCommand(
+          id: restored.id,
+          eventId: '55555555-5555-4555-8555-555555555557',
+          memberId: member1,
+          projectId: project1,
+          expectedRevision: archived.revision,
+        ),
+        RestoreComplianceRecordCommand(
+          id: restored.id,
+          eventId: '55555555-5555-4555-8555-555555555558',
+          memberId: member1,
+          projectId: project1,
+          expectedRevision: restored.revision,
+        ),
+      ]) {
+        await expectLater(
+          attendance.restoreComplianceRecord(command),
+          throwsA(isA<AgendaValidationFailure>()),
+        );
+      }
+      expect(await eventCount(), 3);
+    },
+  );
+
+  test(
+    'quick compliance create retry is idempotent with stable identities',
+    () async {
+      await _createMember(attendance, id: member1, name: 'Ayşe', team: 'A');
+      const command = SaveComplianceRecordCommand(
+        id: '44444444-4444-4444-8444-444444444461',
+        eventId: '55555555-5555-4555-8555-555555555561',
+        memberId: member1,
+        expectedRevision: 0,
+        documentType: ComplianceDocumentType.basicSafetyTraining,
+        sourceStatus: ComplianceSourceStatus.valid,
+      );
+      final created = await attendance.saveComplianceRecord(command);
+      final retried = await attendance.saveComplianceRecord(command);
+      expect(retried.id, created.id);
+      expect(retried.revision, 1);
+      final detail = await attendance.getPersonDetail(member1);
+      expect(
+        detail.compliance.where((record) => record.id == created.id),
+        hasLength(1),
+      );
+      expect(
+        detail.complianceEvents.where((event) => event.recordId == created.id),
+        hasLength(1),
+      );
+      await expectLater(
+        attendance.saveComplianceRecord(
+          const SaveComplianceRecordCommand(
+            id: '44444444-4444-4444-8444-444444444461',
+            eventId: '55555555-5555-4555-8555-555555555562',
+            memberId: member1,
+            expectedRevision: 0,
+            documentType: ComplianceDocumentType.basicSafetyTraining,
+            sourceStatus: ComplianceSourceStatus.valid,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+    },
+  );
+
   test('member create update archive and stale revision fail closed', () async {
     final created = await _createMember(
       attendance,

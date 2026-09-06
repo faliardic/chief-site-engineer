@@ -49,6 +49,10 @@ abstract interface class AttendanceApplication {
     ArchiveComplianceRecordCommand command,
   );
 
+  Future<WorkforceComplianceRecord> restoreComplianceRecord(
+    RestoreComplianceRecordCommand command,
+  );
+
   Future<WorkforcePpeAssignment> savePpeAssignment(
     SavePpeAssignmentCommand command,
   );
@@ -845,6 +849,33 @@ class SqliteAttendanceApplication implements AttendanceApplication {
               'İSG kayıt kimliği başka personele bağlıdır.',
             );
           }
+          if (command.expectedRevision == 0) {
+            final retryEvents = await tx.query(
+              'workforce_events',
+              where:
+                  'id = ? AND aggregate_type = ? AND aggregate_id = ? '
+                  'AND project_id = ? AND event_type = ?',
+              whereArgs: [
+                command.eventId,
+                'compliance',
+                command.id,
+                member.projectId,
+                'compliance.created',
+              ],
+              limit: 1,
+            );
+            if (current.revision == 1 &&
+                current.archivedAt == null &&
+                _complianceMatches(current, values) &&
+                retryEvents.length == 1) {
+              final payload = jsonDecode(
+                retryEvents.single['payload_json']! as String,
+              );
+              if (payload is Map && payload['member_id'] == member.id) {
+                return current;
+              }
+            }
+          }
           _requireRevision(current.revision, command.expectedRevision);
           if (_complianceMatches(current, values)) return current;
           final changed = await tx.update(
@@ -924,6 +955,78 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           aggregateId: current.id,
           projectId: member.projectId,
           eventType: 'compliance.archived',
+          occurredAt: timestamp,
+          payload: {'member_id': member.id},
+        );
+        final saved = await tx.query(
+          'workforce_compliance_records',
+          where: 'id = ?',
+          whereArgs: [current.id],
+          limit: 1,
+        );
+        return _complianceFromRow(saved.single, today);
+      }),
+    );
+  }
+
+  @override
+  Future<WorkforceComplianceRecord> restoreComplianceRecord(
+    RestoreComplianceRecordCommand command,
+  ) async {
+    validateUuid(command.id, 'İSG kayıt kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    validateUuid(command.memberId, 'Personel kimliği');
+    validateUuid(command.projectId, 'Proje kimliği');
+    _validateExpectedRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    final today = CseTimeCodec.istanbulDayKey(timestamp);
+    return _withDatabase(
+      now,
+      (database) => database.transaction((tx) async {
+        final rows = await tx.query(
+          'workforce_compliance_records',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        if (rows.isEmpty) {
+          throw const AgendaValidationFailure('İSG kaydı bulunamadı.');
+        }
+        final current = _complianceFromRow(rows.single, today);
+        if (current.memberId != command.memberId) {
+          throw const AgendaValidationFailure(
+            'İSG kayıt kimliği başka personele bağlıdır.',
+          );
+        }
+        _requireRevision(current.revision, command.expectedRevision);
+        if (current.archivedAt == null) {
+          throw const AgendaValidationFailure('İSG kaydı zaten aktiftir.');
+        }
+        final member = await _requireMember(tx, current.memberId);
+        if (member.projectId != command.projectId) {
+          throw const AgendaValidationFailure(
+            'İSG kaydı başka projeye bağlıdır.',
+          );
+        }
+        final changed = await tx.update(
+          'workforce_compliance_records',
+          {
+            'archived_at': null,
+            'updated_at': timestamp,
+            'revision': current.revision + 1,
+          },
+          where: 'id = ? AND revision = ? AND archived_at IS NOT NULL',
+          whereArgs: [current.id, current.revision],
+        );
+        if (changed != 1) throw _staleFailure();
+        await _insertWorkforceEvent(
+          tx,
+          id: command.eventId,
+          type: 'compliance',
+          aggregateId: current.id,
+          projectId: member.projectId,
+          eventType: 'compliance.reopened',
           occurredAt: timestamp,
           payload: {'member_id': member.id},
         );
