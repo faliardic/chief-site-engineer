@@ -90,10 +90,26 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
                 DropdownButtonFormField<ComplianceSourceStatus>(
                   initialValue: status,
                   isExpanded: true,
+                  isDense: false,
                   itemHeight: null,
                   decoration: const InputDecoration(
                     labelText: 'Kullanıcı durumu',
                   ),
+                  selectedItemBuilder: (context) => ComplianceSourceStatus
+                      .values
+                      .map(
+                        (item) => Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(
+                            item.label,
+                            key: Key(
+                              'compliance-status-selected-${item.storageValue}',
+                            ),
+                            semanticsLabel: '${item.label} (kullanıcı kaydı)',
+                          ),
+                        ),
+                      )
+                      .toList(),
                   items: ComplianceSourceStatus.values
                       .map(
                         (item) => DropdownMenuItem(

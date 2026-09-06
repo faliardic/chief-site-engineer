@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_person_detail_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_attendance_application.dart';
@@ -413,6 +414,79 @@ void main() {
   }
 
   for (final size in [const Size(320, 640), const Size(390, 500)]) {
+    testWidgets('compliance selected status is unclipped at $size text 2', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final attendance = _Attendance(empty: true);
+        await _pump(tester, attendance, size: size, scale: 2);
+        await _tab(tester, 'İSG');
+        await tester.tap(find.byKey(const Key('add-compliance-record')));
+        await tester.pumpAndSettle();
+        final dropdown = find.byType(
+          DropdownButtonFormField<ComplianceSourceStatus>,
+        );
+        for (final status in ComplianceSourceStatus.values) {
+          final menuLabel = status == ComplianceSourceStatus.valid
+              ? 'Geçerli (kullanıcı kaydı)'
+              : status.label;
+          await _selectDialogValue<ComplianceSourceStatus>(tester, menuLabel);
+          await _revealDialogControl(tester, dropdown);
+          expect(find.text('Kullanıcı durumu'), findsOneWidget);
+          final selected = find.byKey(
+            Key('compliance-status-selected-${status.storageValue}'),
+          );
+          expect(selected.hitTestable(), findsOneWidget);
+          expect(tester.widget<Text>(selected).data, status.label);
+          if (status == ComplianceSourceStatus.valid) {
+            expect(find.text('Geçerli (kullanıcı kaydı)'), findsNothing);
+          }
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: selected, matching: find.byType(RichText)),
+          );
+          expect(paragraph.textScaler.scale(16), 32);
+          expect(
+            DefaultTextStyle.of(tester.element(selected)).style.fontSize,
+            Theme.of(tester.element(selected)).textTheme.titleMedium!.fontSize,
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final boxes = paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: 0, extentOffset: status.label.length),
+          );
+          expect(boxes, isNotEmpty);
+          for (final box in boxes) {
+            expect(box.left, greaterThanOrEqualTo(-0.01));
+            expect(box.top, greaterThanOrEqualTo(-0.01));
+            // Selection boxes include fractional trailing glyph spacing.
+            expect(box.right, lessThanOrEqualTo(paragraph.size.width + 0.1));
+            expect(box.bottom, lessThanOrEqualTo(paragraph.size.height + 0.01));
+          }
+          final fieldBounds = tester.getRect(dropdown);
+          final valueBounds = tester.getRect(selected);
+          expect(valueBounds.left, greaterThanOrEqualTo(fieldBounds.left));
+          expect(valueBounds.top, greaterThanOrEqualTo(fieldBounds.top));
+          expect(valueBounds.right, lessThanOrEqualTo(fieldBounds.right));
+          expect(valueBounds.bottom, lessThanOrEqualTo(fieldBounds.bottom));
+          final data = tester
+              .getSemantics(find.byType(DropdownButton<ComplianceSourceStatus>))
+              .getSemanticsData();
+          expect(data.label, contains('Kullanıcı durumu'));
+          expect(data.label, contains('${status.label} (kullanıcı kaydı)'));
+          expect(data.flagsCollection.isButton, isTrue);
+          expect(data.hasAction(SemanticsAction.tap), isTrue);
+          expect(tester.takeException(), isNull);
+        }
+        expect(attendance.calls, ['read:person-1']);
+        expect(attendance.complianceCommands, isEmpty);
+        await tester.tap(find.widgetWithText(TextButton, 'Vazgeç'));
+        await tester.pumpAndSettle();
+        await tester.pump(kThemeAnimationDuration);
+      } finally {
+        semantics.dispose();
+      }
+    });
+
     testWidgets('compliance dialog disclosure retains values at $size text 2', (
       tester,
     ) async {
@@ -599,7 +673,7 @@ void main() {
           field.$2,
         );
       }
-      expect(find.text('Geçerli (kullanıcı kaydı)'), findsOneWidget);
+      expect(find.text('Geçerli'), findsOneWidget);
       expect(attendance.calls, ['read:person-1']);
       await tester.enterText(_field('Not'), 'Yalnız seçilen kaydın yeni notu');
       await _saveDialog(tester);
