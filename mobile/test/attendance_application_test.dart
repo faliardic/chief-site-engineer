@@ -81,6 +81,177 @@ void main() {
     }
   });
 
+  test(
+    '20B history preserves exact records and per-record sequence without writes',
+    () async {
+      final originalClock = now;
+      addTearDown(() => now = originalClock);
+      await _createMember(attendance, id: member1, name: 'Ayşe', team: 'A');
+      await _createMember(
+        attendance,
+        id: member2,
+        name: 'Başka kişi',
+        team: 'A',
+      );
+      await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: 'B'),
+      );
+      await attendance.createMember(
+        const CreateWorkforceMemberCommand(
+          id: member3,
+          projectId: project2,
+          fullName: 'Başka proje',
+          teamName: 'B',
+          roleName: 'Usta',
+        ),
+      );
+      String uuid(int n) =>
+          '44444444-4444-4444-8444-${n.toString().padLeft(12, '0')}';
+      for (var i = 1; i <= 6; i++) {
+        await attendance.saveComplianceRecord(
+          SaveComplianceRecordCommand(
+            id: uuid(i),
+            eventId: uuid(100 + i),
+            memberId: i == 5
+                ? member2
+                : i == 6
+                ? member3
+                : member1,
+            expectedRevision: 0,
+            documentType: ComplianceDocumentType.healthReport,
+            sourceStatus: i <= 2
+                ? ComplianceSourceStatus.valid
+                : ComplianceSourceStatus.exception,
+            documentNumber: 'Belge $i',
+            issuedDate: '2026-07-01',
+            expiryDate: i <= 2 ? null : '2026-07-18',
+            note: 'Not $i',
+            reason: 'Gerekçe $i',
+          ),
+        );
+      }
+      now = originalClock.subtract(const Duration(days: 1));
+      await attendance.saveComplianceRecord(
+        SaveComplianceRecordCommand(
+          id: uuid(3),
+          eventId: uuid(203),
+          memberId: member1,
+          expectedRevision: 1,
+          documentType: ComplianceDocumentType.healthReport,
+          sourceStatus: ComplianceSourceStatus.notApplicable,
+          documentNumber: 'Düzeltilmiş 3',
+          issuedDate: '2026-07-01',
+          expiryDate: '2026-07-18',
+          note: 'Korunan not',
+          reason: 'Korunan gerekçe',
+        ),
+      );
+      now = originalClock.subtract(const Duration(days: 2));
+      for (final i in [3, 4, 5, 6]) {
+        await attendance.archiveComplianceRecord(
+          ArchiveComplianceRecordCommand(
+            id: uuid(i),
+            eventId: uuid(300 + i),
+            expectedRevision: i == 3 ? 2 : 1,
+          ),
+        );
+      }
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      try {
+        // Synthetic ownership mismatches must never become another person's history.
+        for (var i = 1; i <= 3; i++) {
+          await raw.insert('workforce_events', {
+            'id': uuid(400 + i),
+            'aggregate_type': i == 3 ? 'person' : 'compliance',
+            'aggregate_id': uuid(3),
+            'project_id': i == 1 ? project2 : project1,
+            'sequence': 10 + i,
+            'event_type': 'compliance.updated',
+            'occurred_at': '2026-07-19T08:00:00Z',
+            'payload_json': '{"member_id":"${i == 2 ? member2 : member1}"}',
+          });
+        }
+        Future<List<List<Map<String, Object?>>>> snapshot() async => [
+          for (final table in [
+            'workforce_members',
+            'workforce_compliance_records',
+            'workforce_events',
+          ])
+            await raw.query(table, orderBy: 'id'),
+        ];
+        final before = await snapshot();
+        for (var read = 0; read < 2; read++) {
+          final detail = await attendance.getPersonDetail(member1);
+          expect(detail.compliance.map((r) => r.id), [uuid(1), uuid(2)]);
+          expect(detail.validComplianceCount, 2);
+          expect(
+            detail.missingComplianceCount +
+                detail.expiredComplianceCount +
+                detail.expiringComplianceCount,
+            0,
+          );
+          expect(detail.archivedCompliance.map((r) => r.id), [
+            uuid(3),
+            uuid(4),
+          ]);
+          final archived = detail.archivedCompliance.first;
+          expect(archived.sourceStatus, ComplianceSourceStatus.notApplicable);
+          expect(archived.revision, 3);
+          expect(archived.documentNumber, 'Düzeltilmiş 3');
+          expect(archived.note, 'Korunan not');
+          expect(archived.reason, 'Korunan gerekçe');
+          expect(archived.issuedDate, '2026-07-01');
+          expect(archived.expiryDate, '2026-07-18');
+          expect(archived.archivedAt, isNotNull);
+          final events = detail.complianceEvents
+              .where((e) => e.recordId == uuid(3))
+              .toList();
+          expect(events.map((e) => e.sequence), [1, 2, 3]);
+          expect(events.map((e) => e.eventType), [
+            'compliance.created',
+            'compliance.updated',
+            'compliance.archived',
+          ]);
+          expect(
+            events.first.occurredAt.compareTo(events.last.occurredAt),
+            greaterThan(0),
+          );
+          expect(detail.complianceEvents, hasLength(7));
+          expect(
+            detail.complianceEvents.every(
+              (e) => e.memberId == member1 && e.projectId == project1,
+            ),
+            isTrue,
+          );
+        }
+        expect(await snapshot(), before);
+        final allArchived = await attendance.getPersonDetail(member2);
+        expect(allArchived.compliance, isEmpty);
+        expect(allArchived.archivedCompliance.single.id, uuid(5));
+        expect(allArchived.complianceEvents.map((e) => e.sequence), [1, 2]);
+        expect(
+          allArchived.validComplianceCount +
+              allArchived.missingComplianceCount +
+              allArchived.expiringComplianceCount +
+              allArchived.expiredComplianceCount,
+          0,
+        );
+        final otherProject = await attendance.getPersonDetail(member3);
+        expect(otherProject.archivedCompliance.single.id, uuid(6));
+        expect(
+          otherProject.complianceEvents.every((e) => e.projectId == project2),
+          isTrue,
+        );
+        expect(await snapshot(), before);
+      } finally {
+        await raw.close();
+      }
+    },
+  );
+
   test('member create update archive and stale revision fail closed', () async {
     final created = await _createMember(
       attendance,

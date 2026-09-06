@@ -11,6 +11,213 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/fake_attendance_application.dart';
 
 void main() {
+  for (final size in [const Size(320, 360), const Size(390, 844)]) {
+    testWidgets('20B read-only archive and event history at $size text 2', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final records = [
+          ..._coreProfileRecords(),
+          _complianceRecord(
+            'archive-a',
+            source: ComplianceSourceStatus.notApplicable,
+            read: ComplianceReadStatus.exception,
+            expiry: '2026-06-30',
+            revision: 3,
+            archivedAt: '2026-07-03T08:00:00Z',
+          ),
+          _complianceRecord(
+            'archive-b',
+            source: ComplianceSourceStatus.exception,
+            read: ComplianceReadStatus.exception,
+            archivedAt: '2026-07-04T08:00:00Z',
+          ),
+        ];
+        final attendance = _Attendance(compliance: records);
+        attendance.store.complianceEvents = [
+          for (var i = 1; i <= 3; i++)
+            WorkforceComplianceEvent(
+              id: 'event-$i',
+              recordId: 'archive-a',
+              memberId: 'person-1',
+              projectId: 'project-1',
+              sequence: i,
+              eventType: [
+                'compliance.created',
+                'compliance.updated',
+                'compliance.archived',
+              ][i - 1],
+              occurredAt: '2026-07-0${4 - i}T08:00:00Z',
+            ),
+          const WorkforceComplianceEvent(
+            id: 'active-event',
+            recordId: 'employment_entry',
+            memberId: 'person-1',
+            projectId: 'project-1',
+            sequence: 1,
+            eventType: 'compliance.created',
+            occurredAt: '2026-07-01T08:00:00Z',
+          ),
+        ];
+        final events = List<WorkforceComplianceEvent>.of(
+          attendance.store.complianceEvents,
+        );
+        await _pump(tester, attendance, size: size, scale: 2);
+        expect(find.text('İSG belgeleri tam'), findsOneWidget);
+        await _tab(tester, 'İSG');
+        final open = find.byKey(const Key('open-compliance-history'));
+        await _revealCompliance(tester, open);
+        expect(tester.getSize(open).height, greaterThanOrEqualTo(48));
+        expect(
+          tester.getSemantics(open),
+          matchesSemantics(
+            label: 'Geçmiş / Arşiv',
+            isButton: true,
+            hasTapAction: true,
+            hasFocusAction: true,
+            hasEnabledState: true,
+            isEnabled: true,
+            isFocusable: true,
+          ),
+        );
+        // Exercise the accessible action, not just a pointer tap.
+        tester.binding.pipelineOwner.semanticsOwner!.performAction(
+          tester.getSemantics(open).id,
+          SemanticsAction.tap,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('compliance-history-page')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('archived-compliance-archive-a')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('archived-compliance-archive-b')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('active-compliance-history-employment_entry')),
+          findsOneWidget,
+        );
+        for (final value in [
+          'Belge numarası: BELGE-archive-a',
+          'Düzenlenme tarihi: 2026-07-01',
+          'Son geçerlilik tarihi: 2026-06-30',
+          'Not: Kayıt notu archive-a',
+          'Gerekçe: Kullanıcının gerekçesi archive-a',
+          'Arşivlenme zamanı: 2026-07-03T08:00:00Z',
+        ]) {
+          final finder = find.text(value);
+          expect(finder, findsWidgets);
+          await Scrollable.ensureVisible(
+            tester.element(finder.first),
+            alignment: 0.5,
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        }
+        final tile = find.byKey(
+          const PageStorageKey('compliance-events-archive-a'),
+        );
+        final title = find.descendant(
+          of: tile,
+          matching: find.text('Kayıt işlemleri'),
+        );
+        await Scrollable.ensureVisible(tester.element(title), alignment: 0.5);
+        await tester.pumpAndSettle();
+        await tester.tap(title);
+        await tester.pumpAndSettle();
+        for (final label in [
+          'İSG kaydı oluşturuldu',
+          'İSG kaydı güncellendi',
+          'İSG kaydı arşivlendi',
+        ]) {
+          expect(find.text(label), findsOneWidget);
+        }
+        final positions = [
+          for (var i = 1; i <= 3; i++)
+            tester.getTopLeft(find.byKey(Key('compliance-event-event-$i'))).dy,
+        ];
+        expect(positions[0], lessThan(positions[1]));
+        expect(positions[1], lessThan(positions[2]));
+        expect(find.textContaining('compliance.'), findsNothing);
+        expect(find.textContaining('member_id'), findsNothing);
+        expect(find.byType(TextField), findsNothing);
+        expect(find.text('Kaydet'), findsNothing);
+        expect(find.text('Geri yükle'), findsNothing);
+        expect(find.text('Arşivle'), findsNothing);
+        await Scrollable.ensureVisible(tester.element(title), alignment: 0.5);
+        await tester.pumpAndSettle();
+        await tester.tap(title);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        await _revealCompliance(tester, open);
+        await tester.tap(open);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        await _tab(tester, 'Profil');
+        expect(find.text('İSG belgeleri tam'), findsOneWidget);
+        expect(attendance.calls, ['read:person-1']);
+        expect(attendance.complianceCommands, isEmpty);
+        expect(attendance.ppeCommands, isEmpty);
+        expect(attendance.archiveCommand, isNull);
+        expect(attendance.store.compliance, records);
+        expect(attendance.store.complianceEvents, events);
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    });
+  }
+  testWidgets(
+    '20B empty and all-archived history stay separate from active checklist',
+    (tester) async {
+      for (final archivedOnly in [false, true]) {
+        final attendance = _Attendance(
+          empty: true,
+          compliance: [
+            if (archivedOnly)
+              _complianceRecord(
+                'old',
+                source: ComplianceSourceStatus.missing,
+                read: ComplianceReadStatus.missing,
+                archivedAt: '2026-07-02T08:00:00Z',
+              ),
+          ],
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+        await _pump(tester, attendance);
+        expect(find.text('İSG belgeleri tam'), findsNothing);
+        await _tab(tester, 'İSG');
+        expect(find.text('Kayıt yok / değerlendirilmedi'), findsWidgets);
+        expect(find.byKey(const Key('compliance-record-old')), findsNothing);
+        await tester.tap(find.byKey(const Key('open-compliance-history')));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Aktif kayıtlara ait işlem geçmişi yok.'),
+          findsOneWidget,
+        );
+        if (archivedOnly) {
+          expect(
+            find.byKey(const Key('archived-compliance-old')),
+            findsOneWidget,
+          );
+        } else {
+          expect(find.text('Arşivlenmiş İSG kaydı yok.'), findsOneWidget);
+        }
+        expect(attendance.calls, ['read:person-1']);
+        expect(attendance.archiveCommand, isNull);
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
   for (final size in [
     const Size(320, 640),
     const Size(390, 844),
@@ -1062,6 +1269,7 @@ WorkforceComplianceRecord _complianceRecord(
   String? expiry,
   int revision = 1,
   bool emptyDetails = false,
+  String? archivedAt,
 }) => WorkforceComplianceRecord(
   id: id,
   memberId: 'person-1',
@@ -1076,7 +1284,7 @@ WorkforceComplianceRecord _complianceRecord(
   revision: revision,
   createdAt: '2026-07-01T08:00:00Z',
   updatedAt: '2026-07-01T08:00:00Z',
-  archivedAt: null,
+  archivedAt: archivedAt,
 );
 
 Future<void> _saveDialog(WidgetTester tester) async {
@@ -1193,6 +1401,8 @@ class _Attendance implements AttendanceApplication {
     return WorkforcePersonDetail(
       member: detail.member,
       compliance: detail.compliance,
+      archivedCompliance: detail.archivedCompliance,
+      complianceEvents: detail.complianceEvents,
       ppeAssignments: detail.ppeAssignments,
       missingComplianceCount: detail.missingComplianceCount,
       validComplianceCount: detail.validComplianceCount,

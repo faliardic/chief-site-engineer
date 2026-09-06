@@ -527,6 +527,18 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
         label: const Text('İSG kaydı ekle'),
       ),
       const SizedBox(height: 8),
+      OutlinedButton.icon(
+        key: const Key('open-compliance-history'),
+        style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
+        onPressed: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => _ComplianceHistoryPage(detail: detail),
+          ),
+        ),
+        icon: const Icon(Icons.history),
+        label: const Text('Geçmiş / Arşiv'),
+      ),
+      const SizedBox(height: 8),
       const Text(
         'Bu durumlar yalnız kayıt görünürlüğüdür; hukuki uygunluk veya işe kabul kararı değildir.',
       ),
@@ -640,6 +652,159 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
   Widget _row(String label, String value) => Card(
     child: ListTile(title: Text(label), subtitle: Text(value)),
   );
+}
+
+class _ComplianceHistoryPage extends StatelessWidget {
+  const _ComplianceHistoryPage({required this.detail});
+
+  final WorkforcePersonDetail detail;
+
+  List<WorkforceComplianceEvent> _events(WorkforceComplianceRecord record) =>
+      detail.complianceEvents
+          .where(
+            (event) =>
+                event.recordId == record.id &&
+                event.memberId == detail.member.id &&
+                event.projectId == detail.member.projectId,
+          )
+          .toList(growable: false);
+
+  @override
+  Widget build(BuildContext context) {
+    final archived = detail.archivedCompliance.where(
+      (record) =>
+          record.memberId == detail.member.id && record.archivedAt != null,
+    );
+    final activeWithEvents = detail.compliance.where(
+      (record) =>
+          record.memberId == detail.member.id &&
+          record.archivedAt == null &&
+          _events(record).isNotEmpty,
+    );
+    return Scaffold(
+      key: const Key('compliance-history-page'),
+      appBar: AppBar(title: const Text('İSG geçmişi')),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          key: const PageStorageKey('compliance-history-scroll'),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Geçmiş / Arşiv',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              Text(detail.member.fullName),
+              const SizedBox(height: 8),
+              const Text(
+                'Salt okunur. Arşivlenmiş kayıtlar aktif İSG özetine katılmaz. '
+                'Belge bilgileri son saklanan değerlerdir; işlemler önceki alan değerlerini göstermez.',
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Arşivlenmiş kayıtlar',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (archived.isEmpty) const Text('Arşivlenmiş İSG kaydı yok.'),
+              for (final record in archived)
+                Card(
+                  key: Key('archived-compliance-${record.id}'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          record.documentType.label,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const Text('Arşivlenmiş kayıt'),
+                        Text(
+                          WorkforceComplianceSummary.sourceLabel(
+                            record.sourceStatus,
+                          ),
+                        ),
+                        if (record.documentNumber case final value?)
+                          Text('Belge numarası: $value'),
+                        if (record.issuedDate case final value?)
+                          Text('Düzenlenme tarihi: $value'),
+                        if (record.expiryDate case final value?)
+                          Text('Son geçerlilik tarihi: $value'),
+                        if (record.note case final value?) Text('Not: $value'),
+                        if (record.reason case final value?)
+                          Text('Gerekçe: $value'),
+                        if (record.createdAt.isNotEmpty)
+                          Text('Oluşturulma zamanı: ${record.createdAt}'),
+                        if (record.updatedAt.isNotEmpty)
+                          Text('Son güncelleme zamanı: ${record.updatedAt}'),
+                        Text('Arşivlenme zamanı: ${record.archivedAt}'),
+                        _eventHistory(record),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Text(
+                'Aktif kayıtların işlem geçmişi',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (activeWithEvents.isEmpty)
+                const Text('Aktif kayıtlara ait işlem geçmişi yok.'),
+              for (final record in activeWithEvents)
+                Card(
+                  key: Key('active-compliance-history-${record.id}'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(record.documentType.label),
+                        if (record.documentNumber case final value?)
+                          Text('Belge numarası: $value'),
+                        _eventHistory(record),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _eventHistory(WorkforceComplianceRecord record) {
+    final events = _events(record);
+    return ExpansionTile(
+      key: PageStorageKey('compliance-events-${record.id}'),
+      title: const Text('Kayıt işlemleri'),
+      minTileHeight: 48,
+      expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('İşlemler her kayıt için saklanan sıra ile gösterilir.'),
+        if (events.isEmpty) const Text('Kaydedilmiş işlem yok.'),
+        for (final event in events)
+          Padding(
+            key: Key('compliance-event-${event.id}'),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(switch (event.eventType) {
+                  'compliance.created' => 'İSG kaydı oluşturuldu',
+                  'compliance.updated' => 'İSG kaydı güncellendi',
+                  'compliance.archived' => 'İSG kaydı arşivlendi',
+                  _ => 'Kaydedilmiş İSG işlemi',
+                }),
+                Text('İşlem sırası: ${event.sequence}'),
+                Text('Kaydedilen zaman: ${event.occurredAt}'),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class _Summary extends StatelessWidget {

@@ -649,6 +649,41 @@ class SqliteAttendanceApplication implements AttendanceApplication {
         whereArgs: [memberId],
         orderBy: 'document_type ASC, expiry_date ASC, id ASC',
       );
+      final archivedComplianceRows = await database.query(
+        'workforce_compliance_records',
+        where: 'workforce_member_id = ? AND archived_at IS NOT NULL',
+        whereArgs: [memberId],
+        orderBy: 'archived_at DESC, id ASC',
+      );
+      final member = _memberFromRow(memberRows.single);
+      final eventRows = await database.rawQuery(
+        '''
+        SELECT e.id, e.aggregate_id, e.project_id, e.sequence,
+          e.event_type, e.occurred_at, e.payload_json
+        FROM workforce_events e
+        JOIN workforce_compliance_records c ON c.id = e.aggregate_id
+        WHERE e.aggregate_type = 'compliance'
+          AND c.workforce_member_id = ? AND e.project_id = ?
+        ORDER BY e.aggregate_id ASC, e.sequence ASC
+        ''',
+        [memberId, member.projectId],
+      );
+      final complianceEvents = <WorkforceComplianceEvent>[];
+      for (final row in eventRows) {
+        final payload = jsonDecode(row['payload_json']! as String);
+        if (payload is! Map || payload['member_id'] != memberId) continue;
+        complianceEvents.add(
+          WorkforceComplianceEvent(
+            id: row['id']! as String,
+            recordId: row['aggregate_id']! as String,
+            memberId: memberId,
+            projectId: row['project_id']! as String,
+            sequence: row['sequence']! as int,
+            eventType: row['event_type']! as String,
+            occurredAt: row['occurred_at']! as String,
+          ),
+        );
+      }
       final ppeRows = await database.query(
         'workforce_ppe_assignments',
         where: 'workforce_member_id = ?',
@@ -685,8 +720,12 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           .toList(growable: false);
       final ppe = ppeRows.map(_ppeFromRow).toList(growable: false);
       return WorkforcePersonDetail(
-        member: _memberFromRow(memberRows.single),
+        member: member,
         compliance: compliance,
+        archivedCompliance: archivedComplianceRows
+            .map((row) => _complianceFromRow(row, today))
+            .toList(growable: false),
+        complianceEvents: List.unmodifiable(complianceEvents),
         ppeAssignments: ppe,
         missingComplianceCount: compliance
             .where((item) => item.readStatus == ComplianceReadStatus.missing)

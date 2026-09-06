@@ -14,6 +14,7 @@ class FakeAttendanceApplication implements AttendanceApplication {
   List<Subcontractor> subcontractors = [];
   List<WorkforceTeam> teams = [];
   List<WorkforceComplianceRecord> compliance = [];
+  List<WorkforceComplianceEvent> complianceEvents = [];
   List<WorkforcePpeAssignment> ppeAssignments = [];
   AttendanceDayDetail? detail;
   AttendanceReminderSetting? setting;
@@ -274,6 +275,21 @@ class FakeAttendanceApplication implements AttendanceApplication {
     return WorkforcePersonDetail(
       member: member,
       compliance: memberCompliance,
+      archivedCompliance: compliance
+          .where((item) => item.memberId == memberId && item.archivedAt != null)
+          .toList(),
+      complianceEvents: complianceEvents
+          .where(
+            (event) =>
+                event.memberId == memberId &&
+                event.projectId == member.projectId &&
+                compliance.any(
+                  (record) =>
+                      record.id == event.recordId &&
+                      record.memberId == memberId,
+                ),
+          )
+          .toList(),
       ppeAssignments: memberPpe,
       missingComplianceCount: memberCompliance
           .where((item) => item.readStatus == ComplianceReadStatus.missing)

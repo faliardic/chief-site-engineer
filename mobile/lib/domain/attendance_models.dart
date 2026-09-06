@@ -311,6 +311,27 @@ class WorkforcePpeAssignment {
   final String? archivedAt;
 }
 
+/// Read-only lifecycle facts. Sequence is authoritative within one record.
+class WorkforceComplianceEvent {
+  const WorkforceComplianceEvent({
+    required this.id,
+    required this.recordId,
+    required this.memberId,
+    required this.projectId,
+    required this.sequence,
+    required this.eventType,
+    required this.occurredAt,
+  });
+
+  final String id;
+  final String recordId;
+  final String memberId;
+  final String projectId;
+  final int sequence;
+  final String eventType;
+  final String occurredAt;
+}
+
 class WorkforcePersonDetail {
   const WorkforcePersonDetail({
     required this.member,
@@ -322,6 +343,8 @@ class WorkforcePersonDetail {
     required this.expiredComplianceCount,
     required this.activePpeCount,
     this.attendanceSummary = const WorkforceAttendanceSummary.empty(),
+    this.archivedCompliance = const [],
+    this.complianceEvents = const [],
   });
 
   final WorkforceMember member;
@@ -333,6 +356,8 @@ class WorkforcePersonDetail {
   final int expiredComplianceCount;
   final int activePpeCount;
   final WorkforceAttendanceSummary attendanceSummary;
+  final List<WorkforceComplianceRecord> archivedCompliance;
+  final List<WorkforceComplianceEvent> complianceEvents;
 }
 
 class WorkforceAttendanceSummary {
