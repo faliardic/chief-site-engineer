@@ -62,7 +62,7 @@ Her rapor mümkün olduğunca şunları içerir:
 - Değerlendirme raporları tavsiye ve karar bağlamıdır; tek başına production authority değildir.
 - Fatih toplantıda mevcut sırayı değiştirirse, yeni production iş başlamadan önce kabul edilen karar `ROADMAP.md` dosyasına truth-sync edilir.
 - Kalıcı ürün kapsamı değişirse gerektiğinde `docs/v2/CSE_V2_SCOPE.md` veya ilgili kalıcı karar kaynağı da güncellenir.
-- Bir değerlendirme daha sonra geçersiz kalırsa eski rapor silinmez veya geriye dönük yeniden yazılmaz. Yeni rapor eski raporu açıkça `SUPERSEDED` veya `KISMEN SUPERSEDED` olarak işaret eder.
+- Bir değerlendirme daha sonra geçersiz kalırsa eski rapor silinmez veya geriye dönük yeniden yazılmaz. Yeni rapor eski raporu açıkça `SUPERSEDED` veya `KISMEN SUPERSEDED` olarak işaretler.
 - Eski rapordaki SHA, Issue/PR veya durum bilgisi güncel gerçek sayılmaz; her yeni toplantıda current GitHub yeniden doğrulanır.
 - ChatGPT geçmiş raporlardaki gerekçeleri kullanabilir fakat güncel olmayan durum bilgisini kopyalayamaz.
 
@@ -502,3 +502,82 @@ Standing owner kuralı gereği Q01–Q26'nın tamamı yeniden değerlendirildi. 
 ### ROADMAP etkisi
 
 `VAR — SIRA DEĞİŞMEDİ` — Q03 başlığı `Ajanda aktif-proje takvimi + hızlı kayıt oluşturma` olarak genişletildi; CAL-01..06 korunup FORM-01..07 eklendi; Q03 bitiş tanımı capture UX, legacy-note preservation, category semantics ve photo-priority sınırlarıyla genişletildi. Q01–Q26 numaraları ve Q-level öncelik sırası değişmedi.
+
+## 12. REVIEW-006 — Envanter/Kroki owner geri bildirimi ve tam kuyruk yeniden sıralaması
+
+**Tarih:** 2026-09-06  
+**Amaç:** Owner'ın Envanter / Kroki kullanım geri bildirimini current Inventory contract ve source ile karşılaştırmak, gerekli dar refinement kapsamını tanımlamak ve tüm pre-release kuyruğu yeniden sıralamak.  
+**Değerlendirilen Q'lar:** Güncel Q01–Q26 kuyruğunun tamamı; ayrıntılı kapsam yeni Q05.
+
+### Current GitHub gerçeği
+
+- Toplantı sırasında current `master`, `AGENTS.md`, ROADMAP, `ROADMAP_REVIEW_LOG.md`, Inventory contract ve current Kroki source yeniden doğrulandı.
+- Açık production işi Issue #708 / Draft PR #715 / Q01 İSG Geçmiş-Arşiv işidir; Q01 exact Fatih Acceptance kapanmadan yeni production child başlamaz.
+- #709–#714 Inventory compact top tools + movement-wheel refinement zinciri tamamlanmış baseline'dır; bu owner geri bildirimi onun tamamını geçersiz saymaz.
+- Current editor toolbar'da `Geri`, `Taşı`, `Çizgiyi bitir`, `Alanı kapat`, `Serbest uzunluk`, zoom `+/-` ve `Tamamını göster` kontrolleri gerçekten mevcuttur.
+- Current one-finger pan davranışı `PAN/Taşı` moduna bağlıdır; kontrat iki-parmak pan/pinch'in her modda güvenli navigation olabilmesine izin verir. Bu nedenle `Taşı` butonunu alternatifsiz silmek doğru değildir.
+- Current contract open polyline için `Çizgiyi bitir` ve block closure için explicit `Alanı kapat` davranışını tanımlar. Owner'ın permanent toolbox sadeleştirme kararı production source'tan önce contract truth-sync gerektirir.
+- Movement wheel yalnız SELECT + selection halinde görünür; controller nudge, seçili polygonun stable block'a map edilmesini ister. Bu nedenle ilk kroki oluşturma desteği tamamlanmış yeni/closed block için hedeflenmeli, unfinished raw polyline için değil.
+- Source'ta draw mode finalize/finish sonrası otomatik başka moda çevriliyor görünmemektedir; sticky-draw owner bulgusu önce gerçek runtime'da reproduce edilmelidir.
+- Map projection aynı/çok yakın marker'ları zaten count-cluster olarak gruplayabilir. Farklı asset'lerin aynı `x/y` koordinatını paylaşmasını yasaklayan source-of-truth constraint bulunmadı; V1 kısıtı bir **asset başına** tek aktif placement'tır.
+- Current create engelinin ana adayı `captureEmptyMapTap()` içindeki marker-hit guard'dır: marker'a denk gelen tap create'i reddeder. Bu nedenle same-point ihtiyacı için varsayılan çözüm schema migration değil explicit marker/cluster add-another UX'idir.
+
+### Owner kararları ve ürün değerlendirmesi
+
+1. `Geri` toolbox'tan çıkar ve üstte belirgin navigation action olur; autosave/back/orientation güvenliği korunur.
+2. `Taşı` toolbar kontrolü kaldırılabilir, ancak yalnız draw/select sırasında güvenli iki-parmak pan/pinch kanıtlandıktan sonra. Navigation capability kaybolamaz.
+3. Zoom `+/-` ve `Tamamını göster` ana toolbox'tan çıkarılır; pinch zoom ve initial fit korunur. Viewport recovery gerekiyorsa ikincil, çakışmayan action/gesture kullanılabilir.
+4. Permanent `Çizgiyi bitir` ve `Alanı kapat` toolbox kontrolleri kaldırılır; capability tamamen silinmez. Valid polygon için snap-to-first ana closure yolu olur; open-polyline bitirme gerektiğinde contextual explicit eylem kalır.
+5. `Serbest uzunluk` ruler/measurement çağrışımlı ikonundan çıkar; yalnız sonraki kenarın smart-length alignment'ını serbest bırakan one-shot semantiğe uygun icon kullanılır.
+6. Movement wheel ilk `createOrRecover` akışında tamamlanmış/closed yeni blok seçildiğinde de çalışır; raw unfinished polyline için sahte blok hareketi yoktur.
+7. Draw/`Çiz` modu explicit mode switch'e kadar sticky kalır. Source zaten böyleyse production rewrite yapılmaz; owner runtime bulgusu reproduce edilip gerçek reset noktası varsa dar fix yapılır.
+8. Farklı Inventory asset kayıtları aynı exact floor + `x/y` koordinatını paylaşabilir. Marker/cluster yüzeyi `Bu noktaya kayıt ekle` eylemi verir; exact coordinate ve floor quick-create'e taşınır.
+9. Same-point kayıtlar source coordinate'leri yapay offset ile değiştirilmeden count/stack cluster olarak sunulur ve deterministik listeden ayrı detail'lere açılır.
+10. Schema değişikliği varsayılan çözüm değildir. Audit gerçek schema/persistence ihtiyacı kanıtlarsa Q05 STANDARD UI kapsamı büyütülmez; ayrı CRITICAL child gerekir.
+
+### Tam kuyruk yeniden değerlendirmesi
+
+Standing owner kuralı gereği bütün current sıra yeniden değerlendirildi:
+
+- Yeni dar Inventory/Kroki refinement, Proje Profili'nden sonra **Q05** olarak yerleştirildi. Ürün çekirdeği ve günlük saha kullanımındaki doğrudan etkisi KKD/Beton sonrası yardımcı polish işlerinden daha yüksek; ancak mevcut geniş Proje Profili kararıyla block/Mahal/İş Gücü bağlamı önce korunur.
+- Önceki Q05 ve sonrası feature/decision maddeleri bir sıra kaydırıldı.
+- Listeyi sırf 26'da tutmak için yapay iş silinmedi. Eski `Eksik evidence + Inventory release-QA` ile `Manuel kabul borçları` aynı exact RC, evidence reuse ve acceptance-disposition ailesi olduğundan tek **Q22 — Release evidence + manuel kabul borçları + Inventory release-QA** gate'inde birleştirildi.
+- Q23 entegre günlük senaryo Q05'teki same-point create/cluster ve sade Kroki interaction'ını da kapsar.
+- Q01 açık production gate'i değişmedi; Q02 hâlâ NEXT'tir.
+
+### Yeni kanonik sıra özeti
+
+1. Q01 — İSG Geçmiş / Arşiv
+2. Q02 — Hatırlatıcı aktif-proje bağlamı + hızlı Unutma
+3. Q03 — Ajanda aktif-proje takvimi + hızlı kayıt oluşturma
+4. Q04 — Ana Sayfa / Proje Profili
+5. Q05 — Envanter / Kroki hedefli interaction refinement
+6. Q06 — KKD hızlı seçim
+7. Q07 — Beton completion/detail/edit
+8. Q08 — Malzemeler UI/UX uyumu
+9. Q09 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
+10. Q10 — Minimum proje-geneli arama
+11. Q11 — Kısa guided onboarding
+12. Q12 — Puantaj → Ajanda otomatik kayıt
+13. Q13 — Şefim otomatik yedek klasörü
+14. Q14 — Otomatik personel kodu decision gate
+15. Q15 — Metraj V1 decision gate
+16. Q16 — Global hızlı cetvel
+17. Q17 — Minimum crash/ANR/fatal telemetry
+18. Q18 — Privacy/KVKK/store declarations
+19. Q19 — Recovery/backup owner acceptance
+20. Q20 — Adaptive cihaz/pencere matrisi
+21. Q21 — TalkBack/yüksek yazı/focus/grayscale
+22. Q22 — Release evidence + manuel kabul borçları + Inventory release-QA
+23. Q23 — Entegre şantiye şefi günü
+24. Q24 — Automated milestone/build/provenance
+25. Q25 — Owner telefon+tablet RC kabulü
+26. Q26 — Açık genel yayın kararı
+
+### Önceki değerlendirmelerle ilişki
+
+`REVIEW-005` Q01–Q04 sıralaması ve Q03 kapsamı bakımından **CURRENT** kalır. Q05 ve sonrası numara/sıra kısmı bu raporla **KISMEN SUPERSEDED** durumundadır. Önceki Inventory tamamlanmış-baseline değerlendirmesi korunur; yalnız 6 Eylül owner bulgularıyla açıkça tanımlanan dar Q05 istisnası yeniden açılır.
+
+### ROADMAP etkisi
+
+`VAR` — owner-inserted Q05 Envanter/Kroki refinement eklendi; Q06–Q21 yeniden numaralandırıldı; eski evidence ve manual-debt release gate'leri Q22 altında birleştirildi; cross-reference'lar yeni Q numaralarına taşındı. Inventory contract'taki explicit toolbar/create yasakları source implementation'dan önce yeni owner yönüyle truth-sync edilmek zorundadır.
