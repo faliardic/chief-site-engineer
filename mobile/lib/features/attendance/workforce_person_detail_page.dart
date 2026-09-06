@@ -56,6 +56,9 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
     final reason = TextEditingController(text: current?.reason);
     var type = current?.documentType ?? ComplianceDocumentType.employmentEntry;
     var status = current?.sourceStatus ?? ComplianceSourceStatus.valid;
+    var detailsExpanded =
+        status == ComplianceSourceStatus.notApplicable ||
+        status == ComplianceSourceStatus.exception;
     final input = await showDialog<_ComplianceInput>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -70,6 +73,7 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
                 DropdownButtonFormField<ComplianceDocumentType>(
                   initialValue: type,
                   isExpanded: true,
+                  itemHeight: null,
                   decoration: const InputDecoration(labelText: 'Belge türü'),
                   items: ComplianceDocumentType.values
                       .map(
@@ -105,19 +109,43 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
                         ),
                       )
                       .toList(),
-                  onChanged: (value) =>
-                      setDialogState(() => status = value ?? status),
+                  onChanged: (value) => setDialogState(() {
+                    status = value ?? status;
+                    if (status == ComplianceSourceStatus.notApplicable ||
+                        status == ComplianceSourceStatus.exception) {
+                      detailsExpanded = true;
+                    }
+                  }),
                 ),
                 _gap,
-                _field(number, 'Belge numarası'),
-                _gap,
-                _field(issued, 'Düzenlenme tarihi (YYYY-AA-GG)'),
-                _gap,
-                _field(expiry, 'Son geçerlilik tarihi (YYYY-AA-GG)'),
-                _gap,
-                _field(reason, 'İstisna/uygulanamaz gerekçesi'),
-                _gap,
-                _field(note, 'Not', maxLines: 3),
+                Semantics(
+                  expanded: detailsExpanded,
+                  child: TextButton.icon(
+                    key: const Key('compliance-dialog-details'),
+                    onPressed: () => setDialogState(
+                      () => detailsExpanded = !detailsExpanded,
+                    ),
+                    icon: Icon(
+                      detailsExpanded ? Icons.expand_less : Icons.expand_more,
+                    ),
+                    label: const Text('Detaylar'),
+                  ),
+                ),
+                if (detailsExpanded) ...[
+                  _gap,
+                  if (status == ComplianceSourceStatus.notApplicable ||
+                      status == ComplianceSourceStatus.exception)
+                    const Text('Bu durum için gerekçe zorunludur.'),
+                  _field(reason, 'İstisna/uygulanamaz gerekçesi'),
+                  _gap,
+                  _field(number, 'Belge numarası'),
+                  _gap,
+                  _field(issued, 'Düzenlenme tarihi (YYYY-AA-GG)'),
+                  _gap,
+                  _field(expiry, 'Son geçerlilik tarihi (YYYY-AA-GG)'),
+                  _gap,
+                  _field(note, 'Not', maxLines: 3),
+                ],
               ],
             ),
           ),

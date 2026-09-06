@@ -412,6 +412,156 @@ void main() {
     );
   }
 
+  for (final size in [const Size(320, 640), const Size(390, 500)]) {
+    testWidgets('compliance dialog disclosure retains values at $size text 2', (
+      tester,
+    ) async {
+      final attendance = _Attendance(empty: true);
+      await _pump(tester, attendance, size: size, scale: 2);
+      await _tab(tester, 'İSG');
+      await tester.tap(find.byKey(const Key('add-compliance-record')));
+      await tester.pumpAndSettle();
+      expect(find.text('Belge türü'), findsOneWidget);
+      expect(find.text('Kullanıcı durumu'), findsOneWidget);
+      expect(find.text('Detaylar'), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+      expect(attendance.complianceCommands, isEmpty);
+      await _selectDialogValue<ComplianceDocumentType>(tester, 'Sağlık raporu');
+      await _toggleComplianceDetails(tester);
+      final values = [
+        ('Belge numarası', 'BELGE-42'),
+        ('Düzenlenme tarihi (YYYY-AA-GG)', '2026-07-01'),
+        ('Son geçerlilik tarihi (YYYY-AA-GG)', '2027-07-01'),
+        ('Not', 'Kullanıcının ayrıntılı notu'),
+        ('İstisna/uygulanamaz gerekçesi', 'Saklanan gerekçe'),
+      ];
+      for (final field in values) {
+        await _revealDialogControl(tester, _field(field.$1));
+        await tester.enterText(_field(field.$1), field.$2);
+        expect(tester.takeException(), isNull);
+      }
+      await _toggleComplianceDetails(tester);
+      expect(find.byType(TextField), findsNothing);
+      await _toggleComplianceDetails(tester);
+      for (final field in values) {
+        expect(
+          tester.widget<TextField>(_field(field.$1)).controller!.text,
+          field.$2,
+        );
+      }
+      expect(attendance.calls, ['read:person-1']);
+      expect(attendance.store.compliance, isEmpty);
+      await _toggleComplianceDetails(tester);
+      await _saveDialog(tester);
+      final command = attendance.complianceCommands.single;
+      expect(command.id, isNotEmpty);
+      expect(command.eventId, isNotEmpty);
+      expect(command.memberId, 'person-1');
+      expect(command.expectedRevision, 0);
+      expect(command.documentType, ComplianceDocumentType.healthReport);
+      expect(command.sourceStatus, ComplianceSourceStatus.valid);
+      expect(command.documentNumber, values[0].$2);
+      expect(command.issuedDate, values[1].$2);
+      expect(command.expiryDate, values[2].$2);
+      expect(command.note, values[3].$2);
+      expect(command.reason, values[4].$2);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final status in [
+      ComplianceSourceStatus.notApplicable,
+      ComplianceSourceStatus.exception,
+    ]) {
+      testWidgets(
+        'compliance dialog ${status.name} auto-expands on add and edit at $size text 2',
+        (tester) async {
+          final attendance = _Attendance(empty: true);
+          await _pump(tester, attendance, size: size, scale: 2);
+          await _tab(tester, 'İSG');
+          await tester.tap(find.byKey(const Key('add-compliance-record')));
+          await tester.pumpAndSettle();
+          expect(find.byType(TextField), findsNothing);
+          await _selectDialogValue<ComplianceSourceStatus>(
+            tester,
+            status.label,
+          );
+          expect(
+            find.text('Bu durum için gerekçe zorunludur.'),
+            findsOneWidget,
+          );
+          final reason = _field('İstisna/uygulanamaz gerekçesi');
+          await _revealDialogControl(tester, reason);
+          await tester.enterText(
+            reason,
+            'Kullanıcının ${status.label} gerekçesi',
+          );
+          await _toggleComplianceDetails(tester);
+          expect(find.byType(TextField), findsNothing);
+          await _selectDialogValue<ComplianceSourceStatus>(
+            tester,
+            'Geçerli (kullanıcı kaydı)',
+          );
+          expect(find.byType(TextField), findsNothing);
+          await _selectDialogValue<ComplianceSourceStatus>(
+            tester,
+            status.label,
+          );
+          expect(
+            tester.widget<TextField>(reason).controller!.text,
+            'Kullanıcının ${status.label} gerekçesi',
+          );
+          expect(attendance.calls, ['read:person-1']);
+          expect(attendance.complianceCommands, isEmpty);
+          await _saveDialog(tester);
+          final command = attendance.complianceCommands.single;
+          expect(command.sourceStatus, status);
+          expect(command.reason, 'Kullanıcının ${status.label} gerekçesi');
+          expect(command.expectedRevision, 0);
+          final edit = find.byKey(Key('edit-compliance-${command.id}'));
+          await _revealCompliance(tester, edit);
+          await tester.tap(edit);
+          await tester.pumpAndSettle();
+          expect(
+            find.text('Bu durum için gerekçe zorunludur.'),
+            findsOneWidget,
+          );
+          expect(
+            tester.widget<TextField>(reason).controller!.text,
+            command.reason,
+          );
+          await tester.tap(find.widgetWithText(TextButton, 'Vazgeç'));
+          await tester.pumpAndSettle();
+          await tester.pump(kThemeAnimationDuration);
+          expect(attendance.complianceCommands, hasLength(1));
+          expect(attendance.archiveCommand, isNull);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets('compliance dialog common path saves without opening details', (
+    tester,
+  ) async {
+    final attendance = _Attendance(empty: true);
+    await _pump(tester, attendance);
+    await _tab(tester, 'İSG');
+    await tester.tap(find.byKey(const Key('add-compliance-record')));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    await _saveDialog(tester);
+    final command = attendance.complianceCommands.single;
+    expect(command.documentType, ComplianceDocumentType.employmentEntry);
+    expect(command.sourceStatus, ComplianceSourceStatus.valid);
+    expect(command.documentNumber, isEmpty);
+    expect(command.issuedDate, isEmpty);
+    expect(command.expiryDate, isEmpty);
+    expect(command.note, isEmpty);
+    expect(command.reason, isEmpty);
+    expect(command.expectedRevision, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'compliance duplicate edit and archive preserve sibling and optional metadata',
     (tester) async {
@@ -432,6 +582,11 @@ void main() {
       await _revealCompliance(tester, edit);
       await tester.tap(edit);
       await tester.pumpAndSettle();
+      expect(find.byType(TextField), findsNothing);
+      await _toggleComplianceDetails(tester);
+      await _toggleComplianceDetails(tester);
+      expect(find.byType(TextField), findsNothing);
+      await _toggleComplianceDetails(tester);
       for (final field in [
         ('Belge numarası', selected.documentNumber),
         ('Düzenlenme tarihi (YYYY-AA-GG)', selected.issuedDate),
@@ -445,6 +600,7 @@ void main() {
         );
       }
       expect(find.text('Geçerli (kullanıcı kaydı)'), findsOneWidget);
+      expect(attendance.calls, ['read:person-1']);
       await tester.enterText(_field('Not'), 'Yalnız seçilen kaydın yeni notu');
       await _saveDialog(tester);
       final command = attendance.complianceCommands.single;
@@ -508,6 +664,7 @@ void main() {
       await _tab(tester, 'İSG');
       await tester.tap(find.byKey(const Key('add-compliance-record')));
       await tester.pumpAndSettle();
+      await _toggleComplianceDetails(tester);
       await tester.enterText(_field('Belge numarası'), 'BELGE-42');
       await _saveDialog(tester);
       final created = attendance.complianceCommands.single;
@@ -519,6 +676,7 @@ void main() {
       expect(created.eventId, isNotEmpty);
       await tester.tap(find.byKey(Key('edit-compliance-${created.id}')));
       await tester.pumpAndSettle();
+      await _toggleComplianceDetails(tester);
       expect(
         tester.widget<TextField>(_field('Belge numarası')).controller!.text,
         'BELGE-42',
@@ -581,6 +739,36 @@ void main() {
 Finder _field(String label) => find.byWidgetPredicate(
   (widget) => widget is TextField && widget.decoration?.labelText == label,
 );
+
+Future<void> _toggleComplianceDetails(WidgetTester tester) async {
+  final disclosure = find.byKey(const Key('compliance-dialog-details'));
+  await _revealDialogControl(tester, disclosure);
+  await tester.tap(disclosure);
+  await tester.pumpAndSettle();
+  expect(tester.takeException(), isNull);
+}
+
+Future<void> _selectDialogValue<T>(WidgetTester tester, String label) async {
+  final dropdown = find.byType(DropdownButtonFormField<T>);
+  await _revealDialogControl(tester, dropdown);
+  await tester.tap(dropdown);
+  await tester.pumpAndSettle();
+  final option = find.text(label).last;
+  await tester.ensureVisible(option);
+  await tester.pumpAndSettle();
+  await tester.tap(option);
+  await tester.pumpAndSettle();
+  expect(tester.takeException(), isNull);
+}
+
+Future<void> _revealDialogControl(WidgetTester tester, Finder control) async {
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pumpAndSettle();
+  await Scrollable.ensureVisible(tester.element(control), alignment: 0.5);
+  await tester.pumpAndSettle();
+  expect(control.hitTestable(), findsOneWidget);
+  expect(tester.takeException(), isNull);
+}
 
 Future<void> _revealCompliance(WidgetTester tester, Finder finder) async {
   final scrollable = find
