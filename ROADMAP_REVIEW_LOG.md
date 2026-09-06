@@ -134,3 +134,190 @@ Q maddeleri değerlendirilirken yalnız “özellik güzel mi?” sorusu sorulma
 ### ROADMAP etkisi
 
 `YOK` — Q01–Q26 sırası bu kayıtla değiştirilmedi.
+
+## 8. REVIEW-002 — İlk genel yayın gereklilik değerlendirmesi
+
+**Tarih:** 2026-09-06  
+**Amaç:** Q01–Q26 listesini ilk genel yayın için saha değeri, veri güvenliği, kapsam şişmesi ve gerçek yayın gerekliliği açısından yeniden değerlendirmek.  
+**Değerlendirilen Q'lar:** Q01–Q26.
+
+### Current GitHub gerçeği
+
+- Toplantı sırasında `master` ve kanonik Q01–Q26 kuyruğu yeniden doğrulandı.
+- Açık production işi Q01 / Issue #708 / Draft PR #715'tir; source/test/independent review PASS, exact Acceptance manuel gate PENDING durumundadır.
+- Bu rapor öneri/değerlendirme kaydıdır; mevcut production sırasını veya PR #715 gate'ini değiştirmez.
+
+### Genel değerlendirme
+
+İlk yayın kapsamı yeni özellik sayısını artırmak yerine CSE'nin mevcut ana sözünü güvenilir biçimde yerine getirmeye odaklanmalıdır: kayıtları hızlı yakalamak, doğru proje bağlamında tutmak, tekrar yazdırmadan takip etmek, kanıt ve dosya bağlantılarını korumak, gerektiğinde geri bulmak ve veri kaybına karşı güvenilir recovery sağlamak.
+
+Önerilen ilke:
+
+> İlk yayını hızlandırmak için güvenlikten veya gerekli kabulden değil, yeni özellik kapsamından kısılmalı.
+
+Küçük görsel kusurlar ve yardımcı kolaylıklar post-release'e kalabilir. Kayıp kayıt, yanlış proje, bozuk attachment bağı, güvenilmez temel hatırlatma davranışı, geri dönülemeyen restore veya yarım kalan ana iş akışı ilk yayına taşınmamalıdır.
+
+### Q01–Q12 değerlendirmesi
+
+#### Q01 — İSG Geçmiş / Arşiv
+- Saha değeri: Yüksek; saklanan geçmişin aktif kayıtla karışmadan geri çağrılmasını sağlar.
+- Yayın öncesi önemi: Güçlü aday; mevcut dar iş zaten implementation/gate aşamasında.
+- Risk/kapsam: Orta; identity/history read sınırı nedeniyle kontrollü kalmalı.
+- Öneri: Mevcut dar kapsamı Acceptance PASS ile tamamla; edit/restore/backfill veya geçmiş alan rekonstrüksiyonu ekleme.
+
+#### Q02 — KKD hızlı seçim
+- Saha değeri: Yüksek günlük kullanım kolaylığı.
+- Yayın öncesi önemi: Güçlü aday, ancak mevcut KKD akışı güvenilir çalışıyorsa tek başına release blocker değildir.
+- Risk/kapsam: Küçük/orta.
+- Öneri: Mevcut canonical KKD seçeneklerini minimum dokunuşla seçtiren dar UX iyileştirmesi; stok/zimmet/toplu dağıtım kapsamı açılmasın.
+
+#### Q03 — Otomatik personel kodu
+- Saha değeri: Sınırlı; teknik stable identity ile kullanıcı-facing personel kodu aynı ihtiyaç değildir.
+- Yayın öncesi önemi: Ertelenebilir.
+- Risk/kapsam: CRITICAL identity/compatibility riski.
+- Öneri: `POST-RELEASE / DEFERRED` güçlü öneri.
+
+#### Q04 — Beton tamamlanma / sonuç / detay / düzenleme
+- Saha değeri: Çok yüksek; Beton modülünün gerçek iş akışını tamamlar.
+- Yayın öncesi önemi: Beton ilk sürümde görünüyorsa V1 blocker.
+- Risk/kapsam: Orta; existing identity/attachment davranışları korunmalı.
+- Öneri: Create → result/detail → edit/completion zinciri güvenilir biçimde tamamlanmalı; yeni beton özellikleri eklenmemeli.
+
+#### Q05 — Malzemeler ortak UI/UX uyumu
+- Saha değeri: Orta/yüksek.
+- Yayın öncesi önemi: İşlevsel tutarlılık gerekli; salt görsel eşleme blocker olmamalı.
+- Risk/kapsam: Küçük/orta.
+- Öneri: Project context, ana eylem, state/error ve erişilebilirlik sorunlarını çöz; sırf görsel birebirlik için yeni tasarım turu açma.
+
+#### Q06 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
+- Saha değeri: Yüksek bulunabilirlik.
+- Yayın öncesi önemi: Minimum anlaşılır yerleşim güçlü aday.
+- Risk/kapsam: Orta; backup/recovery sınırında kapsam büyümesi engellenmeli.
+- Öneri: Kullanıcı fotoğrafı, dosyası ve yedeğini nerede bulacağını anlamalı; tüm bilgi mimarisini yeniden kurma.
+
+#### Q07 — Inventory release-level entegre doğrulama
+- Saha değeri: Yüksek; tamamlanmış alanın regresyonunu engeller.
+- Yayın öncesi önemi: Release QA gereği.
+- Risk/kapsam: Yeni feature işi yok.
+- Öneri: Yalnız entegre doğrulama; kanıtlanmış regresyonda dar bug child.
+
+#### Q08 — Bildirim panelinde Ertele
+- Saha değeri: Yüksek kullanım kolaylığı.
+- Yayın öncesi önemi: Mevcut güvenilir erteleme yolu varsa ertelenebilir; temel reminder güvenilirliği daha önemlidir.
+- Risk/kapsam: Background scheduling/persistence'e dokunursa büyür.
+- Öneri: Panel kısayolunu ana reminder güvenilirliğinin önüne koyma.
+
+#### Q09 — Puantaj tamamlanınca Ajanda kaydı
+- Saha değeri: Orta; tekrar yazmayı azaltabilir.
+- Yayın öncesi önemi: Ertelenebilir.
+- Risk/kapsam: CRITICAL duplicate/transaction/history/rollback riski.
+- Öneri: `POST-RELEASE / DEFERRED` güçlü öneri; Puantaj zaten kaynak kayıt olarak çalışmalı.
+
+#### Q10 — Şefim otomatik yedek klasörü
+- Saha değeri: Orta; kullanım kolaylığı.
+- Yayın öncesi önemi: Koşullu. Güvenilir dış yedek/recovery yolu zorunlu, otomatik klasörün kendisi değil.
+- Risk/kapsam: CRITICAL path/data-root/restore compatibility.
+- Öneri: Mevcut yedek dışa aktarma ve recovery güvenilir ise post-release'e bırakılabilir; değilse eksik olan güvenlik yolu blocker olarak çözülmeli.
+
+#### Q11 — Global hızlı cetvel
+- Saha değeri: Faydalı yardımcı araç.
+- Yayın öncesi önemi: Ertelenebilir.
+- Risk/kapsam: Calibration ve global overlay/context restore nedeniyle gereksiz genişleyebilir.
+- Öneri: `POST-RELEASE / DEFERRED` güçlü öneri.
+
+#### Q12 — Metraj V1 release kapsam kararı
+- Saha değeri: Uzun vadede yüksek.
+- Yayın öncesi önemi: Kapsamlı katalog ilk yayın için zorunlu değil; mevcut hesapların doğruluğu zorunlu.
+- Risk/kapsam: Büyük; katalog/schema/persistence zinciri açabilir.
+- Öneri: Decision Gate'te **B — Post-release expansion** güçlü öneri.
+
+### Q13–Q17 değerlendirmesi
+
+#### Q13 — Minimum proje-geneli ortak arama
+- Saha değeri: Çok yüksek; biriken saha hafızasını geri bulmayı sağlar.
+- Yayın öncesi önemi: Güçlü V1 adayı.
+- Risk/kapsam: Basit, supported record families ile sınırlandırılırsa orta.
+- Öneri: Basit metin araması + project-safe scope + kaynak kayda geçiş; AI/OCR/enterprise index yok.
+
+#### Q14 — Kısa guided onboarding
+- Saha değeri: Yüksek ilk kullanım değeri.
+- Yayın öncesi önemi: İlk kullanımın sorunsuz olması güçlü V1 gereğidir; tanıtım slaytı sayısı değil.
+- Risk/kapsam: Küçük.
+- Öneri: İlk proje ve ilk yararlı kayda yardım almadan ulaşılabilmeli; uzun tutorial açılmamalı.
+
+#### Q15 — Minimum crash / ANR / fatal telemetry
+- Saha değeri: Dolaylı fakat release sonrası teşhis için yüksek.
+- Yayın öncesi önemi: Minimum hata görünürlüğü güçlü release adayı.
+- Risk/kapsam: Privacy ve üçüncü taraf servis eklenirse büyür.
+- Öneri: Kişisel saha içeriği toplamayan minimum teknik hata görünürlüğü; büyük davranış analitiği/telemetry sistemi açma.
+
+#### Q16 — Privacy / KVKK / store declarations
+- Saha değeri: Doğrudan saha akışı değil; güven ve mağaza uyumu için kritik.
+- Yayın öncesi önemi: Release blocker.
+- Risk/kapsam: Gerçek uygulama davranışıyla beyanların eşleşmesi gerekir.
+- Öneri: Metin + gerçek permission/local-data/backup/media/telemetry davranışı birlikte doğrulansın; olmayan claim yazılmasın.
+
+#### Q17 — Recovery / backup owner acceptance
+- Saha değeri: Kritik güvenilirlik.
+- Yayın öncesi önemi: Kesin release blocker.
+- Risk/kapsam: CRITICAL destructive/data-integrity alanı.
+- Öneri: Locked Restore Model A ve gerçek recovery yolu owner tarafından doğrulanmadan genel yayın yapılmamalı.
+
+### Q18–Q26 değerlendirmesi
+
+#### Q18 — Compact / medium / expanded window matrisi
+- Yayın öncesi önemi: Release gate.
+- Öneri: Desteklenen genişliklerde ana işlev, okunabilirlik ve taşma kontrolü; estetik mükemmellik hedefi değil. Q19 ile ortak kanıt kullanılabilir.
+
+#### Q19 — Telefon / tablet / portrait / landscape / split-screen
+- Yayın öncesi önemi: Release gate.
+- Öneri: Hedef cihaz sınıflarında kritik akış ve state retention; her cihaz modelini tek tek test etme. Q18 kanıtıyla tekrar üretme.
+
+#### Q20 — TalkBack / yüksek yazı / focus / grayscale
+- Yayın öncesi önemi: Kritik akışlarda release gate.
+- Öneri: Primary navigation, create/edit/save/confirm erişilebilir olmalı; kontrol yeni görsel redesign programına dönüşmemeli.
+
+#### Q21 — Eksik evidence kapanışı
+- Yayın öncesi önemi: Release gate.
+- Öneri: Aynı RC üzerinde Q23/Q25 sırasında üretilen yeterli kanıt yeniden kullanılsın; sırf evidence sayısı için tekrar test/ekran görüntüsü üretilmesin.
+
+#### Q22 — Manuel kabul borçlarının kapanışı
+- Yayın öncesi önemi: Release gate.
+- Öneri: Release'e dahil gerçek davranışların gerekli testleri PASS olmalı; tarihsel/superseded maddeler gerekçeli N/A veya superseded disposition alabilir.
+
+#### Q23 — Entegre “bir şantiye şefi günü” senaryosu
+- Saha değeri: Çok yüksek.
+- Yayın öncesi önemi: En önemli ürün kabul kapılarından biri.
+- Öneri: Dolu bir projede project context → reminder/agenda → plan → puantaj → saha rehberi/İSG/KKD → beton/malzeme → inventory/media → backup/recovery akışı tek bütün olarak sınansın; tekrar veri girişi, context drift, dead end ve sürpriz mutation kabul edilmesin.
+
+#### Q24 — Otomatik milestone gate + analyze/build + artifact provenance
+- Yayın öncesi önemi: Kesin teknik release gate.
+- Öneri: Exact release candidate revision için birleşik test/analyze/build, package/signing/entrypoint ve artifact provenance doğrulanmalı; başka revision kanıtı yeterli sayılmamalı.
+
+#### Q25 — Owner telefon + tablet Release Candidate kabulü
+- Yayın öncesi önemi: Release gate.
+- Öneri: Exact RC artifact telefon + tablet sınıfında kritik günlük akış ve ergonomi açısından Fatih tarafından kabul edilmeli; mümkün olduğunda Q18–Q23 kanıtları aynı adayda birleştirilmeli.
+
+#### Q26 — Açık genel yayın kararı
+- Yayın öncesi önemi: Final owner gate.
+- Öneri: Bütün required gate'ler geçtikten sonra ayrıca açık owner release kararı korunmalı.
+
+### Liste dışında özellikle korunması önerilen release riskleri
+
+1. **Reminder güvenilirliği, notification-panel kolaylığından önce gelir.** Arka plan, ekran kapalı, uygulama yeniden açılışı ve izin reddi davranışları kullanıcıya yanlış güven vermemeli.
+2. **Kayıt güvenliği yalnız backup ekranında test edilmemeli.** `Kaydedildi` sonrası restart/update/reopen sırasında doğru proje, attachment bağı ve duplicate-free davranış korunmalı.
+3. **İlk kullanım owner alışkanlığıyla karıştırılmamalı.** Ürünü geliştirme sürecinden tanımayan bir şantiye şefi ilk proje ve ilk kayda yardım almadan ulaşabilmeli.
+4. **Store/release uygunluğu özellik listesinden ayrıdır.** Paket, target/platform uyumluluğu, imza, mağaza beyanları ve hesap bazlı yayın koşulları Q16/Q24 çevresinde ayrıca doğrulanmalıdır.
+
+### Toplantı sonucu
+
+- **Fatih kararları:** Bu raporun değerlendirme günlüğüne eklenmesi onaylandı. Q maddelerinin release statüsü/sırası için henüz ayrıca owner reprioritization kararı verilmedi.
+- **Güçlü post-release önerileri:** Q03 otomatik personel kodu, Q09 Puantaj→Ajanda otomasyonu, Q11 global hızlı cetvel, Q12 kapsamlı Metraj genişlemesi.
+- **Koşullu post-release önerisi:** Q10 otomatik yedek klasörü; yalnız mevcut dış yedek/recovery yolu yeterliyse.
+- **Dar kapsamda tutulması önerilenler:** Q02, Q05, Q06, Q08, Q13, Q14, Q15.
+- **Korunması önerilen zorunlu kapılar:** Q16, Q17 ve Q18–Q26; ayrıca Q04 Beton akışının release kapsamındaysa tamamlanması.
+- **Yeni araştırma gerekenler:** Store/account-specific production access koşulları, final telemetry kapsamı ve gerçek RC üzerinde reminder güvenilirliği kanıtı release aşamasında ayrıca doğrulanmalı.
+
+### ROADMAP etkisi
+
+`YOK` — bu rapor yalnız değerlendirme hafızasıdır. Q01–Q26 sırası veya status etiketleri bu kayıtla değiştirilmedi. Fatih daha sonra önerilerden herhangi birini owner kararı olarak kabul ederse, yeni production iş başlamadan önce ilgili değişiklik `ROADMAP.md` içine truth-sync edilmelidir.
