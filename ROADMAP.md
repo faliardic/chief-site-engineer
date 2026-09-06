@@ -68,10 +68,121 @@ Bitiş tanımı:
 - exact kişi/proje isolation ve zero-mutation read davranışı korunur;
 - Fatih exact Acceptance build'de PASS verir ve PR merge edilir.
 
+### Q01.5 — Ana Sayfa / Proje Profili genişletme
+
+**Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi — `Ana Sayfa / Proje Profili` başlığı  
+**Durum:** `NEXT` — Q01 gate'leri kapanıp PR #715 merge edilmeden production implementation başlamaz.
+
+Bu owner-inserted ara Q, mevcut Q01–Q26 numaralarını topluca değiştirmeden Q01 ile Q02 arasındaki kanonik yürütme noktasını oluşturur. Amaç; Ana Sayfa'yı menü veya dar özet olmaktan çıkarıp aktif projenin okunabilir profili ve günlük saha kontrol yüzeyi haline getirmektir. Uygulama tek büyük PR olarak yapılmaz; aşağıdaki AP dilimleri current model audit'i ve risk düzeyine göre ayrı child'lara bölünebilir.
+
+#### AP-01 — Mevcut proje veri modelini denetle
+
+Kod değişikliğinden önce proje/blok/kat/mahal/personel omurgası incelenir:
+
+- hangi proje alanları zaten mevcut;
+- blok için stable ID/kayıt yapısı;
+- kat ve Mahal'in blokla mevcut ilişkisi;
+- toplam alan/kat bilgilerinin current source-of-truth'u;
+- İşveren / Ana yüklenici / Yapı denetim gibi tarafların mevcut kaynakları;
+- yeni alanlardan hangilerinin schema/persistence değişikliği gerektirdiği.
+
+**Kural:** Mevcut bilgi ikinci kez saklanmaz. Audit schema değişikliğinin gerçekten gerekli olduğunu kanıtlarsa implementation öncesi ayrı CRITICAL child gerekir.
+
+#### AP-02 — Proje profilinin bilgi mimarisini kur
+
+İlk görünümde kompakt **Proje Özeti** bulunur. Hedef hazır alanlar:
+
+- Proje adı;
+- adres;
+- toplam alan;
+- blok sayısı;
+- toplam kat;
+- **YİBF No**.
+
+Boş alanlar ana ekranı gereksiz doldurmaz. Ayrıntılar katmanlı/açılır bölümlerde sunulur:
+
+- **Resmî Bilgiler:** YİBF No, ruhsat no, ruhsat tarihi, ada/parsel;
+- **Proje Bilgileri:** başlangıç tarihi, hedef bitiş, kullanım türü, taşıyıcı sistem;
+- **İlgili Taraflar:** İşveren, Ana yüklenici, Yapı denetim, Şantiye şefi.
+
+Kesin alan listesi AP-01 audit sonucu kilitlenir; mevcut source'ta olmayan bilgi uydurulmaz.
+
+#### AP-03 — Zengin profili ağır zorunlu forma dönüştürme
+
+İlk proje oluşturma minimum bilgilerle tamamlanabilir kalır. Ayrıntılı proje bilgileri sonradan **Proje Profili → Düzenle** üzerinden eklenebilir. Zengin proje profili yeni proje oluşturma sürtünmesini artırmaz.
+
+#### AP-04 — Blok bazlı proje yapısı
+
+Çok bloklu projelerde ayrı **Bloklar** bölümü bulunur. A Blok / B Blok / C Blok gibi kayıtlar ayrı açılabilir. Audit izin verdiği ölçüde blokta şu bilgiler gösterilebilir:
+
+- blok adı;
+- toplam kat;
+- bodrum kat;
+- toplam alan;
+- oturum alanı;
+- bağımsız bölüm sayısı;
+- kullanım türü.
+
+Tek bloklu projede gereksiz çok-blok arayüzü dayatılmaz. Yeni stable identity veya persistence ihtiyacı audit edilmeden varsayılmaz.
+
+#### AP-05 — Proje toplamlarını mümkün olduğunca bloklardan türet
+
+Aynı bilgi proje ve blok seviyesinde kullanıcıya ikinci kez girdirilmez. Örneğin A Blok `4.500 m²`, B Blok `3.500 m²` ise semantik olarak uygunsa proje toplam alanı `8.000 m²` türetilebilir. Blok sayısı, toplam alan ve uygun bazı kat/bağımsız bölüm toplamları aynı ilkeye tabidir.
+
+**Kural:** Türetilmiş değer ile bağımsız proje-level source alanı birbirine karıştırılmaz; mevcut source-of-truth sessizce değiştirilmez.
+
+#### AP-06 — Mahal'i proje profilinin ana öğesi yap
+
+`Mahal Kataloğu` Ajanda bağlamından çıkarılıp proje profiline taşınır. Proje profilinde erişilebilir, etiketli **Mahaller** girişi bulunur; yalnız icon kullanılmaz. Mevcut model izin verdiği ölçüde kullanıcıya `Proje → Blok → Kat → Mahal` ilişkisi anlaşılır biçimde gösterilir.
+
+#### AP-07 — Özel Alan özelliğini koru
+
+Mevcut **Özel alan ekle** kaldırılmaz. Ancak standart ve yaygın proje bilgileri kullanıcıya özel alan olarak yeniden tanımlatılmaz. Özel alan; sözleşme numarası, belediye dosya numarası, kule vinç referansı veya gerçekten projeye/kullanıcıya özgü ek bilgiler için esnek katman olarak kalır.
+
+#### AP-08 — Ana sayfaya İş Gücü kartı ekle
+
+Proje profilinde görünür **İş Gücü** kartı bulunur. Birincil günlük bilgi **Bugün sahada: N kişi** olur. Mevcut veri kaynakları güvenilir biçimde ayırabiliyorsa ikincil olarak **N kayıtlı personel** bilgisi gösterilebilir.
+
+**Kural:** `Sicilde kayıtlı personel` ile `bugün gerçekten sahada bulunan personel` aynı metrik gibi sunulmaz.
+
+#### AP-09 — İş Gücü kartını gerçek personel listesine bağla
+
+İş Gücü kartına dokunulduğunda aktif projedeki saha personeli açılır. Bugünkü saha durumu önceliklidir. Liste gerektiğinde kişi, **Taşeron / İşveren** ve mevcut günlük durum bilgisini gösterebilir. Kullanıcı yalnız listeyi görmek için Sicil → ekip → Puantaj arasında gereksiz ekran dolaşımına zorlanmaz.
+
+#### AP-10 — İş Gücü için doğru empty state'ler
+
+İki durum ayrılır:
+
+1. **Hiç firma/personel kaydı yok:** `Henüz saha personeli eklenmedi.` → ana eylem `Taşeron / İşveren ekle`.
+2. **Personel kayıtlı fakat bugün saha/Puantaj durumu yok:** `Bugün için saha personeli henüz işaretlenmedi.` → ana eylem `Puantaja git`.
+
+Bu iki durum aynı mesaj veya aynı CTA ile gösterilmez.
+
+#### AP-11 — Ana sayfa yoğunluk kontrolü
+
+Bütün proje alanları aynı anda açık bir form yığınına dönüştürülmez. Hedef hiyerarşi:
+
+`Aktif proje → Proje Özeti → Bloklar → Mahaller / İş Gücü → Ayrıntılı proje bilgileri → Özel Alanlar`
+
+Dashboard hâlâ canlı proje kontrol merkezi olmalı; bakım/form yoğunluğu günlük saha bilgisini bastırmamalıdır.
+
+**Q01.5 bitiş tanımı:**
+
+- proje genel bilgisi tek profilden okunabilir;
+- çok bloklu projede bloklar ayrı incelenebilir;
+- semantik olarak güvenli proje toplamları tekrar veri girişi olmadan türetilebilir;
+- Mahaller doğrudan proje profilinden erişilebilir;
+- bugünkü saha personeli ile kayıtlı personel ayrımı anlaşılır;
+- İş Gücü kartı aktif proje personel görünümüne gider;
+- empty state doğru ilk eylemi sunar;
+- standart bilgiler için `Özel alan` oluşturmaya gerek kalmaz;
+- ilk proje oluşturma onlarca zorunlu alana dönüşmez;
+- schema/stable identity/persistence değişikliği gerekiyorsa ayrı CRITICAL yetki olmadan yapılmaz.
+
 ### Q02 — KKD hızlı seçim
 
 **Kaynak:** #617 Phase 4 / item 21  
-**Durum:** `NEXT`
+**Durum:** `QUEUED`
 
 Amaç: günlük saha kullanımında mevcut canonical KKD semantiğini değiştirmeden hızlı, erişilebilir ve minimum dokunuşlu seçim/atama akışı.
 
@@ -273,7 +384,7 @@ ChatGPT her yeni görevde veya `devam` talebinde:
 
 1. current GitHub `master`, `AGENTS.md`, açık production Issue/PR ve bu queue'yu okur;
 2. açık production Issue/PR varsa önce onu required gate'lerine kadar tamamlar;
-3. aksi halde Q01→Q26 içinde current GitHub'a göre tamamlanmamış ilk uygulanabilir maddeyi seçer;
+3. aksi halde `Q01 → Q01.5 → Q02 → ... → Q26` sırasıyla current GitHub'a göre tamamlanmamış ilk uygulanabilir maddeyi seçer;
 4. `DECISION GATE` maddesinde Fatih kararı yoksa implementation başlatmaz;
 5. CRITICAL etiketi taşıyan maddede exact Issue/allowlist/compatibility/manual gate olmadan değişiklik yaptırmaz;
 6. Fatih yeni sıra kararı verirse önce ROADMAP truth-sync yapılır, sonra production iş başlar;
@@ -284,7 +395,7 @@ Bu kural, ChatGPT'nin sohbet hafızasından veya eski SHA'lardan “sıradaki i�
 
 ## 6. İlk genel yayın sonrası / deferred backlog
 
-Aşağıdakiler Q01–Q26 release kuyruğunu bloke etmez, ancak owner kararıyla daha sonra aktive edilebilir:
+Aşağıdakiler `Q01 → Q01.5 → Q02...Q26` release kuyruğunu bloke etmez, ancak owner kararıyla daha sonra aktive edilebilir:
 
 - **DWG Viewer v1 / Issue #523:** `POST-RELEASE / DEFERRED`. DWG ve doküman viewer uzun vadeli ana ürün hedefidir; ilk genel yayın bağımlılığı değildir.
 - Q03'te V1 dışına alınırsa otomatik personel kodu.
@@ -307,4 +418,4 @@ Aşağıdakiler Q01–Q26 release kuyruğunu bloke etmez, ancak owner kararıyla
 
 Daha ayrıntılı V2 tarihçesi Git geçmişinde, `docs/v2/CSE_V2_SCOPE.md`, Issue #617 yorumları ve ilgili child Issue/PR'larda korunur. Eski roadmap fazları, Epic #97/#105/#127–#140, Orchestrator O0–O10, Bridge/Work Mode ve superseded UI programları current queue değildir.
 
-Tarihsel kayıtlar silinmiş sayılmaz; yalnız yürütme otoritesi bu dosyadaki Q01–Q26 kuyruğuna merkezileştirilmiştir.
+Tarihsel kayıtlar silinmiş sayılmaz; yalnız yürütme otoritesi bu dosyadaki `Q01 → Q01.5 → Q02...Q26` kuyruğuna merkezileştirilmiştir.
