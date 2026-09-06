@@ -41,7 +41,19 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
     });
     try {
       final detail = await widget.attendance.getPersonDetail(widget.memberId);
-      if (mounted) setState(() => _detail = detail);
+      if (mounted) {
+        setState(() {
+          _detail = detail;
+          // Keep retry identities until a fresh read confirms persistence.
+          _quickAddCommands.removeWhere(
+            (_, command) =>
+                detail.compliance.any((record) => record.id == command.id) ||
+                detail.archivedCompliance.any(
+                  (record) => record.id == command.id,
+                ),
+          );
+        });
+      }
     } on Object catch (error) {
       if (mounted) {
         setState(() => _error = _message(error, 'Personel detayı açılamadı.'));
@@ -273,7 +285,6 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
     setState(() => _quickAddBusy.add(type));
     try {
       await widget.attendance.saveComplianceRecord(command);
-      _quickAddCommands.remove(type);
       await _load();
     } on Object catch (error) {
       if (mounted) {

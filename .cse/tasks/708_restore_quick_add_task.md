@@ -33,3 +33,18 @@
 
 Stop on conflict, protected-path drift, stale/double restore acceptance, identity
 or isolation loss, backup incompatibility, or any required validation failure.
+
+## Review blocker correction — 2026-09-07
+
+- Reviewed head: `72a02c3ee34cfbf258fbd8574ddf58cc11466ba9`
+- Execution budget: 25 minutes
+- Retain the cached quick-add command after save returns; release it only when
+  refreshed person detail contains its exact record ID.
+- Refresh failures and reads without that ID must preserve record/event identity
+  for the next user retry. Keep application-layer idempotency unchanged.
+- Add a separate save-success/read-failure/retry widget regression; retain the
+  existing response-lost-after-save regression.
+- Validate focused widget/application tests, format, diff-check and the existing
+  nine-path/protected-drift boundary; analyzer only if materially necessary.
+- Push the correction to the same branch, truth-sync the PR body, keep Draft,
+  and leave exact-head re-review and Acceptance gates pending. No build/install.

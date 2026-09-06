@@ -524,6 +524,85 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'quick-add retry after failed refresh keeps persisted identities',
+    (tester) async {
+      final attendance = _Attendance(empty: true);
+      await _pump(tester, attendance);
+      await _tab(tester, 'İSG');
+      attendance.personDetailFailure = StateError('refresh failed after save');
+      final card = find.byKey(const Key('quick-compliance-employment_entry'));
+
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+      expect(attendance.calls, [
+        'read:person-1',
+        'save-compliance',
+        'read:person-1',
+      ]);
+      expect(find.text('Personel detayı açılamadı.'), findsOneWidget);
+      expect(attendance.complianceCommands, hasLength(1));
+      final first = attendance.complianceCommands.single;
+      expect(attendance.store.compliance, hasLength(1));
+      expect(attendance.store.compliance.single.id, first.id);
+      expect(attendance.store.complianceEvents, hasLength(1));
+      expect(attendance.store.complianceEvents.single.id, first.eventId);
+      expect(
+        find.descendant(of: card, matching: find.text('+ Ekle')),
+        findsOneWidget,
+      );
+
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+      expect(attendance.complianceCommands, hasLength(2));
+      expect(attendance.complianceCommands.last.id, first.id);
+      expect(attendance.complianceCommands.last.eventId, first.eventId);
+      expect(attendance.store.compliance, hasLength(1));
+      expect(attendance.store.compliance.single.id, first.id);
+      expect(attendance.store.complianceEvents, hasLength(1));
+      expect(attendance.store.complianceEvents.single.id, first.eventId);
+      expect(find.text('Personel detayı açılamadı.'), findsNothing);
+      expect(find.text('Kayıt var'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'quick-add keeps identities until refresh contains the exact ID',
+    (tester) async {
+      final attendance = _Attendance(empty: true);
+      await _pump(tester, attendance);
+      await _tab(tester, 'İSG');
+      final staleDetail = await attendance.store.getPersonDetail('person-1');
+      attendance.pending = Completer<WorkforcePersonDetail>();
+      final card = find.byKey(const Key('quick-compliance-employment_entry'));
+
+      await tester.tap(card);
+      await tester.pump();
+      expect(attendance.complianceCommands, hasLength(1));
+      expect(attendance.store.compliance, hasLength(1));
+      final first = attendance.complianceCommands.single;
+      attendance.pending!.complete(staleDetail);
+      await tester.pumpAndSettle();
+      attendance.pending = null;
+      expect(find.text('Personel detayı açılamadı.'), findsNothing);
+      expect(
+        find.descendant(of: card, matching: find.text('+ Ekle')),
+        findsOneWidget,
+      );
+
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+      expect(attendance.complianceCommands, hasLength(2));
+      expect(attendance.complianceCommands.last.id, first.id);
+      expect(attendance.complianceCommands.last.eventId, first.eventId);
+      expect(attendance.store.compliance, hasLength(1));
+      expect(attendance.store.complianceEvents, hasLength(1));
+      expect(find.text('Kayıt var'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('one and multiple quick-card states open exact detail', (
     tester,
   ) async {
@@ -1604,11 +1683,16 @@ class _Attendance implements AttendanceApplication {
   ArchiveComplianceRecordCommand? archiveCommand;
   RestoreComplianceRecordCommand? restoreCommand;
   Object? complianceFailureAfterSave;
+  Object? personDetailFailure;
   Completer<WorkforcePersonDetail>? pending;
 
   @override
   Future<WorkforcePersonDetail> getPersonDetail(String memberId) async {
     calls.add('read:$memberId');
+    if (personDetailFailure case final failure?) {
+      personDetailFailure = null;
+      throw failure;
+    }
     if (pending != null) return pending!.future;
     final detail = await store.getPersonDetail(memberId);
     return WorkforcePersonDetail(
