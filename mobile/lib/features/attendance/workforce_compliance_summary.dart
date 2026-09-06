@@ -18,7 +18,6 @@ class WorkforceComplianceSummary {
   static const scopeLabel =
       'Bu özet yalnız kaydedilen bilgileri gösterir; gereklilikler değerlendirilmedi.';
   static const duplicateLabel = 'Bu türde birden fazla aktif kayıt var';
-  static const noExpiryLabel = 'Son geçerlilik tarihi girilmemiş';
 
   final List<WorkforceComplianceCategory> categories;
 
@@ -54,12 +53,6 @@ class WorkforceComplianceSummary {
       if (exceptions > 0) 'İstisna olarak işaretlenmiş kayıt: $exceptions',
       if (categories.any((category) => category.hasMultipleRecords))
         'Aynı türde birden fazla aktif kayıt var',
-      if (active.any(
-        (record) =>
-            record.sourceStatus == ComplianceSourceStatus.valid &&
-            record.expiryDate == null,
-      ))
-        'Son geçerlilik tarihi girilmemiş kayıt var',
     ];
     return messages.isEmpty ? const ['Mevcut kayıtlarda uyarı yok'] : messages;
   }

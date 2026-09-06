@@ -585,9 +585,7 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
           if (item.issuedDate case final issued?)
             Text('Düzenlenme tarihi: $issued'),
           if (item.expiryDate case final expiry?)
-            Text('Son geçerlilik tarihi: $expiry')
-          else if (item.sourceStatus == ComplianceSourceStatus.valid)
-            const Text(WorkforceComplianceSummary.noExpiryLabel),
+            Text('Son geçerlilik tarihi: $expiry'),
           if (item.note case final note?) Text('Not: $note'),
           if (item.reason case final reason?) Text('Gerekçe: $reason'),
           const SizedBox(height: 8),

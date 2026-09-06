@@ -238,8 +238,8 @@ void main() {
       ComplianceSourceStatus.valid,
       ComplianceReadStatus.valid,
       null,
-      'Son geçerlilik tarihi girilmemiş kayıt var',
-      'Son geçerlilik tarihi girilmemiş',
+      'Mevcut kayıtlarda uyarı yok',
+      'Kullanıcı kaydı: geçerli olarak işaretlendi',
     ),
     (
       ComplianceSourceStatus.notApplicable,
@@ -271,7 +271,16 @@ void main() {
         );
         await _pump(tester, attendance);
         expect(find.text(scenario.$4), findsOneWidget);
-        expect(find.text('Mevcut kayıtlarda uyarı yok'), findsNothing);
+        expect(
+          find.text('Mevcut kayıtlarda uyarı yok'),
+          scenario.$4 == 'Mevcut kayıtlarda uyarı yok'
+              ? findsOneWidget
+              : findsNothing,
+        );
+        expect(
+          find.text('Son geçerlilik tarihi girilmemiş kayıt var'),
+          findsNothing,
+        );
         await _tab(tester, 'İSG');
         await _revealCompliance(tester, find.text(scenario.$5));
         expect(find.text(scenario.$5).hitTestable(), findsOneWidget);
@@ -292,9 +301,7 @@ void main() {
               of: find.byKey(const Key('compliance-single')),
               matching: find.text('Son geçerlilik tarihi girilmemiş'),
             ),
-            scenario.$1 == ComplianceSourceStatus.valid
-                ? findsOneWidget
-                : findsNothing,
+            findsNothing,
           );
         }
         expect(attendance.calls, ['read:person-1']);
@@ -343,7 +350,6 @@ void main() {
             'Uygulanamaz olarak işaretlenmiş kayıt: 1',
             'İstisna olarak işaretlenmiş kayıt: 1',
             'Aynı türde birden fazla aktif kayıt var',
-            'Son geçerlilik tarihi girilmemiş kayıt var',
           ]) {
             final field = find.text(signal);
             await tester.ensureVisible(field);
@@ -353,6 +359,10 @@ void main() {
           }
           expect(find.text('İSG TAM'), findsNothing);
           expect(find.text('İSG EKSİĞİ VAR'), findsNothing);
+          expect(
+            find.text('Son geçerlilik tarihi girilmemiş kayıt var'),
+            findsNothing,
+          );
           await _tab(tester, 'İSG');
           final add = find.byKey(const Key('add-compliance-record'));
           expect(tester.getSize(add).height, greaterThanOrEqualTo(48));
@@ -367,9 +377,7 @@ void main() {
               'Belge numarası: ${record.documentNumber}',
               'Düzenlenme tarihi: ${record.issuedDate}',
               if (record.expiryDate != null)
-                'Son geçerlilik tarihi: ${record.expiryDate}'
-              else if (record.sourceStatus == ComplianceSourceStatus.valid)
-                'Son geçerlilik tarihi girilmemiş',
+                'Son geçerlilik tarihi: ${record.expiryDate}',
               'Not: ${record.note}',
               'Gerekçe: ${record.reason}',
             ]) {
@@ -380,8 +388,7 @@ void main() {
               await _revealCompliance(tester, field);
               expect(field.hitTestable(), findsOneWidget);
             }
-            if (record.expiryDate == null &&
-                record.sourceStatus != ComplianceSourceStatus.valid) {
+            if (record.expiryDate == null) {
               expect(
                 find.descendant(
                   of: card,
@@ -613,6 +620,52 @@ void main() {
       );
     }
   }
+
+  testWidgets(
+    'compliance valid without details is neutral in profile and card',
+    (tester) async {
+      final record = _complianceRecord('without-details', emptyDetails: true);
+      final attendance = _Attendance(compliance: [record]);
+      await _pump(tester, attendance, scale: 2);
+      expect(find.text('Mevcut kayıtlarda uyarı yok'), findsOneWidget);
+      expect(find.text('Kayıt yok / değerlendirilmedi'), findsNothing);
+      expect(
+        find.text('Son geçerlilik tarihi girilmemiş kayıt var'),
+        findsNothing,
+      );
+      expect(find.text('İSG TAM'), findsNothing);
+      expect(find.text('İSG EKSİĞİ VAR'), findsNothing);
+      await _tab(tester, 'İSG');
+      final card = find.byKey(const Key('compliance-without-details'));
+      await _revealCompliance(tester, card);
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.text('Kullanıcı kaydı: geçerli olarak işaretlendi'),
+        ),
+        findsOneWidget,
+      );
+      for (final label in [
+        'Son geçerlilik tarihi girilmemiş',
+        'Belge numarası:',
+        'Düzenlenme tarihi:',
+        'Son geçerlilik tarihi:',
+        'Not:',
+        'Gerekçe:',
+        'Süresi geçmiş',
+        'Süresi yaklaşıyor',
+      ]) {
+        expect(
+          find.descendant(of: card, matching: find.textContaining(label)),
+          findsNothing,
+        );
+      }
+      expect(attendance.store.compliance.single, same(record));
+      expect(attendance.calls, ['read:person-1']);
+      expect(attendance.complianceCommands, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('compliance dialog common path saves without opening details', (
     tester,
@@ -872,17 +925,18 @@ WorkforceComplianceRecord _complianceRecord(
   ComplianceReadStatus read = ComplianceReadStatus.valid,
   String? expiry,
   int revision = 1,
+  bool emptyDetails = false,
 }) => WorkforceComplianceRecord(
   id: id,
   memberId: 'person-1',
   documentType: type,
-  documentNumber: 'BELGE-$id',
-  issuedDate: '2026-07-01',
+  documentNumber: emptyDetails ? null : 'BELGE-$id',
+  issuedDate: emptyDetails ? null : '2026-07-01',
   expiryDate: expiry,
   sourceStatus: source,
   readStatus: read,
-  note: 'Kayıt notu $id',
-  reason: 'Kullanıcının gerekçesi $id',
+  note: emptyDetails ? null : 'Kayıt notu $id',
+  reason: emptyDetails ? null : 'Kullanıcının gerekçesi $id',
   revision: revision,
   createdAt: '2026-07-01T08:00:00Z',
   updatedAt: '2026-07-01T08:00:00Z',

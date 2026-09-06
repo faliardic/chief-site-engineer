@@ -24,44 +24,57 @@ void main() {
     },
   );
 
-  test(
-    'missing expired expiring and no-expiry are independent recorded signals',
-    () {
-      final cases = [
-        (
-          _record(
-            'missing',
-            source: ComplianceSourceStatus.missing,
-            read: ComplianceReadStatus.missing,
-          ),
-          'Eksik olarak işaretlenmiş kayıt var',
+  test('missing expired expiring are independent recorded signals', () {
+    final cases = [
+      (
+        _record(
+          'missing',
+          source: ComplianceSourceStatus.missing,
+          read: ComplianceReadStatus.missing,
         ),
-        (
-          _record(
-            'expired',
-            read: ComplianceReadStatus.expired,
-            expiry: '2026-09-01',
-          ),
-          'Süresi geçmiş kayıt var',
+        'Eksik olarak işaretlenmiş kayıt var',
+      ),
+      (
+        _record(
+          'expired',
+          read: ComplianceReadStatus.expired,
+          expiry: '2026-09-01',
         ),
-        (
-          _record(
-            'expiring',
-            read: ComplianceReadStatus.expiring,
-            expiry: '2026-09-30',
-          ),
-          'Süresi yaklaşan kayıt var',
+        'Süresi geçmiş kayıt var',
+      ),
+      (
+        _record(
+          'expiring',
+          read: ComplianceReadStatus.expiring,
+          expiry: '2026-09-30',
         ),
-        (_record('undated'), 'Son geçerlilik tarihi girilmemiş kayıt var'),
-      ];
-      for (final value in cases) {
-        expect(WorkforceComplianceSummary([value.$1]).signals, [value.$2]);
-      }
-      final mixed = WorkforceComplianceSummary(cases.map((value) => value.$1));
-      expect(mixed.signals, containsAll(cases.map((value) => value.$2)));
-      expect(mixed.signals, isNot(contains('Mevcut kayıtlarda uyarı yok')));
-    },
-  );
+        'Süresi yaklaşan kayıt var',
+      ),
+    ];
+    for (final value in cases) {
+      expect(WorkforceComplianceSummary([value.$1]).signals, [value.$2]);
+    }
+    final mixed = WorkforceComplianceSummary(cases.map((value) => value.$1));
+    expect(mixed.signals, containsAll(cases.map((value) => value.$2)));
+    expect(mixed.signals, isNot(contains('Mevcut kayıtlarda uyarı yok')));
+  });
+
+  test('valid no-expiry and empty details are neutral recorded facts', () {
+    for (final record in [
+      _record('undated'),
+      _record('without-details', emptyDetails: true),
+    ]) {
+      final summary = WorkforceComplianceSummary([record]);
+      expect(record.expiryDate, isNull);
+      expect(summary.signals, ['Mevcut kayıtlarda uyarı yok']);
+      expect(summary.categories.first.records, [record]);
+      expect(WorkforceComplianceSummary.dateWarning(record.readStatus), isNull);
+      expect(
+        WorkforceComplianceSummary.sourceLabel(record.sourceStatus),
+        'Kullanıcı kaydı: geçerli olarak işaretlendi',
+      );
+    }
+  });
 
   test(
     'source not-applicable and exception remain distinct despite shared read status',
@@ -202,16 +215,17 @@ WorkforceComplianceRecord _record(
   String? expiry,
   String? reason,
   String? archivedAt,
+  bool emptyDetails = false,
 }) => WorkforceComplianceRecord(
   id: id,
   memberId: 'person-1',
   documentType: ComplianceDocumentType.employmentEntry,
-  documentNumber: 'Belge $id',
-  issuedDate: '2026-01-01',
+  documentNumber: emptyDetails ? null : 'Belge $id',
+  issuedDate: emptyDetails ? null : '2026-01-01',
   expiryDate: expiry,
   sourceStatus: source,
   readStatus: read,
-  note: 'Not $id',
+  note: emptyDetails ? null : 'Not $id',
   reason: reason,
   revision: 7,
   createdAt: '2026-01-01T08:00:00Z',
