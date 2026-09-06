@@ -752,3 +752,36 @@ Standing owner kuralı gereği Q01–Q26'nın tamamı yeniden değerlendirildi:
 ### ROADMAP etkisi
 
 `VAR` — İş Gücü/Sicil Q'su Günlük Puantaj direct-list/flat-roster/save-complete kapsamıyla genişletildi ve Q04'e yükseltildi; Proje Profili Q05'e kaydı; Q03/Q05/Q07/Q22/Q23 cross-reference'ları yeni sıraya taşındı. Günlük Puantaj primary bulk butonları kaldırılırken bulk capability secondary/draft olarak korunur; mandatory Firma/Ekip roster navigation kaldırılır; save/complete transaction sınırı gerekiyorsa ayrı CRITICAL authority olmadan genişletilmez.
+
+## 15. REVIEW-009 — Q01 owner Acceptance FAIL ve restore/quick-add CRITICAL correction
+
+**Tarih:** 2026-09-07
+**Amaç:** PR #715 exact Acceptance üzerindeki owner bulgusunu Issue #708'in güncel restore + hızlı belge contract'ıyla truth-sync etmek ve Q01–Q26 sırasını yeniden değerlendirmek.
+**Değerlendirilen Q'lar:** Güncel Q01–Q26 kuyruğunun tamamı; kapsam değişikliği yalnız Q01.
+
+### Owner Acceptance bulgusu ve supersession
+
+- Fatih, exact PR #715 Acceptance build'inde `Geçmiş / Arşiv` içinde geri yükleme bulunmamasını ve dört temel İSG belgesinin hızlı eklenememesini ürün borcu olarak bildirdi; Acceptance sonucu **FAIL** oldu.
+- Eski Q01 `edit/restore yok` bitiş sınırı owner kararıyla **SUPERSEDED** durumundadır. Read-only arşiv ayrımı, kişi/proje isolation ve insan-okunur event görünürlüğü korunur; fakat artık Q01'in tamamlanması için güvenli restore ve explicit quick-add mutation'ları gerekir.
+- Q01 bu nedenle **CRITICAL correction**'dır: archived exact record aynı stable ID ile yeniden aktif edilir, revision artar ve aynı transaction'da append-only `compliance.reopened` event'i yazılır. Önceki lifecycle geçmişi silinmez veya yeniden yazılmaz.
+
+### Güncel Q01 ürün ve güvenlik contract'ı
+
+- İlk İSG görünümünde `İşe giriş kaydı`, `Sağlık raporu`, `Temel İSG eğitimi` ve `Mesleki yeterlilik` için dört büyük quick-add kart bulunur.
+- `0` aktif kayıtta explicit `+ Ekle` minimum kayıt oluşturur; `1` aktif kayıtta karta dokunmak exact detail/edit'i açar; `2+` aktif aynı tür kayıtta `N kayıt` gösterilip deterministic seçim yapılır. Latest-wins, merge veya dedupe yoktur.
+- Belge numarası, düzenlenme/son tarih, source status, gerekçe ve not detail-on-demand olarak sonradan aynı stable kayıtta tamamlanabilir; hızlı ekleme resmi doğrulama/uygunluk iddiası üretmez.
+- Restore yalnız archived exact kayda uygulanır; yeni kayıt/kopya üretmez, `archived_at` değerini temizler, revision'ı `+1` artırır ve `compliance.reopened` olayını mevcut sequence'in sonuna ekler.
+- Aynı türden başka aktif kayıt restore'u engellemez. Stale/double restore fail-closed kalır ve duplicate event üretemez; okuma veya ekran açılışı mutation oluşturmaz.
+- PR #715 Draft kalır. Yeni focused validation, yeni bağımsız review ve yeni exact Acceptance build üzerinde Fatih PASS olmadan Ready/merge yapılamaz.
+
+### Tam Q01–Q26 yeniden değerlendirmesi
+
+Standing owner kuralıyla Q01–Q26'nın tamamı yeniden değerlendirildi. **Sıra değişmedi.** Q01, açık production blocker olarak ilk sırada kaldı; correction ve yeni gate'ler kapanmadan Q02 başlamaz. Q02–Q26'nın kapsamı, numarası ve göreli sırası bu review ile değiştirilmedi.
+
+### Önceki değerlendirmelerle ilişki
+
+`REVIEW-008` ve önceki kayıtların Q02–Q26 kapsam/sıra kararları **CURRENT** kalır. Q01'i read-only/no-restore bitişiyle tanımlayan önceki kısımlar bu owner kararı ve Issue #708'in güncel contract'ıyla **SUPERSEDED** durumundadır.
+
+### ROADMAP etkisi
+
+`VAR, SIRA DEĞİŞMEDİ` — Q01 başlığı ve bitiş contract'ı quick-add + detail-on-demand + same-record restore yönüne truth-sync edildi; Q01 `ACTIVE — owner Acceptance FAIL / CRITICAL correction required` olarak açık production blocker kaldı. Q02–Q26 değişmedi.
