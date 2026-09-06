@@ -14,6 +14,7 @@ class FakeAttendanceApplication implements AttendanceApplication {
   List<Subcontractor> subcontractors = [];
   List<WorkforceTeam> teams = [];
   List<WorkforceComplianceRecord> compliance = [];
+  List<WorkforceComplianceEvent> complianceEvents = [];
   List<WorkforcePpeAssignment> ppeAssignments = [];
   AttendanceDayDetail? detail;
   AttendanceReminderSetting? setting;
@@ -274,6 +275,21 @@ class FakeAttendanceApplication implements AttendanceApplication {
     return WorkforcePersonDetail(
       member: member,
       compliance: memberCompliance,
+      archivedCompliance: compliance
+          .where((item) => item.memberId == memberId && item.archivedAt != null)
+          .toList(),
+      complianceEvents: complianceEvents
+          .where(
+            (event) =>
+                event.memberId == memberId &&
+                event.projectId == member.projectId &&
+                compliance.any(
+                  (record) =>
+                      record.id == event.recordId &&
+                      record.memberId == memberId,
+                ),
+          )
+          .toList(),
       ppeAssignments: memberPpe,
       missingComplianceCount: memberCompliance
           .where((item) => item.readStatus == ComplianceReadStatus.missing)
@@ -297,6 +313,17 @@ class FakeAttendanceApplication implements AttendanceApplication {
   Future<WorkforceComplianceRecord> saveComplianceRecord(
     SaveComplianceRecordCommand command,
   ) async {
+    final existingIndex = compliance.indexWhere(
+      (item) => item.id == command.id,
+    );
+    if (existingIndex >= 0 && command.expectedRevision == 0) {
+      return compliance[existingIndex];
+    }
+    if (existingIndex >= 0 &&
+        compliance[existingIndex].revision != command.expectedRevision) {
+      throw StateError('stale compliance revision');
+    }
+    final current = existingIndex >= 0 ? compliance[existingIndex] : null;
     final value = WorkforceComplianceRecord(
       id: command.id,
       memberId: command.memberId,
@@ -313,11 +340,34 @@ class FakeAttendanceApplication implements AttendanceApplication {
       note: command.note,
       reason: command.reason,
       revision: command.expectedRevision + 1,
-      createdAt: '2026-07-19T08:00:00Z',
+      createdAt: current?.createdAt ?? '2026-07-19T08:00:00Z',
       updatedAt: '2026-07-19T08:01:00Z',
       archivedAt: null,
     );
     compliance = [...compliance.where((item) => item.id != value.id), value];
+    final member = members.firstWhere((item) => item.id == command.memberId);
+    complianceEvents = [
+      ...complianceEvents,
+      WorkforceComplianceEvent(
+        id: command.eventId,
+        recordId: command.id,
+        memberId: command.memberId,
+        projectId: member.projectId,
+        sequence:
+            complianceEvents
+                .where((event) => event.recordId == command.id)
+                .fold<int>(
+                  0,
+                  (value, event) =>
+                      event.sequence > value ? event.sequence : value,
+                ) +
+            1,
+        eventType: current == null
+            ? 'compliance.created'
+            : 'compliance.updated',
+        occurredAt: '2026-07-19T08:01:00Z',
+      ),
+    ];
     return value;
   }
 
@@ -343,6 +393,60 @@ class FakeAttendanceApplication implements AttendanceApplication {
       archivedAt: '2026-07-19T08:01:00Z',
     );
     compliance = [...compliance.where((item) => item.id != value.id), value];
+    return value;
+  }
+
+  @override
+  Future<WorkforceComplianceRecord> restoreComplianceRecord(
+    RestoreComplianceRecordCommand command,
+  ) async {
+    final index = compliance.indexWhere((item) => item.id == command.id);
+    if (index < 0) throw StateError('compliance record missing');
+    final current = compliance[index];
+    final member = members.firstWhere((item) => item.id == current.memberId);
+    if (current.memberId != command.memberId ||
+        member.projectId != command.projectId ||
+        current.revision != command.expectedRevision ||
+        current.archivedAt == null) {
+      throw StateError('invalid compliance restore');
+    }
+    final value = WorkforceComplianceRecord(
+      id: current.id,
+      memberId: current.memberId,
+      documentType: current.documentType,
+      documentNumber: current.documentNumber,
+      issuedDate: current.issuedDate,
+      expiryDate: current.expiryDate,
+      sourceStatus: current.sourceStatus,
+      readStatus: current.readStatus,
+      note: current.note,
+      reason: current.reason,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-07-19T08:02:00Z',
+      archivedAt: null,
+    );
+    compliance = [...compliance]..[index] = value;
+    complianceEvents = [
+      ...complianceEvents,
+      WorkforceComplianceEvent(
+        id: command.eventId,
+        recordId: current.id,
+        memberId: current.memberId,
+        projectId: member.projectId,
+        sequence:
+            complianceEvents
+                .where((event) => event.recordId == current.id)
+                .fold<int>(
+                  0,
+                  (value, event) =>
+                      event.sequence > value ? event.sequence : value,
+                ) +
+            1,
+        eventType: 'compliance.reopened',
+        occurredAt: '2026-07-19T08:02:00Z',
+      ),
+    ];
     return value;
   }
 

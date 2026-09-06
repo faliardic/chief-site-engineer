@@ -24,6 +24,9 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
   WorkforcePersonDetail? _detail;
   bool _loading = true;
   String? _error;
+  final Map<ComplianceDocumentType, SaveComplianceRecordCommand>
+  _quickAddCommands = {};
+  final Set<ComplianceDocumentType> _quickAddBusy = {};
 
   @override
   void initState() {
@@ -38,7 +41,19 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
     });
     try {
       final detail = await widget.attendance.getPersonDetail(widget.memberId);
-      if (mounted) setState(() => _detail = detail);
+      if (mounted) {
+        setState(() {
+          _detail = detail;
+          // Keep retry identities until a fresh read confirms persistence.
+          _quickAddCommands.removeWhere(
+            (_, command) =>
+                detail.compliance.any((record) => record.id == command.id) ||
+                detail.archivedCompliance.any(
+                  (record) => record.id == command.id,
+                ),
+          );
+        });
+      }
     } on Object catch (error) {
       if (mounted) {
         setState(() => _error = _message(error, 'Personel detayı açılamadı.'));
@@ -48,13 +63,19 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
     }
   }
 
-  Future<void> _saveCompliance([WorkforceComplianceRecord? current]) async {
+  Future<void> _saveCompliance([
+    WorkforceComplianceRecord? current,
+    ComplianceDocumentType? initialType,
+  ]) async {
     final number = TextEditingController(text: current?.documentNumber);
     final issued = TextEditingController(text: current?.issuedDate);
     final expiry = TextEditingController(text: current?.expiryDate);
     final note = TextEditingController(text: current?.note);
     final reason = TextEditingController(text: current?.reason);
-    var type = current?.documentType ?? ComplianceDocumentType.employmentEntry;
+    var type =
+        current?.documentType ??
+        initialType ??
+        ComplianceDocumentType.employmentEntry;
     var status = current?.sourceStatus ?? ComplianceSourceStatus.valid;
     var detailsExpanded =
         status == ComplianceSourceStatus.notApplicable ||
@@ -235,6 +256,86 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
         setState(() => _error = _message(error, 'İSG belgesi arşivlenemedi.'));
       }
     }
+  }
+
+  Future<void> _restoreCompliance(WorkforceComplianceRecord current) =>
+      widget.attendance.restoreComplianceRecord(
+        RestoreComplianceRecordCommand(
+          id: current.id,
+          eventId: RecordId.randomUuid(),
+          memberId: widget.memberId,
+          projectId: _detail!.member.projectId,
+          expectedRevision: current.revision,
+        ),
+      );
+
+  Future<void> _quickAddCompliance(ComplianceDocumentType type) async {
+    if (_quickAddBusy.contains(type)) return;
+    final command = _quickAddCommands.putIfAbsent(
+      type,
+      () => SaveComplianceRecordCommand(
+        id: RecordId.randomUuid(),
+        eventId: RecordId.randomUuid(),
+        memberId: widget.memberId,
+        expectedRevision: 0,
+        documentType: type,
+        sourceStatus: ComplianceSourceStatus.valid,
+      ),
+    );
+    setState(() => _quickAddBusy.add(type));
+    try {
+      await widget.attendance.saveComplianceRecord(command);
+      await _load();
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _error = _message(error, 'İSG belgesi eklenemedi.'));
+      }
+    } finally {
+      if (mounted) setState(() => _quickAddBusy.remove(type));
+    }
+  }
+
+  Future<void> _openQuickCompliance(
+    ComplianceDocumentType type,
+    List<WorkforceComplianceRecord> records,
+  ) async {
+    if (records.isEmpty) {
+      await _quickAddCompliance(type);
+      return;
+    }
+    if (records.length == 1) {
+      await _saveCompliance(records.single);
+      return;
+    }
+    final ordered = [...records]..sort((a, b) => a.id.compareTo(b.id));
+    final selected = await showModalBottomSheet<WorkforceComplianceRecord>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          children: [
+            Text(type.label, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            for (final record in ordered)
+              ListTile(
+                key: Key('quick-compliance-select-${record.id}'),
+                minTileHeight: 48,
+                onTap: () => Navigator.pop(context, record),
+                title: Text(
+                  record.documentNumber ?? 'Numara daha sonra eklenebilir',
+                ),
+                subtitle: Text(
+                  WorkforceComplianceSummary.sourceLabel(record.sourceStatus),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null && mounted) await _saveCompliance(selected);
   }
 
   Future<void> _savePpe([WorkforcePpeAssignment? current]) async {
@@ -519,12 +620,106 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
     key: const PageStorageKey('workforce-person-compliance'),
     padding: const EdgeInsets.all(12),
     children: [
-      FilledButton.icon(
+      Text(
+        'Temel İSG belgeleri',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      const SizedBox(height: 8),
+      for (final type in _quickComplianceTypes) ...[
+        Builder(
+          builder: (context) {
+            final records = detail.compliance
+                .where((record) => record.documentType == type)
+                .toList(growable: false);
+            final status = switch (records.length) {
+              0 => '+ Ekle',
+              1 => 'Kayıt var',
+              final count => '$count kayıt',
+            };
+            final busy = _quickAddBusy.contains(type);
+            return Semantics(
+              button: true,
+              label: '${type.label}: $status',
+              enabled: !busy,
+              focusable: true,
+              onTap: busy ? null : () => _openQuickCompliance(type, records),
+              excludeSemantics: true,
+              child: Card(
+                child: InkWell(
+                  key: Key('quick-compliance-${type.storageValue}'),
+                  onTap: busy
+                      ? null
+                      : () => _openQuickCompliance(type, records),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 72),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.description_outlined),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  type.label,
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (busy)
+                            const Align(
+                              alignment: Alignment.centerRight,
+                              child: SizedBox.square(
+                                dimension: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          else
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(status),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 4),
+      ],
+      OutlinedButton.icon(
         key: const Key('add-compliance-record'),
-        style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
-        onPressed: _saveCompliance,
-        icon: const Icon(Icons.post_add_outlined),
-        label: const Text('İSG kaydı ekle'),
+        style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
+        onPressed: () => _saveCompliance(null, ComplianceDocumentType.other),
+        icon: const Icon(Icons.add),
+        label: const Text('Diğer İSG kaydı ekle'),
+      ),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        key: const Key('open-compliance-history'),
+        style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
+        onPressed: () async {
+          final changed = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (_) => _ComplianceHistoryPage(
+                detail: detail,
+                onRestore: _restoreCompliance,
+              ),
+            ),
+          );
+          if (changed == true && mounted) await _load();
+        },
+        icon: const Icon(Icons.history),
+        label: const Text('Geçmiş / Arşiv'),
       ),
       const SizedBox(height: 8),
       const Text(
@@ -642,6 +837,207 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
   );
 }
 
+class _ComplianceHistoryPage extends StatelessWidget {
+  const _ComplianceHistoryPage({required this.detail, required this.onRestore});
+
+  final WorkforcePersonDetail detail;
+  final Future<void> Function(WorkforceComplianceRecord record) onRestore;
+
+  List<WorkforceComplianceEvent> _events(WorkforceComplianceRecord record) =>
+      detail.complianceEvents
+          .where(
+            (event) =>
+                event.recordId == record.id &&
+                event.memberId == detail.member.id &&
+                event.projectId == detail.member.projectId,
+          )
+          .toList(growable: false);
+
+  @override
+  Widget build(BuildContext context) {
+    final archived = detail.archivedCompliance.where(
+      (record) =>
+          record.memberId == detail.member.id && record.archivedAt != null,
+    );
+    final activeWithEvents = detail.compliance.where(
+      (record) =>
+          record.memberId == detail.member.id &&
+          record.archivedAt == null &&
+          _events(record).isNotEmpty,
+    );
+    return Scaffold(
+      key: const Key('compliance-history-page'),
+      appBar: AppBar(title: const Text('İSG geçmişi')),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          key: const PageStorageKey('compliance-history-scroll'),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Geçmiş / Arşiv',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              Text(detail.member.fullName),
+              const SizedBox(height: 8),
+              const Text(
+                'Geçmişi okumak kayıtları değiştirmez. Arşivlenmiş kayıtlar aktif İSG özetine katılmaz. '
+                'Belge bilgileri son saklanan değerlerdir; işlemler önceki alan değerlerini göstermez.',
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Arşivlenmiş kayıtlar',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (archived.isEmpty) const Text('Arşivlenmiş İSG kaydı yok.'),
+              for (final record in archived)
+                Card(
+                  key: Key('archived-compliance-${record.id}'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          record.documentType.label,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const Text('Arşivlenmiş kayıt'),
+                        Text(
+                          WorkforceComplianceSummary.sourceLabel(
+                            record.sourceStatus,
+                          ),
+                        ),
+                        if (record.documentNumber case final value?)
+                          Text('Belge numarası: $value'),
+                        if (record.issuedDate case final value?)
+                          Text('Düzenlenme tarihi: $value'),
+                        if (record.expiryDate case final value?)
+                          Text('Son geçerlilik tarihi: $value'),
+                        if (record.note case final value?) Text('Not: $value'),
+                        if (record.reason case final value?)
+                          Text('Gerekçe: $value'),
+                        if (record.createdAt.isNotEmpty)
+                          Text('Oluşturulma zamanı: ${record.createdAt}'),
+                        if (record.updatedAt.isNotEmpty)
+                          Text('Son güncelleme zamanı: ${record.updatedAt}'),
+                        Text('Arşivlenme zamanı: ${record.archivedAt}'),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          key: Key('restore-compliance-${record.id}'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                          ),
+                          onPressed: () => _confirmRestore(context, record),
+                          icon: const Icon(Icons.restore),
+                          label: const Text('Geri yükle'),
+                        ),
+                        _eventHistory(record),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Text(
+                'Aktif kayıtların işlem geçmişi',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (activeWithEvents.isEmpty)
+                const Text('Aktif kayıtlara ait işlem geçmişi yok.'),
+              for (final record in activeWithEvents)
+                Card(
+                  key: Key('active-compliance-history-${record.id}'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(record.documentType.label),
+                        if (record.documentNumber case final value?)
+                          Text('Belge numarası: $value'),
+                        _eventHistory(record),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _eventHistory(WorkforceComplianceRecord record) {
+    final events = _events(record);
+    return ExpansionTile(
+      key: PageStorageKey('compliance-events-${record.id}'),
+      title: const Text('Kayıt işlemleri'),
+      minTileHeight: 48,
+      expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('İşlemler her kayıt için saklanan sıra ile gösterilir.'),
+        if (events.isEmpty) const Text('Kaydedilmiş işlem yok.'),
+        for (final event in events)
+          Padding(
+            key: Key('compliance-event-${event.id}'),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(switch (event.eventType) {
+                  'compliance.created' => 'İSG kaydı oluşturuldu',
+                  'compliance.updated' => 'İSG kaydı güncellendi',
+                  'compliance.archived' => 'İSG kaydı arşivlendi',
+                  'compliance.reopened' => 'İSG kaydı geri yüklendi',
+                  _ => 'Kaydedilmiş İSG işlemi',
+                }),
+                Text('İşlem sırası: ${event.sequence}'),
+                Text('Kaydedilen zaman: ${event.occurredAt}'),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _confirmRestore(
+    BuildContext context,
+    WorkforceComplianceRecord record,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('İSG kaydını geri yükle'),
+        content: const Text('Bu kayıt aktif İSG kayıtlarına geri dönecek.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Geri yükle'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await onRestore(record);
+      if (context.mounted) Navigator.of(context).pop(true);
+    } on Object catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_message(error, 'İSG kaydı geri yüklenemedi.')),
+          ),
+        );
+      }
+    }
+  }
+}
+
 class _Summary extends StatelessWidget {
   const _Summary({required this.detail});
   final WorkforcePersonDetail detail;
@@ -742,6 +1138,13 @@ class _Summary extends StatelessWidget {
 }
 
 const _gap = SizedBox(height: 10);
+
+const _quickComplianceTypes = [
+  ComplianceDocumentType.employmentEntry,
+  ComplianceDocumentType.healthReport,
+  ComplianceDocumentType.basicSafetyTraining,
+  ComplianceDocumentType.vocationalCertificate,
+];
 
 TextField _field(
   TextEditingController controller,

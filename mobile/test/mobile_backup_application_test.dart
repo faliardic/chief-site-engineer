@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/application/construction_schedule_date_engine.dart';
 import 'package:chief_site_engineer/application/construction_schedule_snapshot_repository.dart';
@@ -13,6 +14,7 @@ import 'package:chief_site_engineer/application/mobile_backup_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/construction_corpus_models.dart';
 import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
@@ -70,6 +72,182 @@ void main() {
       await temporaryRoot.delete(recursive: true);
     }
   });
+
+  test(
+    '20B compliance history backup round-trip preserves records and lifecycle events',
+    () async {
+      const project = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+      const person = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+      String uuid(int n) =>
+          '44444444-4444-4444-8444-${n.toString().padLeft(12, '0')}';
+      final agenda = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      final attendance = SqliteAttendanceApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+        agenda: agenda,
+      );
+      await agenda.createProject(
+        const CreateProjectCommand(id: project, name: 'Sentetik İSG'),
+      );
+      await attendance.createMember(
+        const CreateWorkforceMemberCommand(
+          id: person,
+          projectId: project,
+          fullName: 'Sentetik kişi',
+          teamName: 'A',
+          roleName: 'Usta',
+        ),
+      );
+      for (var i = 1; i <= 4; i++) {
+        await attendance.saveComplianceRecord(
+          SaveComplianceRecordCommand(
+            id: uuid(i),
+            eventId: uuid(100 + i),
+            memberId: person,
+            expectedRevision: 0,
+            documentType: ComplianceDocumentType.healthReport,
+            sourceStatus: i <= 2
+                ? ComplianceSourceStatus.valid
+                : i == 3
+                ? ComplianceSourceStatus.notApplicable
+                : ComplianceSourceStatus.exception,
+            documentNumber: 'Belge $i',
+            issuedDate: '2026-07-01',
+            expiryDate: i == 1 ? '2026-07-25' : null,
+            note: 'Not $i',
+            reason: 'Gerekçe $i',
+          ),
+        );
+      }
+      await attendance.saveComplianceRecord(
+        SaveComplianceRecordCommand(
+          id: uuid(3),
+          eventId: uuid(203),
+          memberId: person,
+          expectedRevision: 1,
+          documentType: ComplianceDocumentType.healthReport,
+          sourceStatus: ComplianceSourceStatus.notApplicable,
+          documentNumber: 'Güncel belge',
+          issuedDate: '2026-07-01',
+          note: 'Korunan not',
+          reason: 'Korunan gerekçe',
+        ),
+      );
+      for (final i in [3, 4]) {
+        await attendance.archiveComplianceRecord(
+          ArchiveComplianceRecordCommand(
+            id: uuid(i),
+            eventId: uuid(300 + i),
+            expectedRevision: i == 3 ? 2 : 1,
+          ),
+        );
+      }
+      final restoredBeforeBackup = await attendance.restoreComplianceRecord(
+        RestoreComplianceRecordCommand(
+          id: uuid(3),
+          eventId: uuid(403),
+          memberId: person,
+          projectId: project,
+          expectedRevision: 3,
+        ),
+      );
+      expect(restoredBeforeBackup.id, uuid(3));
+      expect(restoredBeforeBackup.revision, 4);
+      expect(restoredBeforeBackup.archivedAt, isNull);
+      Future<List<List<Map<String, Object?>>>> snapshot() async {
+        final raw = await _openRaw(directories);
+        try {
+          expect(await raw.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+          expect(
+            (await raw.rawQuery('PRAGMA integrity_check')).single.values.single,
+            'ok',
+          );
+          return [
+            for (final table in [
+              'workforce_members',
+              'workforce_compliance_records',
+              'workforce_events',
+            ])
+              await raw.query(table, orderBy: 'id'),
+          ];
+        } finally {
+          await raw.close();
+        }
+      }
+
+      final before = await snapshot();
+      final backup = _application(directories, gateway: gateway);
+      final created = await backup.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      // Alter only this synthetic fixture through the unchanged public command.
+      await attendance.archiveComplianceRecord(
+        ArchiveComplianceRecordCommand(
+          id: uuid(1),
+          eventId: uuid(401),
+          expectedRevision: 1,
+        ),
+      );
+      expect(await snapshot(), isNot(before));
+      final preflight = await backup.preflightBackup(
+        created.package,
+        _password,
+      );
+      await backup.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: created.package,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+      expect(await snapshot(), before);
+      final detail = await attendance.getPersonDetail(person);
+      expect(detail.compliance.map((r) => r.id).toSet(), {
+        uuid(1),
+        uuid(2),
+        uuid(3),
+      });
+      expect(detail.archivedCompliance.map((r) => r.id).toSet(), {uuid(4)});
+      expect(detail.validComplianceCount, 1);
+      expect(detail.expiringComplianceCount, 1);
+      expect(detail.expiredComplianceCount, 0);
+      expect(detail.missingComplianceCount, 0);
+      final restored = detail.compliance.firstWhere((r) => r.id == uuid(3));
+      expect(restored.revision, 4);
+      expect(restored.archivedAt, isNull);
+      expect(restored.reason, 'Korunan gerekçe');
+      expect(restored.note, 'Korunan not');
+      expect(restored.documentNumber, 'Güncel belge');
+      expect(restored.sourceStatus, ComplianceSourceStatus.notApplicable);
+      expect(
+        detail.complianceEvents
+            .where((e) => e.recordId == uuid(3))
+            .map((e) => e.sequence),
+        [1, 2, 3, 4],
+      );
+      expect(
+        detail.complianceEvents
+            .where((e) => e.recordId == uuid(3))
+            .map((e) => e.eventType),
+        [
+          'compliance.created',
+          'compliance.updated',
+          'compliance.archived',
+          'compliance.reopened',
+        ],
+      );
+      expect(detail.complianceEvents, hasLength(8));
+      expect(await snapshot(), before);
+    },
+  );
 
   test('backup creation reports real stages in pipeline order', () async {
     final application = _application(directories, gateway: gateway);
