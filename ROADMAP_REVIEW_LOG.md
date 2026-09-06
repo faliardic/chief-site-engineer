@@ -389,3 +389,70 @@ Küçük görsel kusurlar ve yardımcı kolaylıklar post-release'e kalabilir. K
 ### ROADMAP etkisi
 
 `VAR` — `ROADMAP.md` tam liste yeniden değerlendirilerek Q01–Q26 biçiminde baştan numaralandırılır; yeni Hatırlatıcı Q02 eklenir, Proje Profili Q03 olur, notification `Ertele` Q02'ye birleştirilir, tamamlanmış Inventory release-QA ayrı sıra maddesi olmaktan çıkarılıp Q21/Q23'e taşınır ve sonraki Q'lar yeni öncelik sırasına göre yeniden numaralandırılır.
+
+## 10. REVIEW-004 — Ajanda/Takvim geri bildirimi ve tam kuyruk yeniden sıralaması
+
+**Tarih:** 2026-09-06  
+**Amaç:** Owner'ın Ajanda — Takvim kullanım geri bildirimini pre-release kuyruğa almak, tüm current Q listesini yeniden değerlendirmek ve yeni sıralamayı kanonikleştirmek.  
+**Değerlendirilen Q'lar:** Güncel pre-release kuyruğun tamamı.
+
+### Current GitHub gerçeği
+
+- Toplantı sırasında current `master`, `AGENTS.md`, ROADMAP ve açık production PR yeniden doğrulandı.
+- Açık production işi Issue #708 / Draft PR #715 / Q01 İSG Geçmiş-Arşiv işidir.
+- PR #715 exact Fatih Acceptance gate'i kapanmadan Ready/merge olamaz; yeni Ajanda implementation'ı Q01 kapanmadan başlamaz.
+
+### Owner Ajanda kararları
+
+- Ajanda ay görünümü yatay kaydırma gerektirmeden kullanılabilir ekran genişliğine sığacak.
+- Ajanda normal görünümünde yalnız aktif proje kayıtları bulunacak; diğer projeler karışmayacak.
+- `Yeni Proje` Ajanda ana ekranından kaldırılacak.
+- `Mahal Kataloğu` yönetimi Ajanda'dan çıkarılıp proje profili/proje bağlamına taşınacak; Ajanda Mahal'i yalnız kayıt bağlamı olarak kullanacak.
+- Kayıt bulunan günler takvimde görünür olacak.
+- Owner'ın önerdiği `kayıt sayısı kadar sınırsız nokta + spiral` davranışı ürün hedefi olarak aynen alınmadı. Aynı amaç daha okunabilir biçimde `1–3 kayıt = bounded nokta`, `4+ = bounded nokta + sayı rozeti/count` ile çözülecek. 100 kayıt için 100 ayrı nokta çizilmeyecek.
+- Seçili günün kayıtları Ajanda bağlamında doğrudan görünür olacak; ay boşluğu ile seçili gün boşluğu farklı empty state olarak sunulacak.
+
+### Yeniden sıralama gerekçesi
+
+- **Ajanda yeni Q03:** Yanlış proje kayıtlarının aynı takvimde görünmesi günlük doğruluk/context problemidir. Takvimin yatay kaydırma istemesi ve proje/Mahal yönetim eylemlerinin Ajanda içinde kalması sık kullanılan akışta doğrudan sürtünme üretir. Bu iş shared active-project altyapısını kullanabilir ve Proje Profili'nin daha geniş schema/model audit'ine bağımlı değildir.
+- **Proje Profili Q04'e kaydı:** Ürün değeri çok yüksek kalır, ancak blok/proje alanları ve olası persistence/stable-ID gereksinimi nedeniyle Ajanda takvim sadeleştirmesinden daha geniştir.
+- **KKD ve sonraki feature Q'ları birer sıra kaydı:** Yeni günlük-core Ajanda işi bunların önüne alınmıştır.
+- **Eski Q18 + Q19 adaptive gate'leri birleştirildi:** Compact/medium/expanded ve telefon/tablet/orientation/split-screen aynı RC, breakpoint ve state-retention doğrulama ailesidir. Ayrı Q tutmak tekrar kanıt üretme riskini artırıyordu. Yeni tek `Adaptive cihaz / pencere matrisi` release gate'i bunları birlikte taşır.
+- Bu birleşme sayesinde yeni Ajanda Q'su eklenmesine rağmen kanonik kuyruk Q01–Q26 olarak kalır; sayı 26'da tutulduğu için değil, iki eski gate gerçekten aynı doğrulama ailesi olduğu için birleştirilmiştir.
+
+### Yeni kanonik sıra özeti
+
+1. Q01 — İSG Geçmiş / Arşiv
+2. Q02 — Hatırlatıcı aktif-proje bağlamı + hızlı Unutma
+3. Q03 — Ajanda takvimi aktif-proje ve okunabilir ay görünümü
+4. Q04 — Ana Sayfa / Proje Profili
+5. Q05 — KKD hızlı seçim
+6. Q06 — Beton completion/detail/edit
+7. Q07 — Malzemeler UI/UX uyumu
+8. Q08 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
+9. Q09 — Minimum proje-geneli arama
+10. Q10 — Kısa guided onboarding
+11. Q11 — Puantaj → Ajanda otomatik kayıt
+12. Q12 — Şefim otomatik yedek klasörü
+13. Q13 — Otomatik personel kodu decision gate
+14. Q14 — Metraj V1 decision gate
+15. Q15 — Global hızlı cetvel
+16. Q16 — Minimum crash/ANR/fatal telemetry
+17. Q17 — Privacy/KVKK/store declarations
+18. Q18 — Recovery/backup owner acceptance
+19. Q19 — Adaptive cihaz/pencere matrisi
+20. Q20 — TalkBack/yüksek yazı/focus/grayscale
+21. Q21 — Eksik evidence + Inventory release-QA
+22. Q22 — Manuel kabul borçları
+23. Q23 — Entegre şantiye şefi günü
+24. Q24 — Automated milestone/build/provenance
+25. Q25 — Owner telefon+tablet RC kabulü
+26. Q26 — Açık genel yayın kararı
+
+### Önceki değerlendirmelerle ilişki
+
+`REVIEW-002` ve `REVIEW-003` içindeki saha değeri/risk gerekçeleri danışma bağlamı olarak korunur. `REVIEW-003` **KISMEN SUPERSEDED** durumundadır: Q02 Hatırlatıcı gerekçesi korunur; Q03 ve sonrası numara/sıra current değildir. Current sıra yalnız ROADMAP'deki Q01–Q26 listesidir.
+
+### ROADMAP etkisi
+
+`VAR` — Ajanda/Takvim Q03 olarak eklendi; Proje Profili ve sonraki Q'lar yeniden numaralandırıldı; eski iki adaptive/device release gate tek Q19 altında birleştirildi; ilgili cross-reference'lar yeni numaralara taşındı.
