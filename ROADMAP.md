@@ -1,7 +1,7 @@
 # CSE V2 — Kanonik Ürün Yol Haritası
 
 **Durum:** Güncel yürütme sırası ve ilk genel yayın öncesi tek kanonik kuyruk  
-**Güncelleme:** 6 Eylül 2026  
+**Güncelleme:** 7 Eylül 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`  
 **Değişken repository gerçeği:** Güncel SHA, açık Issue/PR, merge ve gate durumu her görevde GitHub `master` üzerinden doğrulanır.
 
@@ -55,18 +55,21 @@ Bu tamamlanmış temel, ilerideki queue maddelerinde sessizce geri alınmaz.
 - `RELEASE GATE` — yeni ürün özelliği değil, yayın yeterliliği kapısıdır.
 - `FINAL OWNER GATE` — public/store release için ayrı açık owner kararı gerekir.
 
-### Q01 — İSG Geçmiş / Arşiv ve lifecycle event görünürlüğü
+### Q01 — İSG hızlı belge kartları + arşiv lifecycle / geri yükleme
 
 **Kaynak:** #617 Phase 4 / item 20B, Issue #708, current PR #715  
-**Durum:** `ACTIVE` — source/test/independent review PASS; exact Acceptance manual gate tamamlanmadan Ready/merge yok.
+**Durum:** `ACTIVE` — PR #715 owner Acceptance FAIL, CRITICAL correction required; yeni review/Acceptance gate'leri tamamlanmadan Ready/merge yok.
 
 Bitiş tanımı:
 
 - arşiv kayıtları aktif İSG özeti/checklist'inden ayrı;
-- existing event sequence insan-okunur Türkçe görünür;
-- edit/restore/backfill yok;
-- exact kişi/proje isolation ve zero-mutation read davranışı korunur;
-- Fatih exact Acceptance build'de PASS verir ve PR merge edilir.
+- dört canonical temel belge türü — `İşe giriş kaydı`, `Sağlık raporu`, `Temel İSG eğitimi`, `Mesleki yeterlilik` — İSG ilk görünümünde hızlı ekleme kartlarıdır;
+- kartta `0` aktif kayıt için explicit `+ Ekle`, `1` aktif kayıt için detail-on-demand, `2+` aktif aynı tür kayıt için latest-wins/dedupe olmadan deterministic `N kayıt` seçimi bulunur;
+- quick-add minimum `valid` kaydı yalnız explicit kullanıcı eylemiyle ve stable record/event identity + idempotency korunarak oluşturur; belge no/tarih/son tarih/not daha sonra exact detail/edit yüzeyinde tamamlanabilir;
+- `Geri yükle` yalnız archived exact kaydı yeni kopya üretmeden aynı record ID ile yeniden aktif eder; `archived_at` temizlenir, revision `+1` olur ve aynı transaction'da append-only `compliance.reopened` olayı mevcut sequence'in sonuna eklenir;
+- önceki lifecycle event'leri korunur; aynı türden başka aktif kayıt restore'u engellemez, merge/dedupe veya latest-wins uygulanmaz;
+- exact kişi/proje isolation korunur; ekranı açmak, geçmişi okumak veya karta bakmak mutation üretmez;
+- restore/quick-add correction için focused validation, bağımsız yeni review ve exact Acceptance build üzerinde Fatih PASS gerekir; PR #715 bu kapılar geçmeden Draft kalır.
 
 ### Q02 — Hatırlatıcı aktif-proje bağlamı + hızlı Unutma akışı
 
