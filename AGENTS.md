@@ -6,7 +6,8 @@ Bu dosya repository kökünde bütün CSE çalışmalarına uygulanır ve günl�
 
 - Güncel repository gerçeği: GitHub `master`, current Issue/PR/branch ve owner kararları.
 - Kalıcı ürün amacı ve veri ilkeleri: `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`.
-- Güncel ürün kapsamı ve sıra: `docs/v2/CSE_V2_SCOPE.md` ve `ROADMAP.md`.
+- Güncel ürün kapsamı: `docs/v2/CSE_V2_SCOPE.md`.
+- **Güncel yürütme sırası ve ilk genel yayın öncesi tek kanonik queue: `ROADMAP.md` içindeki Q01–Q26 kuyruğu.**
 - Kritik Git ve veri güvenliği: `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`.
 - Lane ve publication ayrıntıları: `docs/protocols/CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`.
 - Test/gate ayrıntıları: `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`.
@@ -21,12 +22,14 @@ Yeni görevde zorunlu okuma:
 
 1. `AGENTS.md`
 2. current GitHub `master`, açık Issue/PR ve aktif görev
-3. yalnız değişen sözleşmenin gerektirdiği koşullu kaynak
+3. `ROADMAP.md` içindeki ilk genel yayın öncesi Q01–Q26 kanonik yürütme kuyruğu
+4. yalnız değişen sözleşmenin gerektirdiği koşullu kaynak
 
 Koşullu okuma:
 
 - ürün/veri kararı: Unified Source;
-- ürün kapsamı/sırası: V2 Scope ve Roadmap;
+- ürün kapsamı: V2 Scope;
+- yürütme sırası: Roadmap Q01–Q26 queue;
 - Git veya kullanıcı verisi riski: Project Instructions;
 - test/gate kararı: Minimum Validation;
 - STANDARD/CRITICAL publication: Workflow Acceleration;
@@ -36,6 +39,23 @@ Koşullu okuma:
 Aynı görev resume ediliyorsa değişmeyen uzun kaynaklar tekrar okunmaz. Kullanıcı `devam` dediğinde current GitHub durumu bulunur ve sıradaki gerçek işlem yapılır.
 
 GitHub'a erişilemiyorsa güncel durum tahmin edilmez ve production işi başlatılmaz.
+
+### 2.1 Kanonik roadmap yönlendirme kuralı
+
+ChatGPT/Work Mode sıradaki production veya release işini sohbet hafızasından, eski SHA'dan, tarihsel Issue'dan veya kendi oluşturduğu paralel backlog'dan seçmez.
+
+Her yeni görev, `devam`, `sırada ne var`, `yayından önce ne kaldı` veya eşdeğer koordinasyon talebinde:
+
+1. önce current açık production Issue/PR kontrol edilir;
+2. açık production Issue/PR varsa required review/validation/manual gate'leri kapanmadan yeni production child başlatılmaz;
+3. açık production işi yoksa `ROADMAP.md` Q01→Q26 kuyruğunda current GitHub gerçeğine göre tamamlanmamış ilk uygulanabilir madde seçilir;
+4. `DECISION GATE` maddesi Fatih kararı olmadan implementation'a çevrilmez;
+5. `CRITICAL` maddesi exact Issue, allowlist, compatibility ve required manual/device gate olmadan çalıştırılmaz;
+6. completed/merged bir queue maddesi yeniden feature işi gibi açılmaz; yalnız kanıtlanmış regresyonda dar bug child açılır;
+7. Fatih queue sırasını değiştirirse production işe geçmeden önce owner kararı ROADMAP'e truth-sync edilir;
+8. ROADMAP durum etiketi ile current GitHub Issue/PR durumu çelişirse current GitHub gerçeği status için, ROADMAP ise sıra için otoritedir.
+
+Bu kuralın amacı, her sohbette aynı yayın yol haritasını sürdürmek ve owner kararı olmadan madde atlamayı, yeniden sıralamayı veya feature şişmesini engellemektir.
 
 Owner talebi AGENTS.md veya canonical çalışma kuralını değiştiriyorsa asıl teknik/ürün işi durur. Önce karar current GitHub authority olarak kaydedilir; en dar protokol değişikliği hazırlanır, review ve publication güvenlik kapılarından geçirilir. Master güncellenip güncel AGENTS.md yeniden okunduktan sonra asıl teknik işe dönülür.
 
@@ -204,4 +224,4 @@ SHA, branch, divergence, allowlist, YAML ve benzeri teknik kanıtlar bu açıkla
 
 ## 9. Ana karar
 
-> Non-CRITICAL işte göreve özel süre bütçesiyle one-pass teslim, tek focused validation ve yalnız gereken manuel kabul; publication current GitHub ruleset'inin izin verdiği en hafif branch/PR yoluyla yürür. Required gate'ler geçince ChatGPT standing owner yetkisiyle Ready/squash merge'i ve açık `Closes` disposition'ını otomatik yürütür; gerçek veri/release ve destructive işlem riskinde ayrı owner onayıyla tam güvenlik süreci uygulanır.
+> Non-CRITICAL işte göreve özel süre bütçesiyle one-pass teslim, tek focused validation ve yalnız gereken manuel kabul; publication current GitHub ruleset'inin izin verdiği en hafif branch/PR yoluyla yürür. Required gate'ler geçince ChatGPT standing owner yetkisiyle Ready/squash merge'i ve açık `Closes` disposition'ını otomatik yürütür; gerçek veri/release ve destructive işlem riskinde ayrı owner onayıyla tam güvenlik süreci uygulanır. Sıradaki pre-release iş her zaman ROADMAP Q01–Q26 kuyruğundan, current GitHub gerçeğiyle birlikte seçilir.
