@@ -166,6 +166,11 @@ void main() {
   testWidgets(
     'AT-602 touch selects, nudges whole block and returns to edge reshape',
     (tester) async {
+      // Keep the existing virtual points clear of the two-row toolbar.
+      tester.view.physicalSize = const Size(800, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final blockId = _uuid(26000);
       final geometry = InventoryGeometry(
         polylines: [
@@ -206,9 +211,16 @@ void main() {
         final state = tester.state<InventorySketchCanvasState>(
           find.byType(InventorySketchCanvas),
         );
-        await tester.tapAt(
-          tester.getTopLeft(canvas) + state.viewport!.virtualToView(point),
+        final target =
+            tester.getTopLeft(canvas) + state.viewport!.virtualToView(point);
+        expect(
+          tester
+              .getRect(find.byKey(const Key('inventory-editor-top-toolbar')))
+              .contains(target),
+          isFalse,
+          reason: 'The touch must reach the canvas rather than an overlay.',
         );
+        await tester.tapAt(target);
         await tester.pump();
       }
 
@@ -295,6 +307,11 @@ void main() {
   testWidgets(
     'AT-602 touch drawing autosaves, leaves and resumes exact open polygon',
     (tester) async {
+      // Keep the existing virtual points clear of the two-row toolbar.
+      tester.view.physicalSize = const Size(800, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final fake = _FakeInventoryApplication.withDraft(
         InventoryGeometry.emptyDraft(),
       );
@@ -306,9 +323,16 @@ void main() {
         final state = tester.state<InventorySketchCanvasState>(
           find.byType(InventorySketchCanvas),
         );
-        await tester.tapAt(
-          tester.getTopLeft(canvas) + state.viewport!.virtualToView(point),
+        final target =
+            tester.getTopLeft(canvas) + state.viewport!.virtualToView(point);
+        expect(
+          tester
+              .getRect(find.byKey(const Key('inventory-editor-top-toolbar')))
+              .contains(target),
+          isFalse,
+          reason: 'The touch must reach the canvas rather than an overlay.',
         );
+        await tester.tapAt(target);
         await tester.pump();
       }
 
@@ -2630,6 +2654,11 @@ void main() {
   testWidgets(
     'smart alignment guide is visible and Serbest uzunluk resets after one edge',
     (tester) async {
+      // Keep the existing virtual points clear of the two-row toolbar.
+      tester.view.physicalSize = const Size(800, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final fake = _FakeInventoryApplication.withDraft(
         InventoryGeometry.emptyDraft(),
       );
@@ -2647,6 +2676,13 @@ void main() {
       final viewport = InventoryViewport.fit(canvasRect.size);
       final target =
           canvasRect.topLeft + viewport.virtualToView(_point(128, 320));
+      expect(
+        tester
+            .getRect(find.byKey(const Key('inventory-editor-top-toolbar')))
+            .contains(target),
+        isFalse,
+        reason: 'The hover must reach the canvas rather than an overlay.',
+      );
       final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
       addTearDown(mouse.removePointer);
       await mouse.addPointer(location: canvasRect.center);
@@ -2969,6 +3005,11 @@ void main() {
   testWidgets(
     'movement wheel keeps grid steps, history and the pending autosave on confirm',
     (tester) async {
+      // Keep the existing virtual points clear of the two-row toolbar.
+      tester.view.physicalSize = const Size(800, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final blockId = _uuid(27000);
       final geometry = _rectangleGeometry(
         left: 640,
@@ -3018,6 +3059,13 @@ void main() {
         final target =
             tester.getTopLeft(canvas) +
             canvasState.viewport!.virtualToView(midpoint);
+        expect(
+          tester
+              .getRect(find.byKey(const Key('inventory-editor-top-toolbar')))
+              .contains(target),
+          isFalse,
+          reason: 'The selection touch must reach the canvas.',
+        );
         await tester.tapAt(target);
         await tester.pump();
         expect(controller.editor!.selection?.wholePolyline, isFalse);
@@ -3214,12 +3262,25 @@ void main() {
           expect(wheelRect.left, greaterThanOrEqualTo(canvasRect.left));
           expect(wheelRect.top, greaterThanOrEqualTo(canvasRect.top));
           expect(wheelRect.bottom, lessThanOrEqualTo(canvasRect.bottom));
-          expect(wheelRect.right, closeTo(canvasRect.right - 80, 0.01));
+          expect(
+            wheelRect.right,
+            closeTo(canvasRect.right - (size.height == 320 ? 8 : 80), 0.01),
+          );
           expect(
             canvasRect.bottom - wheelRect.bottom,
-            size.height == 320 ? 64 : 80,
+            size.height == 320 ? 16 : 80,
           );
           expect(wheelRect.overlaps(tester.getRect(toolbar)), isFalse);
+          final saveStatus = find.byKey(
+            const Key('inventory-editor-save-status-overlay'),
+          );
+          expect(tester.getRect(saveStatus).left, canvasRect.left + 8);
+          expect(tester.getRect(saveStatus).bottom, canvasRect.bottom - 8);
+          expect(
+            tester.getRect(saveStatus).overlaps(tester.getRect(toolbar)),
+            isFalse,
+          );
+          expect(find.text('Kaydedildi'), findsOneWidget);
           expect(
             wheelRect.overlaps(
               tester.getRect(
@@ -3348,7 +3409,7 @@ void main() {
     const Size(320, 320),
     const Size(390, 320),
   ]) {
-    testWidgets('horizontal top toolbar stays accessible at $size / text 2', (
+    testWidgets('two-row top toolbar stays accessible at $size / text 2', (
       tester,
     ) async {
       tester.view.physicalSize = size;
@@ -3399,7 +3460,17 @@ void main() {
           toolbarRect.left,
           closeTo(tester.getRect(workspace).left + 8, 0.01),
         );
-        expect(toolbarRect.height, 48);
+        expect(toolbarRect.height, 96);
+        final rows = find.descendant(of: toolbar, matching: find.byType(Row));
+        expect(rows, findsNWidgets(2));
+        final row1 = find.byKey(const Key('inventory-editor-toolbar-row-1'));
+        final row2 = find.byKey(const Key('inventory-editor-toolbar-row-2'));
+        expect(row1, findsOneWidget);
+        expect(row2, findsOneWidget);
+        expect(tester.getRect(row1).top, toolbarRect.top);
+        expect(tester.getRect(row2).top, toolbarRect.top + 48);
+        expect(tester.getSize(row1).height, 48);
+        expect(tester.getSize(row2).height, 48);
         final scrollView = find.descendant(
           of: toolbar,
           matching: find.byType(SingleChildScrollView),
@@ -3442,13 +3513,27 @@ void main() {
           const Key('inventory-editor-free-length'),
           const Key('inventory-editor-delete'),
         };
-        var previousX = double.negativeInfinity;
-        for (final key in controls.keys) {
-          final center = tester.getCenter(find.byKey(key));
-          expect(center.dx, greaterThan(previousX));
-          expect(center.dy, closeTo(toolbarRect.center.dy, 0.01));
-          previousX = center.dx;
+        final orderedKeys = controls.keys.toList();
+        for (var row = 0; row < 2; row++) {
+          var previousX = double.negativeInfinity;
+          final rowFinder = row == 0 ? row1 : row2;
+          expect(
+            find.descendant(of: rowFinder, matching: find.byType(IconButton)),
+            findsNWidgets(7),
+          );
+          for (final key in orderedKeys.skip(row * 7).take(7)) {
+            expect(
+              find.descendant(of: rowFinder, matching: find.byKey(key)),
+              findsOneWidget,
+            );
+            final center = tester.getCenter(find.byKey(key));
+            expect(center.dx, greaterThan(previousX));
+            expect(center.dy, closeTo(toolbarRect.top + row * 48 + 24, 0.01));
+            previousX = center.dx;
+          }
         }
+        final row1Start = tester.getRect(row1).left;
+        final row2Start = tester.getRect(row2).left;
         for (final entry in controls.entries) {
           final control = find.byKey(entry.key);
           expect(control, findsOneWidget);
@@ -3498,8 +3583,25 @@ void main() {
         final scrollState = tester.state<ScrollableState>(
           find.descendant(of: toolbar, matching: find.byType(Scrollable)),
         );
-        expect(scrollState.position.pixels, greaterThan(0));
-        expect(scrollState.position.maxScrollExtent, greaterThan(0));
+        final expectedScrollExtent = (7 * 48 + 2 * 8 + 8 - toolbarRect.width)
+            .clamp(0.0, double.infinity);
+        expect(
+          scrollState.position.maxScrollExtent,
+          closeTo(expectedScrollExtent, 0.01),
+        );
+        if (expectedScrollExtent > 0) {
+          expect(scrollState.position.pixels, greaterThan(0));
+        } else {
+          expect(scrollState.position.pixels, 0);
+        }
+        expect(
+          row1Start - tester.getRect(row1).left,
+          closeTo(scrollState.position.pixels, 0.01),
+        );
+        expect(
+          row2Start - tester.getRect(row2).left,
+          closeTo(scrollState.position.pixels, 0.01),
+        );
         expect(tester.getRect(canvas), canvasRect);
         final afterScrollViewport = tester
             .state<InventorySketchCanvasState>(
