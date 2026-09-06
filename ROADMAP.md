@@ -24,13 +24,13 @@ CSE owner-only, local-first ve mobile-first kişisel saha asistanıdır. V1 saha
 
 Frictionless Release Readiness programı Issue #617 ile yürür. UI/UX sözleşmesi, adaptive shell, ortak aktif proje, 48×48 erişilebilirlik tabanı, form/primary-action standardı, temel search/filter/error state altyapısı ve visual-first dönüşümün ana dilimleri merged durumdadır.
 
-Son Inventory refinement zinciri #709/#710 → #711/#712 → #713/#714 ile tamamlanmış ve owner manuel kabulünden geçmiştir. DWG Viewer / Issue #523 ilk genel yayın için blocker değildir ve `POST-RELEASE / DEFERRED` kalır.
+Son Inventory refinement zinciri #709/#710 → #711/#712 → #713/#714 tamamlanmış ve owner manuel kabulünden geçmiştir. 6 Eylül owner saha kullanım geri bildirimiyle Q05 altında yalnız dar Kroki/interaction refinement istisnası yeniden açılmıştır; önceki tamamlanmış davranışlar bunun dışında tekrar geliştirme işi sayılmaz. DWG Viewer / Issue #523 ilk genel yayın için blocker değildir ve `POST-RELEASE / DEFERRED` kalır.
 
 Değişmeyen teknik baseline değerleri ilgili source/protokol ve current master'dan okunur; bu dosya sabit master SHA tutmaz.
 
 ## 3. Tamamlanmış yayın-hazırlık temeli
 
-Aşağıdaki alanlar yeni queue maddesi olarak tekrar açılmaz; yalnız release QA sırasında regresyon bulunursa dar bug Issue'su açılır:
+Aşağıdaki alanlar yeni queue maddesi olarak tekrar açılmaz; yalnız release QA sırasında regresyon bulunursa dar bug Issue'su açılır veya aşağıda açıkça owner-inserted dar istisna tanımlanır:
 
 - #616 sanitize full-product evidence baseline.
 - #618 kanonik frictionless UI/UX sözleşmesi + V2/roadmap truth-sync.
@@ -40,7 +40,7 @@ Aşağıdaki alanlar yeni queue maddesi olarak tekrar açılmaz; yalnız release
 - Daily Log + Work Chain targeted Acceptance evidence closure (#698).
 - Saha Rehberi/Sicil temel bilgi mimarisi ve Puantaj prerequisite/quick-result sadeleştirmeleri.
 - İSG model audit + 20A aktif checklist/tracking temeli.
-- Inventory compact top tools + D-pad + iki sıralı sketch-editor toolbar (#709–#714). Inventory için yeni redesign açılmaz; release-level doğrulama Q21/Q23 içine dahil edilir.
+- Inventory compact top tools + D-pad + iki sıralı sketch-editor toolbar (#709–#714) tamamlanmış baseline'dır. Q05 yalnız 6 Eylül owner kullanımında kanıtlanan toolbar/gesture, first-create movement ve same-point multi-record borcunu düzeltir; Inventory'nin geri kalanını yeniden tasarım programına dönüştürmez.
 
 Bu tamamlanmış temel, ilerideki queue maddelerinde sessizce geri alınmaz.
 
@@ -376,49 +376,126 @@ Dashboard hâlâ canlı proje kontrol merkezi olmalı; bakım/form yoğunluğu g
 - ilk proje oluşturma onlarca zorunlu alana dönüşmez;
 - schema/stable identity/persistence değişikliği gerekiyorsa ayrı CRITICAL yetki olmadan yapılmaz.
 
-### Q05 — KKD hızlı seçim
+### Q05 — Envanter / Kroki hedefli interaction refinement
+
+**Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi — `Envanter / Kroki` başlığı; tamamlanmış #709–#714 baseline'ı; `docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md`.  
+**Durum:** `QUEUED`
+
+Bu Q, tamamlanmış Inventory v1'i yeniden tasarım programına açmaz. Yalnız owner'ın gerçek kullanımda işaretlediği Kroki toolbar/gesture sürtünmesini ve aynı fiziksel noktaya birden fazla farklı Inventory kaydı ekleme engelini giderir. İlk implementation child source değişikliğinden önce current Inventory contract'taki açık toolbar davranışlarını bu owner kararıyla truth-sync eder.
+
+#### INV-01 — Geri eylemini toolbox'tan ayır
+
+- `Geri` çizim araçlarıyla aynı toolbox/rail içinde bir çizim aracı gibi sunulmaz.
+- Ekranın üst bölümünde, kolay fark edilen, en az 48×48 gerçek hit-area'lı ayrı bir navigation action olur.
+- Back/pop mevcut awaited autosave, save-failure block ve orientation restore sözleşmelerini aynen korur; görünür yer değişikliği veri güvenliğini daraltmaz.
+
+#### INV-02 — `Taşı` modunu görünür toolbox'tan çıkar; pan/zoom kabiliyetini koru
+
+- Dedicated `Taşı` toolbar butonu kaldırılır.
+- Bu kaldırma ancak draw/select modlarında source mutation üretmeyen iki-parmak pan/pinch güvenli ve testli hale getirildikten sonra yapılır; tek parmak draw/select semantiği korunur.
+- Pinch zoom ana viewport zoom yoludur; toolbar `+ / -` zoom butonları kaldırılır.
+- `Tamamını göster / fit` ana toolbox'tan kaldırılır. Editor açılışındaki mevcut fit-to-canvas davranışı korunur; kullanıcı viewport'ta kaybolursa gerekiyorsa double-tap/overflow gibi ikincil, çakışmayan recovery gesture/action kullanılabilir.
+- Pan/zoom/fit hiçbir koşulda source geometry veya placement koordinatını mutate etmez.
+
+#### INV-03 — Permanent `Çizgiyi bitir` / `Alanı kapat` toolbar butonlarını kaldır, capability'yi contextual yap
+
+- `Çizgiyi bitir` ve `Alanı kapat` permanent toolbox kontrolü olarak gösterilmez.
+- Geçerli kapalı blok için mevcut snap-to-first/tap-first closure davranışı ana yol olur; kapanma sonrasında block/floor metadata akışı devam eder.
+- Open-polyline desteği sessizce yok edilmez. Açık çizgiyi bitirme gerekiyorsa yalnız o anda görünen contextual `Tamam/Bitir`, yeni çizgiye geçiş veya eşdeğer açık kullanıcı eylemiyle erişilebilir kalır.
+- Tek noktalı incomplete polyline cleanup, undo/redo ve autosave semantics korunur; mode switch gizlice source çizgiyi bitirmez.
+- `CSE_INVENTORY_MAP_V1_CONTRACT.md` içindeki explicit button requirement production source'tan önce bu yeni owner UI yönüyle güncellenir.
+
+#### INV-04 — `Serbest uzunluk` ikonunu semantiğine uygun hale getir
+
+- Mevcut cetvel/`straighten` ikonu değiştirilir; yeni ikon bir ölçüm aracı izlenimi vermeden **yalnız sonraki kenarda akıllı uzunluk hizalamasını serbest bırakma** anlamını taşımalıdır.
+- Exact Material icon implementation audit/görsel testte seçilir; yalnız icon değişikliği `Serbest uzunluk` semantiğini değiştirmez.
+- Bir-shot davranışı korunur: yalnız sonraki committed segmentte smart length alignment bypass edilir, orthogonal kural korunur ve sonra normal hizalama geri gelir.
+
+#### INV-05 — D-pad/movement wheel ilk kroki oluşturma aşamasında da çalışır
+
+- `createOrRecover` ile ilk kroki hazırlanırken kullanıcı yeni oluşturulmuş/kapalı bir bloğu seçtiğinde aynı movement wheel ile sağa/sola/yukarı/aşağı taşıyabilir.
+- Hareket yalnız valid mapped/new block üzerinde çalışır; henüz tamamlanmamış tek açık raw polyline sahte blok gibi taşınmaz.
+- Bounds, self-intersection, overlap ve spatial validation fail-closed kalır.
+- Immutable legacy/base geometry için mevcut kilit davranışı sessizce kaldırılmaz.
+- İlk child mevcut source davranışını focused test + gerçek owner repro ile doğrular; zaten desteklenen path varsa gereksiz production rewrite yapılmaz, yalnız kanıtlanmış gap düzeltilir.
+
+#### INV-06 — Çizim modu sticky kalır
+
+- Kullanıcı `Çiz` modunu seçtiğinde, çizgiyi/alanı bitirmesi modu otomatik olarak başka moda çevirmemelidir.
+- Kullanıcı açıkça `Seç` veya başka bir interaction'a geçene kadar draw mode seçili kalır.
+- Current source bu yönde görünüyorsa ilk child cihazdaki owner bulgusunu reproduce eder; kaynak zaten doğruysa no-op evidence ile kapanır, device/runtime reset kanıtlanırsa dar bug fix yapılır.
+
+#### INV-07 — Aynı fiziksel noktaya birden fazla farklı Inventory kaydı ekle
+
+- Farklı `inventory_assets` kayıtları aynı exact aktif floor + `x/y` koordinatını paylaşabilir; bu davranış tek asset için v1 `one active placement` sınırını kaldırmaz.
+- Current model/DB audit farklı asset'ler için same-coordinate uniqueness göstermediğinden varsayılan plan schema değişikliği değildir. Schema ihtiyacı ortaya çıkarsa Q05 aynı STANDARD UI işi içinde büyütülmez; ayrı CRITICAL child gerekir.
+- Mevcut marker/cluster'a dokunulduğunda kayıtları açmanın yanında açık **`Bu noktaya kayıt ekle`** eylemi sunulur; bu eylem exact mevcut coordinate ve floor context'ini quick-create akışına taşır.
+- Aynı noktadaki birden fazla kayıt tek count-cluster/stack marker ile temsil edilir; cluster açıldığında tüm kayıtlar deterministik listelenir ve her biri ayrı detail'e açılabilir.
+- Marker overlap çözümü source koordinatlarını yapay olarak sağa/sola kaydırmaz; görsel ayrıştırma yalnız presentation state'tir.
+- Existing map boş-alan tap davranışı korunur; marker hit'in create'i tamamen bloke etmesi bu explicit add-another action ile giderilir.
+
+#### INV-08 — Q05 güvenlik ve kabul sınırı
+
+- Stable asset/block/floor/sketch/placement identity, optimistic revision, append-only placement/event history, autosave/finalize ve backup formatı korunur.
+- Bir asset'i birden fazla aktif placement'a bölme, stock ledger, CAD/GIS, gerçek ölçü veya yeni schema bu Q'nun doğal uzantısı değildir.
+- Toolbar sadeleştirmesiyle temel navigation/pan/zoom/open-line/closure capability kaybolamaz.
+- Exact create/edit-active ve same-point cluster davranışı focused automated test + owner device Acceptance ile doğrulanır.
+
+**Q05 bitiş tanımı:**
+
+- Geri eylemi toolbox'tan ayrılmış ve üstte açık navigation action olmuştur;
+- `Taşı`, zoom `+/-`, fit, permanent `Çizgiyi bitir` ve permanent `Alanı kapat` ana toolbox'tan çıkmıştır, fakat karşılık gelen gerekli navigation/drawing capability kaybolmamıştır;
+- draw/select sırasında iki-parmak pan/pinch güvenli çalışır;
+- `Serbest uzunluk` ölçüm aracı izlenimi vermeyen anlamlı icon taşır ve one-shot semantics korunur;
+- movement wheel yeni ilk-kroki bloklarında çalışır;
+- draw mode explicit mode değişimine kadar sticky kalır;
+- aynı exact noktada birden fazla farklı Inventory kaydı oluşturulabilir, cluster üzerinden tek tek açılabilir ve `Bu noktaya kayıt ekle` akışı vardır;
+- source coordinate/identity/history/backup kontratları bozulmaz;
+- Inventory contract source implementation'dan önce yeni toolbar/gesture/same-point owner kararlarıyla truth-sync edilmiştir.
+
+### Q06 — KKD hızlı seçim
 
 **Kaynak:** #617 Phase 4 / item 21  
 **Durum:** `QUEUED`
 
 Amaç: günlük saha kullanımında mevcut canonical KKD semantiğini değiştirmeden hızlı, erişilebilir ve minimum dokunuşlu seçim/atama akışı.
 
-### Q06 — Beton tamamlanma / sonuç / detay / düzenleme akışı
+### Q07 — Beton tamamlanma / sonuç / detay / düzenleme akışı
 
 **Kaynak:** #617 Phase 5 / item 23  
 **Durum:** `QUEUED`
 
 Amaç: Beton Paketi'nin gerçek saha kullanımında create → sonuç → detail → edit/completion zincirini tamamlamak ve mevcut identity/attachment davranışını korumak.
 
-### Q07 — Malzemeler ortak UI/UX sistem uyumu
+### Q08 — Malzemeler ortak UI/UX sistem uyumu
 
 **Kaynak:** #617 Phase 5 / item 24  
 **Durum:** `QUEUED`
 
 Amaç: İstenecek Malzemeler ekranını shared project context, action, state, accessibility ve compact/adaptive görsel dile oturtmak; lifecycle source-of-truth'u değiştirmemek.
 
-### Q08 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
+### Q09 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
 
 **Kaynak:** #617 Phase 5 / item 25  
 **Durum:** `QUEUED`
 
 Amaç: supporting tools'ın final first-release information architecture ve erişim yerini netleştirmek; attachment/recovery güvenlik sınırlarını korumak.
 
-### Q09 — Minimum proje-geneli ortak arama
+### Q10 — Minimum proje-geneli ortak arama
 
 **Kaynak:** #617 Phase 6 / item 27  
 **Durum:** `QUEUED`
 
 İlk release için supported existing record families üzerinde basit, hızlı, project-safe ortak arama; enterprise/global index motoru değil.
 
-### Q10 — Kısa guided onboarding
+### Q11 — Kısa guided onboarding
 
 **Kaynak:** #617 Phase 6 / item 28  
 **Durum:** `QUEUED`
 
 Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günlük akış. Uzun tutorial yok.
 
-### Q11 — Puantaj tamamlanınca Ajanda'ya otomatik kayıt
+### Q12 — Puantaj tamamlanınca Ajanda'ya otomatik kayıt
 
 **Kaynak:** #617 owner decision `Puantaj → Ajanda automatic completion record`  
 **Durum:** `QUEUED — CRITICAL`
@@ -428,7 +505,7 @@ Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günl�
 - retry/reopen duplicate üretmez;
 - identity, transaction, failure, event/history ve rollback sözleşmeleri ayrı CRITICAL Issue'da kilitlenir.
 
-### Q12 — Şefim otomatik yedek klasörü
+### Q13 — Şefim otomatik yedek klasörü
 
 **Kaynak:** #617 owner decision `Backup destination folder`  
 **Durum:** `QUEUED — CRITICAL`
@@ -437,7 +514,7 @@ Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günl�
 - silent backup generation, overwrite, rotation/delete veya `.csebackup` format değişikliği bu kapsamın parçası değildir;
 - exact path/data-root, compatibility ve restore validation zorunludur.
 
-### Q13 — Otomatik personel kodu release kararı
+### Q14 — Otomatik personel kodu release kararı
 
 **Kaynak:** #617 Phase 4 / item 22  
 **Durum:** `DECISION GATE`
@@ -446,7 +523,7 @@ Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günl�
 - Fatih ilk genel yayın için gerekli görmezse açıkça `POST-RELEASE / DEFERRED` olarak işaretlenir.
 - Karar verilmeden sessiz implementation yapılmaz.
 
-### Q14 — Metraj V1 release kapsam kararı
+### Q15 — Metraj V1 release kapsam kararı
 
 **Kaynak:** #617 owner decision `Metraj scope expansion`  
 **Durum:** `DECISION GATE`
@@ -460,7 +537,7 @@ Yayın öncesi yapılacak karar:
 
 Fatih karar vermeden ChatGPT bu maddeyi sessizce atlamaz veya kapsamlı Metraj geliştirmesini başlatmaz.
 
-### Q15 — Global hızlı cetvel
+### Q16 — Global hızlı cetvel
 
 **Kaynak:** #617 owner decision `Quick Ruler global tool`  
 **Durum:** `QUEUED`
@@ -470,30 +547,30 @@ Fatih karar vermeden ChatGPT bu maddeyi sessizce atlamaz veya kapsamlı Metraj g
 - source/form/session mutation yok;
 - gerçek ölçü iddiasından önce device-aware physical calibration veya açık calibration fallback zorunludur.
 
-### Q16 — Minimum crash / ANR / fatal telemetry
+### Q17 — Minimum crash / ANR / fatal telemetry
 
 **Kaynak:** #617 Phase 6 / item 29  
 **Durum:** `QUEUED`
 
 Release kalitesinde crash/ANR/fatal görünürlüğü; privacy/local-first ve store beyanlarıyla uyumlu minimum kapsam.
 
-### Q17 — Privacy / KVKK / store declarations
+### Q18 — Privacy / KVKK / store declarations
 
 **Kaynak:** #617 Phase 6 / item 30  
 **Durum:** `QUEUED`
 
 Gerçek uygulama davranışı, izinler, local data, backup, medya ve telemetry ile birebir uyumlu privacy/KVKK/store açıklamaları. Uygulamada olmayan claim yok.
 
-### Q18 — Recovery / backup owner acceptance
+### Q19 — Recovery / backup owner acceptance
 
 **Kaynak:** #617 Phase 6 / item 31  
 **Durum:** `RELEASE GATE`
 
-- locked Restore Model A doğrulanır: exact backup state full replacement, restore öncesi safety backup, backup verification, etkilenen kayıt açıklaması, restore sonrası geri alma ve safety backup retention;
-- backup folder işi Q12 pre-release yapıldıysa bu tur onun gerçek cihaz davranışını da kapsar;
+- locked Restore Model A doğrulanır: exact backup state full replacement, restore öncesi safety backup, backup verification, etkilenecek kayıt açıklaması, restore sonrası geri alma ve safety backup retention;
+- backup folder işi Q13 pre-release yapıldıysa bu tur onun gerçek cihaz davranışını da kapsar;
 - gerçek kritik data/destructive operasyon yalnız açık owner authority ile yürür.
 
-### Q19 — Adaptive cihaz / pencere matrisi
+### Q20 — Adaptive cihaz / pencere matrisi
 
 **Kaynak:** #617 Phase 7 / items 32–33  
 **Durum:** `RELEASE GATE`
@@ -508,36 +585,32 @@ Eski ayrı `compact/medium/expanded` ve `telefon/tablet/portrait/landscape/split
 
 Aynı RC ve aynı senaryodan üretilebilen kanıt tekrar çalıştırılmaz; estetik mükemmellik değil işlevsel/adaptive yeterlilik aranır.
 
-### Q20 — TalkBack / yüksek yazı / focus / grayscale
+### Q21 — TalkBack / yüksek yazı / focus / grayscale
 
 **Kaynak:** #617 Phase 7 / item 34  
 **Durum:** `RELEASE GATE`
 
 Primary navigation ve kritik create/edit/save/confirm akışlarında erişilebilirlik kapanışı; yeni bir görsel redesign programına dönüşmez.
 
-### Q21 — Eksik #616 evidence + Inventory release-QA kapanışı
+### Q22 — Release evidence + manuel kabul borçları + Inventory release-QA
 
-**Kaynak:** #617 Phase 7 / item 35; #709–#714  
+**Kaynak:** #617 Phase 7 / items 35–36; Issue #479; #709–#714; Q05 owner refinement  
 **Durum:** `RELEASE GATE`
 
-- Baseline'da eksik kalan populated Puantaj, Beton result/detail/edit, attachment viewer, kayıtlı İSG/KKD ve gerekli motion/Back kanıtları current release candidate davranışıyla tamamlanır.
+Aynı RC üzerinde tekrar eden evidence ve manual-debt işleri tek gate'te kapanır:
+
+- Baseline'da eksik kalan populated Puantaj, Beton result/detail/edit, attachment viewer, kayıtlı İSG/KKD ve gerekli motion/Back kanıtları tamamlanır.
 - Daily Log + Work Chain targeted evidence #698 ile kapanmıştır ve yeniden yapılmaz.
-- Inventory için yeni redesign açılmaz; Kroki/Katlar/Liste, compact top tools, D-pad ve iki sıralı toolbar current RC üzerinde entegre regresyon/evidence kapsamında doğrulanır.
-- Aynı RC üzerinde Q23/Q25 sırasında üretilen yeterli kanıt tekrar kullanılabilir; sırf evidence sayısı için tekrar üretim yapılmaz.
-
-### Q22 — Manuel kabul borçlarının kapanışı
-
-**Kaynak:** #617 Phase 7 / item 36 + Issue #479  
-**Durum:** `RELEASE GATE`
-
-Release'e gerçekten dahil olan user-visible özelliklerde gerekli `PENDING/DEFERRED` manual test borcu çözülür. Tarihsel gereksiz testler sırf sayı kapatmak için çalıştırılmaz; current release behavior'a göre PASS / N/A / superseded disposition verilir.
+- Inventory için #709–#714 baseline'ı ile Q05 Kroki refinement davranışları current RC üzerinde entegre regresyon/evidence kapsamında doğrulanır.
+- Release'e gerçekten dahil user-visible özelliklerde gerekli `PENDING/DEFERRED` manual test borcu PASS / N/A / superseded disposition ile kapanır; tarihsel gereksiz test sırf sayı için çalıştırılmaz.
+- Q23/Q25 sırasında aynı exact RC üzerinde üretilmiş yeterli kanıt yeniden kullanılır; sırf evidence sayısı için duplicate screenshot/test turu yoktur.
 
 ### Q23 — Entegre “bir şantiye şefi günü” senaryosu
 
 **Kaynak:** #617 Phase 7 / item 37  
 **Durum:** `RELEASE GATE`
 
-Tek projede gerçek günlük akışı temsil eden bütünleşik senaryo: proje bağlamı → hatırlatma/ajanda → plan → puantaj → saha rehberi/İSG/KKD → beton/malzeme → envanter/medya → backup/recovery; tekrar veri girişi, context drift, dead end ve mutation sürprizi olmamalı. Inventory'nin ayrı Q'dan çıkarılan release-level entegre doğrulaması bu senaryonun doğal parçasıdır.
+Tek projede gerçek günlük akışı temsil eden bütünleşik senaryo: proje bağlamı → hatırlatma/ajanda → plan → puantaj → saha rehberi/İSG/KKD → beton/malzeme → envanter/medya → backup/recovery; tekrar veri girişi, context drift, dead end ve mutation sürprizi olmamalı. Inventory'de Q05 same-point cluster/create ve sade Kroki interaction'ı bu senaryonun doğal parçasıdır.
 
 ### Q24 — Otomatik milestone gate + analyze/build + artifact provenance
 
@@ -571,7 +644,7 @@ ChatGPT her yeni görevde veya `devam` talebinde:
 5. CRITICAL etiketi taşıyan maddede exact Issue/allowlist/compatibility/manual gate olmadan değişiklik yaptırmaz;
 6. Fatih yeni sıra kararı verirse önce ROADMAP truth-sync yapılır, sonra production iş başlar;
 7. aynı anda ikinci production implementation child açmaz;
-8. tamamlanmış bir queue maddesini tekrar geliştirme işi gibi açmaz; yalnız kanıtlanmış regresyonda dar bug Issue açar.
+8. tamamlanmış bir queue maddesini tekrar geliştirme işi gibi açmaz; yalnız kanıtlanmış regresyonda dar bug Issue açar veya ROADMAP'te açık owner-inserted dar refinement tanımlanır.
 
 ### Owner geri bildirimi sonrası tam yeniden sıralama kuralı
 
@@ -592,8 +665,8 @@ Bu kural, sıra ve numaraların tarihsel referans uğruna dondurulmasını engel
 Aşağıdakiler Q01–Q26 release kuyruğunu bloke etmez, ancak owner kararıyla daha sonra aktive edilebilir:
 
 - **DWG Viewer v1 / Issue #523:** `POST-RELEASE / DEFERRED`. DWG ve doküman viewer uzun vadeli ana ürün hedefidir; ilk genel yayın bağımlılığı değildir.
-- Q13'te V1 dışına alınırsa otomatik personel kodu.
-- Q14'te B seçilirse kapsamlı Metraj katalog/çalışma merkezi.
+- Q14'te V1 dışına alınırsa otomatik personel kodu.
+- Q15'te B seçilirse kapsamlı Metraj katalog/çalışma merkezi.
 - V2.12 Günlük Log v2 ve V2.13 Mini Hesap Makinesi: mevcut owner pause kararı sürer.
 - Ayrı ürün toplantısı/brainstorm kayıtları, owner tarafından pre-release queue'ya taşınmadıkça yayın blocker'ı değildir.
 - Büyük AI/semantic search, SaaS/multi-user, Primavera replacement ve geniş CAD/GIS hedefleri ilk genel yayın dışında kalır.
