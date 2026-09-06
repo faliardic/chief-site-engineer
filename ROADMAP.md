@@ -137,12 +137,12 @@ Bu alt dilim background/reboot engine değişikliği gerektirirse aynı STANDARD
 - notification `Ertele` kolaylığı temel reminder güvenilirliğinin önüne geçmez;
 - uygulama restart/background/permission/reboot davranışı değişiyorsa gerekli ayrı risk/gate tanımlanmadan merge edilmez.
 
-### Q03 — Ajanda takvimi aktif-proje ve okunabilir ay görünümü
+### Q03 — Ajanda aktif-proje takvimi + hızlı kayıt oluşturma
 
-**Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi — `Ajanda — Takvim` başlığı; #617 daily-core ilkeleri.  
+**Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimleri — `Ajanda — Takvim` ve `Ajanda Kaydı Oluşturma` başlıkları; #617 daily-core ilkeleri.  
 **Durum:** `QUEUED`
 
-Ajanda, proje yönetimi menüsü değil **aktif projenin takvim tabanlı saha zaman çizgisi** olarak çalışır. Bu Q mevcut Ajanda source/history sözleşmesini yeniden yazmaz; ay görünümündeki proje izolasyonu, okunabilirlik ve bağlam dışı yönetim eylemlerini düzeltir.
+Ajanda, proje yönetimi menüsü değil **aktif projenin takvim tabanlı saha zaman çizgisi ve hızlı kayıt yüzeyi** olarak çalışır. Bu Q mevcut Ajanda stable identity, `AgendaCategory`, history/event ve attachment sözleşmelerini yeniden yazmaz; takvim ile `+ Ajanda kaydı` akışını aynı günlük-core işi altında sadeleştirir.
 
 #### CAL-01 — Takvimi ekran genişliğine sığdır
 
@@ -187,16 +187,83 @@ Ajanda, proje yönetimi menüsü değil **aktif projenin takvim tabanlı saha za
 - `Bu ay için Ajanda kaydı bulunmuyor.` ile `Bugün için kayıt yok.` gibi ay ve seçili-gün empty state'leri ayrılır.
 - Boş seçili günde görünür `+ Ajanda kaydı` ana eylemi sunulabilir.
 
+#### FORM-01 — Tarih ve saati açıklamanın hemen üstüne taşı
+
+- Ayrı/aşağıdaki `Zaman ve tür` ExpansionTile kaldırılır.
+- Tarih ve saat, `Kısa açıklama` alanının hemen üzerinde tek kompakt metadata satırında görünür.
+- Tarih için takvim, saat için saat ikonu kullanılır; değerler ikon yanında açık metinle görünür.
+- Kullanıcı bu kontrollere dokunarak tarih/saat seçicilerini açar.
+- Normal yeni kayıt varsayılanı current Europe/Istanbul tarih+saatidir.
+- Form kullanıcı tarafından takvimde başka bir gün seçildikten sonra açılmışsa seçilen gün korunur; saat current Istanbul saatiyle başlar. Kullanıcıya zaten seçtiği günü tekrar girdirtmez.
+
+#### FORM-02 — Proje seçicisini ve form içi proje oluşturmayı kaldır
+
+- Yeni Ajanda kaydında `Proje` dropdown'u bulunmaz.
+- `Yeni proje oluştur` ikonu/eylemi formdan kaldırılır.
+- Shared aktif proje üstte küçük, salt-okunur bağlam olarak görünür ve yeni kayıt bu exact proje ID'sine yazılır.
+- Aktif proje yoksa form global/projesiz kayıt yaratmaz; kullanıcı önce proje seçme/oluşturma akışına yönlendirilir.
+- Var olan bir kayıt düzenlenirken source proje identity'si formdan sessizce başka projeye taşınamaz; mevcut project ilişkisinin korunması audit ile sabitlenir.
+
+#### FORM-03 — Proje seçicisinin yerine hızlı Mahal seçimi koy
+
+- Ana bağlam kontrolü **Mahal seç** olur; yalnız aktif projenin mevcut stable Mahal kayıtlarını gösterir.
+- Mahal seçimi opsiyoneldir; proje-geneli Ajanda kaydı geçerli kalır ve kullanıcı olmayan bir Mahal uydurmaya zorlanmaz.
+- Kontrol ikon + açık `Mahal` etiketi taşır; çok mahalde bounded bottom sheet/searchable picker kullanılabilir.
+- Mahal yönetimi/oluşturma bu formun işi değildir; `Mahal Kataloğu` form içine geri sokulmaz.
+- Existing arşivli stable Mahal bağı bulunan eski kayıt düzenlenirken mevcut bağ görünür/preserved kalır; sessizce aktif başka Mahal'e dönüştürülmez.
+
+#### FORM-04 — Tek ana metin alanı olarak `Kısa açıklama` bırak
+
+- `İsteğe bağlı ayrıntılar` başlığı/ExpansionTile yeni kayıt formundan kaldırılır.
+- Yeni kayıtta ayrı `Ayrıntılı not` metin alanı bulunmaz.
+- Kullanıcının ana metin girişi yalnız `Kısa açıklama` olur; birkaç satıra büyüyebilen multiline alan olarak kalır.
+- Mevcut legacy kayıtların saklanmış `notes` değeri migration olmadan silinmez veya edit-save sırasında boşaltılmaz; detail/history yüzeyindeki mevcut veri korunur.
+- Eski not alanının gelecekte tamamen kaldırılması ayrı veri-contract kararıdır; bu UI sadeleştirmesi fiziksel veri silme yetkisi değildir.
+
+#### FORM-05 — Kayıt türünü ikincil, kompakt kontrol olarak koru
+
+- `Kayıt türü`, kaldırılan `Zaman ve tür` bölümünün içinde gizli ayrı form bölümü olarak kalmaz.
+- Mevcut kapalı `AgendaCategory` sözleşmesi korunur; normal yeni kayıt varsayılanı `Genel not` olur ve kullanıcı çoğu kayıtta tür seçmeye zorlanmaz.
+- Tür gerekiyorsa `Tür: Genel not` benzeri kompakt chip/dropdown ile değiştirilebilir; ana form hiyerarşisini domine etmez.
+- İmalat, Kontrol, Görüşme/karar, Teslimat, İş güvenliği, Beton ve Sorun/gecikme gibi mevcut kategori anlamları; filtreleme ve Beton bağlantısı/sinyali gibi mevcut downstream davranışlar audit edilmeden silinmez.
+- Schema/storage enum değişikliği bu UI işi kapsamında yoktur.
+
+#### FORM-06 — Fotoğraf eklemeyi büyük ve görsel öncelikli hale getir
+
+- Küçük `Fotoğraf ekle` ikon aksiyonu yerine form genişliğini kullanan belirgin bir fotoğraf kutusu/paneli bulunur.
+- Kullanıcı-facing metin açıkça `Buradan fotoğraf ekle` / `Fotoğraf ekle` gibi eylemi anlatır.
+- Dokununca mevcut güvenli Kamera / Sistem fotoğraf seçici akışı açılır; attachment güvenlik sözleşmesi korunur.
+- Seçilen fotoğraflar kutunun altında bounded thumbnail/önizleme kartları olarak görünür; yalnız dosya adı listesiyle yetinilmez.
+- Her önizlemede erişilebilir, en az 48×48 kaldırma eylemi bulunur.
+- Çoklu fotoğraf seçimi korunur; picker iptali/başarısızlığı form metnini veya önceden seçilmiş fotoğrafları kaybettirmez.
+- Thumbnail sunumu tam çözünürlüklü bütün fotoğrafları gereksiz eager decode ederek form performansını bozmamalıdır.
+- Bu dilim yeni kayıttaki capture/pending-photo UX'ini düzeltir; mevcut kayıt attachment yaşam döngüsünü genişletmek ayrıca yetkilendirilmedikçe kapsam dışıdır.
+
+#### FORM-07 — Nihai form hiyerarşisi ve draft güvenliği
+
+Hedef günlük create sırası:
+
+`Aktif proje (salt-okunur) → Tarih / Saat → Kısa açıklama → Mahal → Fotoğraf → Tür (ikincil) → Kaydet`
+
+- Mevcut görünür `Kaydet` ana eylemi korunur ve en az 48×48 olur.
+- Kaydedilmemiş değişiklik guard'ı korunur; fotoğraf veya metin varken yanlışlıkla Back veri kaybı üretmez.
+- Proje/Mahal yönetimi, uzun opsiyonel form bölümleri ve ikinci metin alanı günlük capture akışını bölmez.
+- Mevcut Beton suggestion gibi yararlı bağlamsal öneriler source semantiği korunarak ikincil kalabilir; ana hızlı kayıt akışını kapatmaz veya zorunlu hale gelmez.
+
 **Q03 bitiş tanımı:**
 
 - takvim yatay kaydırma olmadan kullanılabilir pencereye sığar;
-- kayıt olan günler yoğunluğu anlaşılır biçimde gösterir;
-- çok yüksek kayıt sayısı sınırsız nokta/spiral ile UI'ı bozmaz;
-- yalnız aktif proje kayıtları görünür;
-- `Yeni Proje` Ajanda'da bulunmaz;
-- `Mahal Kataloğu` yönetimi proje profiline taşınır, Ajanda Mahal'i yalnız bağlam olarak kullanır;
-- proje değişimi kayıtları mutate etmez;
-- seçili günün kayıtları ve empty state kullanıcıya doğrudan anlaşılır.
+- kayıt olan günler yoğunluğu anlaşılır biçimde gösterir ve çok yüksek kayıt sayısı sınırsız nokta/spiral ile UI'ı bozmaz;
+- yalnız aktif proje kayıtları görünür ve proje değişimi source kayıtları mutate etmez;
+- `Yeni Proje` ve `Mahal Kataloğu` yönetimi Ajanda ana ekranında/formunda bulunmaz;
+- seçili günün kayıtları ve empty state kullanıcıya doğrudan anlaşılır;
+- yeni kayıt formunda tarih/saat açıklamanın üstündedir ve context-aware doğru varsayılanla gelir;
+- proje yeniden seçtirilmez; aktif proje read-only context olarak kullanılır;
+- Mahal kolay erişilen, opsiyonel stable-ID seçicisidir;
+- yeni kayıt için tek ana metin alanı `Kısa açıklama`dır; legacy ayrıntılı not verisi silinmez;
+- fotoğraf ekleme büyük, belirgin ve önizlemeli ana capture yüzeyidir;
+- `AgendaCategory` semantiği korunur fakat tür seçmek common-case zorunlu adıma dönüşmez;
+- draft/back güvenliği, attachment bütünlüğü, stable identity/history ve mevcut downstream category davranışları korunur.
 
 ### Q04 — Ana Sayfa / Proje Profili genişletme
 
