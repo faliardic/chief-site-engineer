@@ -266,7 +266,7 @@ class FakeAttendanceApplication implements AttendanceApplication {
   Future<WorkforcePersonDetail> getPersonDetail(String memberId) async {
     final member = members.firstWhere((item) => item.id == memberId);
     final memberCompliance = compliance
-        .where((item) => item.memberId == memberId)
+        .where((item) => item.memberId == memberId && item.archivedAt == null)
         .toList();
     final memberPpe = ppeAssignments
         .where((item) => item.memberId == memberId)

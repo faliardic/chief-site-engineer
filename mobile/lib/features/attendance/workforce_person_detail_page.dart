@@ -2,6 +2,7 @@ import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
+import 'package:chief_site_engineer/features/attendance/workforce_compliance_summary.dart';
 import 'package:flutter/material.dart';
 
 class WorkforcePersonDetailPage extends StatefulWidget {
@@ -55,12 +56,15 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
     final reason = TextEditingController(text: current?.reason);
     var type = current?.documentType ?? ComplianceDocumentType.employmentEntry;
     var status = current?.sourceStatus ?? ComplianceSourceStatus.valid;
+    var detailsExpanded =
+        status == ComplianceSourceStatus.notApplicable ||
+        status == ComplianceSourceStatus.exception;
     final input = await showDialog<_ComplianceInput>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(
-            current == null ? 'İSG belgesi ekle' : 'İSG belgesini düzenle',
+            current == null ? 'İSG kaydı ekle' : 'İSG kaydını düzenle',
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -69,6 +73,7 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
                 DropdownButtonFormField<ComplianceDocumentType>(
                   initialValue: type,
                   isExpanded: true,
+                  itemHeight: null,
                   decoration: const InputDecoration(labelText: 'Belge türü'),
                   items: ComplianceDocumentType.values
                       .map(
@@ -85,30 +90,78 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
                 DropdownButtonFormField<ComplianceSourceStatus>(
                   initialValue: status,
                   isExpanded: true,
+                  isDense: false,
+                  itemHeight: null,
                   decoration: const InputDecoration(
                     labelText: 'Kullanıcı durumu',
                   ),
+                  selectedItemBuilder: (context) => ComplianceSourceStatus
+                      .values
+                      .map(
+                        (item) => Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(
+                            item.label,
+                            key: Key(
+                              'compliance-status-selected-${item.storageValue}',
+                            ),
+                            semanticsLabel: '${item.label} (kullanıcı kaydı)',
+                          ),
+                        ),
+                      )
+                      .toList(),
                   items: ComplianceSourceStatus.values
                       .map(
                         (item) => DropdownMenuItem(
                           value: item,
-                          child: Text(item.label),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Text(
+                              item == ComplianceSourceStatus.valid
+                                  ? 'Geçerli (kullanıcı kaydı)'
+                                  : item.label,
+                            ),
+                          ),
                         ),
                       )
                       .toList(),
-                  onChanged: (value) =>
-                      setDialogState(() => status = value ?? status),
+                  onChanged: (value) => setDialogState(() {
+                    status = value ?? status;
+                    if (status == ComplianceSourceStatus.notApplicable ||
+                        status == ComplianceSourceStatus.exception) {
+                      detailsExpanded = true;
+                    }
+                  }),
                 ),
                 _gap,
-                _field(number, 'Belge numarası'),
-                _gap,
-                _field(issued, 'Düzenlenme tarihi (YYYY-AA-GG)'),
-                _gap,
-                _field(expiry, 'Son geçerlilik tarihi (YYYY-AA-GG)'),
-                _gap,
-                _field(reason, 'İstisna/uygulanamaz gerekçesi'),
-                _gap,
-                _field(note, 'Not', maxLines: 3),
+                Semantics(
+                  expanded: detailsExpanded,
+                  child: TextButton.icon(
+                    key: const Key('compliance-dialog-details'),
+                    onPressed: () => setDialogState(
+                      () => detailsExpanded = !detailsExpanded,
+                    ),
+                    icon: Icon(
+                      detailsExpanded ? Icons.expand_less : Icons.expand_more,
+                    ),
+                    label: const Text('Detaylar'),
+                  ),
+                ),
+                if (detailsExpanded) ...[
+                  _gap,
+                  if (status == ComplianceSourceStatus.notApplicable ||
+                      status == ComplianceSourceStatus.exception)
+                    const Text('Bu durum için gerekçe zorunludur.'),
+                  _field(reason, 'İstisna/uygulanamaz gerekçesi'),
+                  _gap,
+                  _field(number, 'Belge numarası'),
+                  _gap,
+                  _field(issued, 'Düzenlenme tarihi (YYYY-AA-GG)'),
+                  _gap,
+                  _field(expiry, 'Son geçerlilik tarihi (YYYY-AA-GG)'),
+                  _gap,
+                  _field(note, 'Not', maxLines: 3),
+                ],
               ],
             ),
           ),
@@ -463,36 +516,102 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
   }
 
   Widget _compliance(WorkforcePersonDetail detail) => ListView(
+    key: const PageStorageKey('workforce-person-compliance'),
     padding: const EdgeInsets.all(12),
     children: [
       FilledButton.icon(
         key: const Key('add-compliance-record'),
+        style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
         onPressed: _saveCompliance,
         icon: const Icon(Icons.post_add_outlined),
-        label: const Text('İSG belgesi ekle'),
+        label: const Text('İSG kaydı ekle'),
       ),
       const SizedBox(height: 8),
       const Text(
         'Bu durumlar yalnız kayıt görünürlüğüdür; hukuki uygunluk veya işe kabul kararı değildir.',
       ),
-      for (final item in detail.compliance)
+      const SizedBox(height: 8),
+      const Text(
+        'Belge türleri takip kategorileridir; zorunlu belge listesi değildir.',
+      ),
+      for (final category in WorkforceComplianceSummary(
+        detail.compliance,
+      ).categories)
         Card(
-          key: Key('compliance-${item.id}'),
-          child: ListTile(
-            onTap: () => _saveCompliance(item),
-            title: Text(item.documentType.label),
-            subtitle: Text(
-              '${item.readStatus.label}'
-              '${item.expiryDate == null ? '' : ' • ${item.expiryDate}'}',
+          child: ExpansionTile(
+            key: PageStorageKey(
+              'compliance-category-${category.type.storageValue}',
             ),
-            trailing: IconButton(
-              tooltip: 'Arşivle',
-              onPressed: () => _archiveCompliance(item),
-              icon: const Icon(Icons.archive_outlined),
-            ),
+            initiallyExpanded: true,
+            maintainState: true,
+            title: Text(category.type.label),
+            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (category.records.isEmpty)
+                const Text(WorkforceComplianceSummary.emptyLabel),
+              if (category.hasMultipleRecords)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(WorkforceComplianceSummary.duplicateLabel),
+                ),
+              for (final item in category.records) _complianceRecord(item),
+            ],
           ),
         ),
     ],
+  );
+
+  Widget _complianceRecord(WorkforceComplianceRecord item) => Card(
+    key: Key('compliance-${item.id}'),
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            WorkforceComplianceSummary.sourceLabel(item.sourceStatus),
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          if (WorkforceComplianceSummary.dateWarning(item.readStatus)
+              case final warning?)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(warning),
+            ),
+          const SizedBox(height: 8),
+          if (item.documentNumber case final number?)
+            Text('Belge numarası: $number'),
+          if (item.issuedDate case final issued?)
+            Text('Düzenlenme tarihi: $issued'),
+          if (item.expiryDate case final expiry?)
+            Text('Son geçerlilik tarihi: $expiry'),
+          if (item.note case final note?) Text('Not: $note'),
+          if (item.reason case final reason?) Text('Gerekçe: $reason'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              TextButton.icon(
+                key: Key('edit-compliance-${item.id}'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: () => _saveCompliance(item),
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Düzenle'),
+              ),
+              TextButton.icon(
+                key: Key('archive-compliance-${item.id}'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: () => _archiveCompliance(item),
+                icon: const Icon(Icons.archive_outlined),
+                label: const Text('Arşivle'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
   );
 
   Widget _ppe(WorkforcePersonDetail detail) => ListView(
@@ -530,7 +649,7 @@ class _Summary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final missing = detail.missingComplianceCount > 0;
+    final compliance = WorkforceComplianceSummary(detail.compliance);
     return Card(
       key: const Key('workforce-person-profile'),
       margin: EdgeInsets.zero,
@@ -594,22 +713,24 @@ class _Summary extends StatelessWidget {
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Divider(),
             ),
-            Text(
-              missing ? 'İSG EKSİĞİ VAR' : 'İSG TAM',
-              style: theme.textTheme.titleMedium,
-            ),
-            if (missing) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  key: const Key('profile-open-compliance'),
-                  onPressed: () =>
-                      DefaultTabController.of(context).animateTo(2),
-                  child: const Text('İSG ekranına git'),
-                ),
+            Text('İSG kayıt durumu', style: theme.textTheme.titleMedium),
+            for (final signal in compliance.signals)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(signal),
               ),
-            ],
+            const SizedBox(height: 8),
+            const Text(WorkforceComplianceSummary.scopeLabel),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const Key('profile-open-compliance'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: () => DefaultTabController.of(context).animateTo(2),
+                child: const Text('İSG ekranına git'),
+              ),
+            ),
           ],
         ),
       ),
