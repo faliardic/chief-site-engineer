@@ -175,41 +175,212 @@ void main() {
     },
   );
 
+  test('helper consumes supplied read status without calculating dates', () {
+    // Deliberately unrelated dates establish that this presenter is not a clock.
+    final valid = _record('record', expiry: '1900-01-01');
+    expect(WorkforceComplianceSummary([valid]).signals, [
+      'Mevcut kayıtlarda uyarı yok',
+    ]);
+    expect(
+      WorkforceComplianceSummary.sourceLabel(valid.sourceStatus),
+      'Kullanıcı kaydı: geçerli olarak işaretlendi',
+    );
+    expect(WorkforceComplianceSummary.dateWarning(valid.readStatus), isNull);
+    final expired = _record(
+      'record-2',
+      expiry: '2999-01-01',
+      read: ComplianceReadStatus.expired,
+    );
+    expect(WorkforceComplianceSummary([expired]).signals, [
+      'Süresi geçmiş kayıt var',
+    ]);
+    expect(
+      WorkforceComplianceSummary.dateWarning(expired.readStatus),
+      'Süresi geçmiş',
+    );
+    expect(
+      WorkforceComplianceSummary.dateWarning(ComplianceReadStatus.expiring),
+      'Süresi yaklaşıyor',
+    );
+  });
+  test('core completeness needs all four active valid categories', () {
+    final complete = _completeCoreRecords();
+    expect(WorkforceComplianceSummary(complete).signals, ['İSG belgeleri tam']);
+    for (final type in _coreTypes) {
+      final remaining = complete.where((record) => record.documentType != type);
+      for (final replacement in <List<WorkforceComplianceRecord>>[
+        [],
+        [_record('other', type: ComplianceDocumentType.other)],
+        [_record('archived', type: type, archivedAt: '2026-09-01T08:00:00Z')],
+        [
+          _record(
+            'na',
+            type: type,
+            source: ComplianceSourceStatus.notApplicable,
+            read: ComplianceReadStatus.exception,
+          ),
+        ],
+        [
+          _record(
+            'exception',
+            type: type,
+            source: ComplianceSourceStatus.exception,
+            read: ComplianceReadStatus.exception,
+          ),
+        ],
+      ]) {
+        expect(
+          WorkforceComplianceSummary([...remaining, ...replacement]).signals,
+          isNot(contains('İSG belgeleri tam')),
+          reason: 'Missing active valid core category: ${type.name}',
+        );
+      }
+    }
+    expect(
+      WorkforceComplianceSummary([
+        _record('only-other', type: ComplianceDocumentType.other),
+      ]).signals,
+      ['Mevcut kayıtlarda uyarı yok'],
+    );
+  });
+
   test(
-    'helper consumes supplied read status without calculating dates or completeness',
+    'core completeness rejects missing or expired siblings in any order',
     () {
-      // Deliberately unrelated dates establish that this presenter is not a clock.
-      final valid = _record('record', expiry: '1900-01-01');
-      expect(WorkforceComplianceSummary([valid]).signals, [
-        'Mevcut kayıtlarda uyarı yok',
-      ]);
+      for (final type in _coreTypes) {
+        for (final blocker in [
+          _record(
+            'missing',
+            type: type,
+            source: ComplianceSourceStatus.missing,
+            read: ComplianceReadStatus.missing,
+          ),
+          _record(
+            'expired',
+            type: type,
+            read: ComplianceReadStatus.expired,
+            expiry: '2026-01-01',
+          ),
+        ]) {
+          final records = [..._completeCoreRecords(), blocker];
+          final signals = WorkforceComplianceSummary(records).signals;
+          expect(signals, isNot(contains('İSG belgeleri tam')));
+          expect(signals, contains('Aynı türde birden fazla aktif kayıt var'));
+          expect(
+            signals,
+            contains(
+              blocker.sourceStatus == ComplianceSourceStatus.missing
+                  ? 'Eksik olarak işaretlenmiş kayıt var'
+                  : 'Süresi geçmiş kayıt var',
+            ),
+          );
+          expect(WorkforceComplianceSummary(records.reversed).signals, signals);
+        }
+      }
+    },
+  );
+
+  test(
+    'core completeness coexists with expiring and recorded special signals',
+    () {
+      final complete = _completeCoreRecords();
+      final expiring = _record(
+        'expiring',
+        type: _coreTypes.first,
+        read: ComplianceReadStatus.expiring,
+        expiry: '2026-09-30',
+      );
       expect(
-        WorkforceComplianceSummary.sourceLabel(valid.sourceStatus),
-        'Kullanıcı kaydı: geçerli olarak işaretlendi',
+        WorkforceComplianceSummary([expiring, ...complete.skip(1)]).signals,
+        ['İSG belgeleri tam', 'Süresi yaklaşan kayıt var'],
       );
-      expect(WorkforceComplianceSummary.dateWarning(valid.readStatus), isNull);
-      final expired = _record(
-        'record-2',
-        expiry: '2999-01-01',
-        read: ComplianceReadStatus.expired,
-      );
-      expect(WorkforceComplianceSummary([expired]).signals, [
-        'Süresi geçmiş kayıt var',
-      ]);
-      expect(
-        WorkforceComplianceSummary.dateWarning(expired.readStatus),
-        'Süresi geçmiş',
-      );
-      expect(
-        WorkforceComplianceSummary.dateWarning(ComplianceReadStatus.expiring),
-        'Süresi yaklaşıyor',
-      );
+      for (final extra in [
+        _record('valid-duplicate'),
+        _record(
+          'na',
+          source: ComplianceSourceStatus.notApplicable,
+          read: ComplianceReadStatus.exception,
+        ),
+        _record(
+          'exception',
+          source: ComplianceSourceStatus.exception,
+          read: ComplianceReadStatus.exception,
+        ),
+        _record(
+          'archived-expired',
+          read: ComplianceReadStatus.expired,
+          archivedAt: '2026-09-01T08:00:00Z',
+        ),
+      ]) {
+        final records = [...complete, extra];
+        final signals = WorkforceComplianceSummary(records).signals;
+        expect(signals.first, 'İSG belgeleri tam');
+        expect(signals, isNot(contains('Mevcut kayıtlarda uyarı yok')));
+        if (extra.archivedAt == null) {
+          expect(signals, contains('Aynı türde birden fazla aktif kayıt var'));
+        }
+        if (extra.sourceStatus == ComplianceSourceStatus.notApplicable) {
+          expect(signals, contains('Uygulanamaz olarak işaretlenmiş kayıt: 1'));
+        }
+        if (extra.sourceStatus == ComplianceSourceStatus.exception) {
+          expect(signals, contains('İstisna olarak işaretlenmiş kayıt: 1'));
+        }
+        expect(WorkforceComplianceSummary(records.reversed).signals, signals);
+      }
+    },
+  );
+
+  test(
+    'core completeness ignores other while preserving its warning signals',
+    () {
+      for (final other in [
+        _record('other', type: ComplianceDocumentType.other),
+        _record(
+          'other',
+          type: ComplianceDocumentType.other,
+          source: ComplianceSourceStatus.missing,
+          read: ComplianceReadStatus.missing,
+        ),
+        _record(
+          'other',
+          type: ComplianceDocumentType.other,
+          read: ComplianceReadStatus.expired,
+          expiry: '2026-01-01',
+        ),
+      ]) {
+        expect(
+          WorkforceComplianceSummary([
+            ..._completeCoreRecords(),
+            other,
+          ]).signals,
+          [
+            'İSG belgeleri tam',
+            if (other.sourceStatus == ComplianceSourceStatus.missing)
+              'Eksik olarak işaretlenmiş kayıt var',
+            if (other.readStatus == ComplianceReadStatus.expired)
+              'Süresi geçmiş kayıt var',
+          ],
+        );
+      }
     },
   );
 }
 
+const _coreTypes = [
+  ComplianceDocumentType.employmentEntry,
+  ComplianceDocumentType.healthReport,
+  ComplianceDocumentType.basicSafetyTraining,
+  ComplianceDocumentType.vocationalCertificate,
+];
+
+List<WorkforceComplianceRecord> _completeCoreRecords() => [
+  for (final type in _coreTypes)
+    _record(type.storageValue, type: type, emptyDetails: true),
+];
+
 WorkforceComplianceRecord _record(
   String id, {
+  ComplianceDocumentType type = ComplianceDocumentType.employmentEntry,
   ComplianceSourceStatus source = ComplianceSourceStatus.valid,
   ComplianceReadStatus read = ComplianceReadStatus.valid,
   String? expiry,
@@ -219,7 +390,7 @@ WorkforceComplianceRecord _record(
 }) => WorkforceComplianceRecord(
   id: id,
   memberId: 'person-1',
-  documentType: ComplianceDocumentType.employmentEntry,
+  documentType: type,
   documentNumber: emptyDetails ? null : 'Belge $id',
   issuedDate: emptyDetails ? null : '2026-01-01',
   expiryDate: expiry,

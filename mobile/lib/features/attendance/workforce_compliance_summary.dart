@@ -18,12 +18,31 @@ class WorkforceComplianceSummary {
   static const scopeLabel =
       'Bu özet yalnız kaydedilen bilgileri gösterir; gereklilikler değerlendirilmedi.';
   static const duplicateLabel = 'Bu türde birden fazla aktif kayıt var';
+  static const _coreDocumentTypes = {
+    ComplianceDocumentType.employmentEntry,
+    ComplianceDocumentType.healthReport,
+    ComplianceDocumentType.basicSafetyTraining,
+    ComplianceDocumentType.vocationalCertificate,
+  };
 
   final List<WorkforceComplianceCategory> categories;
 
   List<String> get signals {
     final active = categories.expand((category) => category.records).toList();
     if (active.isEmpty) return const [emptyLabel];
+    final coreComplete = categories
+        .where((category) => _coreDocumentTypes.contains(category.type))
+        .every(
+          (category) =>
+              category.records.any(
+                (record) => record.sourceStatus == ComplianceSourceStatus.valid,
+              ) &&
+              !category.records.any(
+                (record) =>
+                    record.sourceStatus == ComplianceSourceStatus.missing ||
+                    record.readStatus == ComplianceReadStatus.expired,
+              ),
+        );
     final notApplicable = active
         .where(
           (record) =>
@@ -36,6 +55,7 @@ class WorkforceComplianceSummary {
         )
         .length;
     final messages = [
+      if (coreComplete) 'İSG belgeleri tam',
       if (active.any(
         (record) => record.sourceStatus == ComplianceSourceStatus.missing,
       ))

@@ -621,6 +621,132 @@ void main() {
     }
   }
 
+  for (final scenario in [
+    ('all four valid without details', _coreProfileRecords(), true, <String>[]),
+    (
+      'expiring core',
+      [
+        ..._coreProfileRecords().skip(1),
+        _complianceRecord(
+          'expiring',
+          read: ComplianceReadStatus.expiring,
+          expiry: '2026-09-30',
+        ),
+      ],
+      true,
+      ['Süresi yaklaşan kayıt var'],
+    ),
+    (
+      'missing core sibling',
+      [
+        ..._coreProfileRecords(),
+        _complianceRecord(
+          'missing',
+          source: ComplianceSourceStatus.missing,
+          read: ComplianceReadStatus.missing,
+        ),
+      ],
+      false,
+      [
+        'Eksik olarak işaretlenmiş kayıt var',
+        'Aynı türde birden fazla aktif kayıt var',
+      ],
+    ),
+    (
+      'expired core sibling',
+      [
+        ..._coreProfileRecords(),
+        _complianceRecord(
+          'expired',
+          read: ComplianceReadStatus.expired,
+          expiry: '2026-01-01',
+        ),
+      ],
+      false,
+      ['Süresi geçmiş kayıt var', 'Aynı türde birden fazla aktif kayıt var'],
+    ),
+    (
+      'not-applicable cannot replace valid core',
+      [
+        ..._coreProfileRecords().skip(1),
+        _complianceRecord(
+          'na',
+          source: ComplianceSourceStatus.notApplicable,
+          read: ComplianceReadStatus.exception,
+        ),
+      ],
+      false,
+      ['Uygulanamaz olarak işaretlenmiş kayıt: 1'],
+    ),
+    (
+      'exception cannot replace valid core',
+      [
+        ..._coreProfileRecords().skip(1),
+        _complianceRecord(
+          'exception',
+          source: ComplianceSourceStatus.exception,
+          read: ComplianceReadStatus.exception,
+        ),
+      ],
+      false,
+      ['İstisna olarak işaretlenmiş kayıt: 1'],
+    ),
+    (
+      'other cannot replace core',
+      [
+        ..._coreProfileRecords().skip(1),
+        _complianceRecord('other', type: ComplianceDocumentType.other),
+      ],
+      false,
+      <String>[],
+    ),
+    (
+      'other expiry does not block core completeness',
+      [
+        ..._coreProfileRecords(),
+        _complianceRecord(
+          'other-expired',
+          type: ComplianceDocumentType.other,
+          read: ComplianceReadStatus.expired,
+          expiry: '2026-01-01',
+        ),
+      ],
+      true,
+      ['Süresi geçmiş kayıt var'],
+    ),
+  ]) {
+    testWidgets('core completeness profile ${scenario.$1}', (tester) async {
+      final attendance = _Attendance(compliance: scenario.$2);
+      await _pump(tester, attendance, size: const Size(320, 640), scale: 2);
+      expect(
+        find.text('İSG belgeleri tam'),
+        scenario.$3 ? findsOneWidget : findsNothing,
+      );
+      expect(
+        find.text('Mevcut kayıtlarda uyarı yok'),
+        !scenario.$3 && scenario.$4.isEmpty ? findsOneWidget : findsNothing,
+      );
+      for (final label in [
+        if (scenario.$3) 'İSG belgeleri tam',
+        ...scenario.$4,
+        'Bu özet yalnız kaydedilen bilgileri gösterir; gereklilikler değerlendirilmedi.',
+      ]) {
+        final field = find.text(label);
+        await tester.ensureVisible(field);
+        await tester.pumpAndSettle();
+        expect(field.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+      expect(
+        find.text('Son geçerlilik tarihi girilmemiş kayıt var'),
+        findsNothing,
+      );
+      expect(attendance.calls, ['read:person-1']);
+      expect(attendance.complianceCommands, isEmpty);
+      expect(attendance.store.compliance, orderedEquals(scenario.$2));
+    });
+  }
+
   testWidgets(
     'compliance valid without details is neutral in profile and card',
     (tester) async {
@@ -917,6 +1043,16 @@ Future<void> _revealCompliance(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
   expect(tester.takeException(), isNull);
 }
+
+List<WorkforceComplianceRecord> _coreProfileRecords() => [
+  for (final type in [
+    ComplianceDocumentType.employmentEntry,
+    ComplianceDocumentType.healthReport,
+    ComplianceDocumentType.basicSafetyTraining,
+    ComplianceDocumentType.vocationalCertificate,
+  ])
+    _complianceRecord(type.storageValue, type: type, emptyDetails: true),
+];
 
 WorkforceComplianceRecord _complianceRecord(
   String id, {
