@@ -666,3 +666,89 @@ Standing owner kuralı gereği Q01–Q26'nın tamamı yeniden değerlendirildi:
 ### ROADMAP etkisi
 
 `VAR` — İş Gücü/Sicil first-class + Firma→Personel yeni Q05 olarak eklendi; literal altıncı compact navigation reddedilip mevcut Puantaj destination'ının İş Gücü parent'a dönüşmesi kanonikleştirildi; Inventory Q06 ve sonraki işler yeniden numaralandırıldı; telemetry + privacy/store tek Q18'de birleştirildi; Q22/Q23 ve post-release cross-reference'ları yeni numaralara taşındı. Ekip user-facing opsiyonelliği production implementation'dan önce compatibility audit ve gerektiğinde ayrı CRITICAL authority gerektirir.
+
+## 14. REVIEW-008 — Günlük Puantaj owner geri bildirimi, Q04 kapsam genişletmesi ve yeniden sıralama
+
+**Tarih:** 2026-09-06  
+**Amaç:** Owner'ın `Puantaj` kullanım geri bildirimini current Attendance source ile karşılaştırmak, Günlük Puantaj'ı first-class İş Gücü/Sicil modeliyle tek günlük-core akışta birleştirmek ve current pre-release kuyruğu yeniden değerlendirmek.  
+**Değerlendirilen Q'lar:** Güncel Q01–Q26 kuyruğunun tamamı; ayrıntılı kapsam yeni Q04.
+
+### Current GitHub gerçeği
+
+- Toplantı sırasında current `master`, `AGENTS.md`, current ROADMAP, Q04/Q05 Workforce kararları ve `AttendancePage` / `AttendanceDayPage` source yeniden doğrulandı.
+- Açık production işi Issue #708 / Draft PR #715 / Q01 İSG Geçmiş-Arşiv işidir; exact Fatih Acceptance kapanmadan yeni production child başlamaz.
+- Current Günlük Puantaj detail üstünde proje adını gösterir; owner'ın proje adının görünmesi yönü mevcut ve korunabilir davranıştır.
+- Current parent `AttendancePage` ayrıca kendi `Proje` dropdown'unu taşır; shared active-project modeline rağmen Puantaj içinde ikinci proje seçimi bulunur.
+- Current `AttendanceDayPage` yalnız existing day entry'si olan kişileri ana `_members` listesine alır; yeni roster için `İşveren seç → Ekip filtresi → aday personel → rostere ekle` zinciri kullanır.
+- Current candidate selection active `team_id` ister; seçili İşveren altında aktif ekip yoksa inline personel oluşturma ve aday liste akışı bloke olur.
+- Ana günlük yüzeyde `Tümünü tam gün` ve `Ekibi tam gün` iki görünür bulk buton olarak bulunur. Current `_markFull()` doğrudan `markFullDay` application write'ı yapar ve sonra reload eder; bu bulk eylem salt local draft değildir.
+- Current personeller `teamId/teamName` anahtarlarıyla zorunlu ekip section'larında gruplanır.
+- Mevcut `_MemberAttendanceCard` içinde canonical `AttendanceResult` için tek dokunuşlu görünür kontroller ve FM/not için ExpansionTile zaten vardır; bu iyi davranış yeni compact row tasarımında korunmalıdır.
+- Current draft ekranında `Kaydet` ve `Günü tamamla` ayrı eylemlerdir. `_transition(complete)` doğrudan `transitionDay` çağırır; önce `_save()` çağırmadığı için ekrandaki kaydedilmemiş roster seçimlerinin tamamlamada sessizce yok sayılması riski vardır. Yeni akış bu belirsizliği kabul edemez.
+
+### Owner kararları ve ürün değerlendirmesi
+
+1. Günlük Puantaj mevcut haliyle yetersiz kabul edilir; sorun yalnız görsel değil, roster/navigation bilgi mimarisidir.
+2. Proje adı günlük ekranda görünür kalır. Normal flow'da ayrıca ikinci bir proje dropdown'u yerine shared active-project context kullanılır.
+3. Aktif projedeki tüm active canonical Sicil personeli günlük ekranda doğrudan listelenir; existing entry'si bulunan pasif kişi o günün tarihsel kaydı için görünmeye devam eder.
+4. `Listede görünmek` source attendance row yaratmak değildir; kullanıcı bir sonuç seçmedikçe veya existing entry yoksa write oluşmaz.
+5. Mandatory `İşveren seç → Ekip filtresi → aday personel → rostere ekle` common-case akışı kaldırılır. Yeni personel gerektiğinde Q04 canonical Firma → Personel akışı kullanılır.
+6. Günlük personel listesi zorunlu ekip section'larına bölünmez; flat ve hızlı taranabilir olur. Firma/meslek kısa ikincil bilgidir; ekip optional/advanced bilgidir.
+7. Mevcut `Tam gün`, `Yarım gün`, `Gelmedi`, izin/current AttendanceResult semantiği tek dokunuşlu, mutually-exclusive personel kontrolü olarak korunur. FM/not ikincil progressive disclosure altında kalır.
+8. Owner'ın `Tümünü tam gün` ve `Ekibi tam gün` ana butonlarını kaldırma yönü kabul edilir. Fakat 50–100 kişilik sahada bulk capability tamamen silinmez; görünür primary butonlar yerine secondary **`Toplu işlemler`** altında bounded `Görünenleri tam gün` / filtre-scope bulk davranışı bulunabilir.
+9. Tercih edilen bulk UX doğrudan persistent write yerine current draft'a uygulanır; `Kaydet` / `Günü tamamla` gerçek write sınırıdır. Existing markFull event/history semantiği bu değişiklikten önce audit edilir.
+10. Günlük özet current draft seçimlerini yansıtacak biçimde listenin üstünde kompakt tutulabilir; saved state ile ekrandaki draft birbirine karıştırılmaz.
+11. `Kaydet` draftı saklayan ikincil eylem olabilir; `Günü tamamla` primary day-completion eylemidir. `Günü tamamla`, kaydedilmemiş current roster değişikliklerini sessizce atlayamaz.
+12. En dar güvenli completion yolu önce draft roster'ı save/verify edip sonra day transition uygulamaktır. Transition başarısızsa saved draft korunur ve gün draft kalır. Save+complete atomic transaction gerekirse ayrı CRITICAL child açılır.
+13. `Çalışma yok` whole-day transition olarak korunur. CSV/export/copy/history günlük personel işaretleme akışının altında ikincil araçlardır.
+14. Empty state Firma/personel altyapısına bağlanır: kayıt yoksa `Taşeron / İşveren ekle`; firma var-personel yoksa `Personel ekle`; personel varsa doğrudan günlük liste.
+
+### Tam kuyruk yeniden değerlendirmesi
+
+Standing owner kuralı gereği Q01–Q26'nın tamamı yeniden değerlendirildi:
+
+- Günlük Puantaj ayrı yeni Q yapılmadı. `İş Gücü / Sicil` ile aynı canonical person/firma verisini ve aynı primary destination'ı kullandığı için REVIEW-007'deki Workforce işiyle **tek Q** altında birleşmesi doğru bulundu.
+- Bu birleşik İş Gücü/Sicil/Puantaj işi günlük saha frekansı ve Q05 Project Profile'daki İş Gücü kartının gerçek hedefini sağlaması nedeniyle **Q04'e yükseltildi**.
+- Proje Profili **Q05'e** kaydı. Profilin ürün değeri yüksek kalır; ancak İş Gücü kartı ve bugünkü personel metriğinin tamamlanmış shared destination'a bağlanması implementation bağımlılığı açısından daha temizdir.
+- Inventory Q06, KKD Q07 ve Q08–Q26 göreli sıralaması değişmedi.
+- Q13 Puantaj→Ajanda automatic completion kaydı ayrı CRITICAL iş olarak kalır; günlük Puantaj UI sadeleştirmesiyle birleştirilmez.
+- Q22 current RC evidence/manual-debt gate'i direct daily roster, primary bulk removal/secondary bulk, no-team grouping ve unsaved→complete davranışlarını kapsar.
+- Q23 entegre şantiye şefi günü senaryosu `Firma/Personel → Sicil → Günlük Puantaj → İSG/KKD` zincirini tekrar veri girişi olmadan doğrular.
+- Q01 açık production gate'i değişmedi; Q02 hâlâ NEXT'tir.
+
+### Yeni kanonik sıra özeti
+
+1. Q01 — İSG Geçmiş / Arşiv
+2. Q02 — Hatırlatıcı aktif-proje bağlamı + hızlı Unutma
+3. Q03 — Ajanda aktif-proje takvimi + hızlı kayıt oluşturma
+4. Q04 — İş Gücü / Sicil first-class alanı + Firma → Personel + Günlük Puantaj sadeleştirmesi
+5. Q05 — Ana Sayfa / Proje Profili
+6. Q06 — Envanter / Kroki hedefli interaction refinement
+7. Q07 — KKD hızlı seçim
+8. Q08 — Beton completion/detail/edit
+9. Q09 — Malzemeler UI/UX uyumu
+10. Q10 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
+11. Q11 — Minimum proje-geneli arama
+12. Q12 — Kısa guided onboarding
+13. Q13 — Puantaj → Ajanda otomatik kayıt
+14. Q14 — Şefim otomatik yedek klasörü
+15. Q15 — Otomatik personel kodu decision gate
+16. Q16 — Metraj V1 decision gate
+17. Q17 — Global hızlı cetvel
+18. Q18 — Minimum crash/ANR/fatal telemetry + Privacy/KVKK/store declarations
+19. Q19 — Recovery/backup owner acceptance
+20. Q20 — Adaptive cihaz/pencere matrisi
+21. Q21 — TalkBack/yüksek yazı/focus/grayscale
+22. Q22 — Release evidence + manuel kabul borçları + Inventory release-QA
+23. Q23 — Entegre şantiye şefi günü
+24. Q24 — Automated milestone/build/provenance
+25. Q25 — Owner telefon+tablet RC kabulü
+26. Q26 — Açık genel yayın kararı
+
+### Önceki değerlendirmelerle ilişki
+
+`REVIEW-007` İş Gücü first-class, max-5 navigation, Firma → Personel, canonical person prerequisite ve Ekip opsiyonelliği kararları bakımından **CURRENT** kalır; ancak Q04/Q05 sırası ve Puantaj kapsamı bu raporla **KISMEN SUPERSEDED / GENİŞLETİLMİŞTİR**. `REVIEW-006` Inventory gerekçeleri bakımından current kalır ve Inventory Q06 olarak devam eder.
+
+### ROADMAP etkisi
+
+`VAR` — İş Gücü/Sicil Q'su Günlük Puantaj direct-list/flat-roster/save-complete kapsamıyla genişletildi ve Q04'e yükseltildi; Proje Profili Q05'e kaydı; Q03/Q05/Q07/Q22/Q23 cross-reference'ları yeni sıraya taşındı. Günlük Puantaj primary bulk butonları kaldırılırken bulk capability secondary/draft olarak korunur; mandatory Firma/Ekip roster navigation kaldırılır; save/complete transaction sınırı gerekiyorsa ayrı CRITICAL authority olmadan genişletilmez.
