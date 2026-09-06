@@ -456,3 +456,49 @@ Küçük görsel kusurlar ve yardımcı kolaylıklar post-release'e kalabilir. K
 ### ROADMAP etkisi
 
 `VAR` — Ajanda/Takvim Q03 olarak eklendi; Proje Profili ve sonraki Q'lar yeniden numaralandırıldı; eski iki adaptive/device release gate tek Q19 altında birleştirildi; ilgili cross-reference'lar yeni numaralara taşındı.
+
+## 11. REVIEW-005 — Ajanda kayıt oluşturma akışı ve Q03 kapsam genişletmesi
+
+**Tarih:** 2026-09-06  
+**Amaç:** Owner'ın Ajanda Kaydı Oluşturma kullanım geri bildirimini değerlendirmek, mevcut runtime sözleşmeleriyle karşılaştırmak ve pre-release roadmap'te doğru iş ailesine yerleştirmek.  
+**Değerlendirilen Q'lar:** Güncel Q01–Q26 kuyruğunun tamamı; ayrıntılı kapsam Q03.
+
+### Current GitHub gerçeği
+
+- Toplantı sırasında current `master`, `AGENTS.md`, ROADMAP, `ROADMAP_REVIEW_LOG.md` ve açık production PR yeniden doğrulandı.
+- Açık production işi Issue #708 / Draft PR #715 / Q01 İSG Geçmiş-Arşiv işidir; Q01 kapanmadan yeni production child başlamaz.
+- Ajanda form source audit'inde mevcut create/edit formunda `Proje` dropdown'u, `Yeni proje oluştur`, ayrı `Zaman ve tür` ExpansionTile, `İsteğe bağlı ayrıntılar`, `Ayrıntılı not`, stable Mahal seçimi ve küçük fotoğraf aksiyonu bulundu.
+- Tarih/saat new-record init'inde zaten Europe/Istanbul current zamanından türetiliyor; takvimden gelen `initialIstanbulDay` mevcutsa seçilen gün korunuyor.
+- `AgendaCategory` kapalı storage enum'udur ve Beton sinyali/yönlendirmesi dahil downstream anlam taşır; bu nedenle yalnız UI sadeleştirmesi gerekçesiyle silinmemelidir.
+- Mahal için stable `locationId` zaten opsiyoneldir; bu, proje-geneli Ajanda kaydını koruyarak proje seçicisinin yerine Mahal'i kullanıcı-facing ana bağlam kontrolü yapmaya uygundur.
+
+### Owner kararları ve ürün değerlendirmesi
+
+1. Ayrı `Zaman ve tür` bölümü kaldırılır; tarih ve saat `Kısa açıklama`nın hemen üstünde açık ikon+değer kontrolleri olur.
+2. Normal varsayılan current İstanbul tarih/saatidir; kullanıcı takvimde başka bir gün seçip create başlattıysa seçilmiş gün yeniden sorulmaz, yalnız saat current değerle başlar.
+3. Proje dropdown'u ve form içindeki `Yeni proje oluştur` kaldırılır. Aktif proje salt-okunur context olur; edit formu source kaydı sessizce başka projeye reassign etmez.
+4. Proje seçicisinin kullanıcı-facing yerini **Mahal seç** alır. Mahal stable-ID tabanlı, yalnız aktif proje kapsamlı ve opsiyonel kalır; proje-geneli kayıt geçerlidir.
+5. `İsteğe bağlı ayrıntılar` ve yeni kayıt için `Ayrıntılı not` alanı kaldırılır. Tek ana metin alanı multiline `Kısa açıklama` olur.
+6. Existing legacy `notes` verisi bu UI değişikliğiyle silinmez, migration yapılmaz veya edit-save sırasında sessizce boşaltılmaz.
+7. `Kayıt türü` ayrı form bölümü olmaktan çıkar ancak mevcut `AgendaCategory` semantiği korunur. Default `Genel not`; değiştirme gerektiğinde kompakt ikincil kontrol kullanılır. Common-case kullanıcı tür seçmeye zorlanmaz.
+8. Fotoğraf ekleme küçük ikon olmaktan çıkar; büyük belirgin kutu/panel, Kamera/Sistem seçici akışı ve altında bounded thumbnail/önizlemeler kullanılır. Çoklu fotoğraf ve draft güvenliği korunur.
+9. Nihai hızlı form hiyerarşisi: `Aktif proje → Tarih/Saat → Kısa açıklama → Mahal → Fotoğraf → Tür (ikincil) → Kaydet`.
+10. Existing Back/unsaved-change guard ve attachment integrity korunur; yeni kayıt fotoğraf UX'i mevcut kayıt attachment yaşam döngüsünü sessizce genişletmez.
+
+### Tam kuyruk yeniden değerlendirmesi
+
+Standing owner kuralı gereği Q01–Q26'nın tamamı yeniden değerlendirildi. Bu geri bildirim için **Q-level yeni sıra değişikliği gerekmiyor**:
+
+- Ajanda kayıt oluşturma, mevcut Q03 Takvim işinden bağımsız bir ürün ailesi değildir; kullanıcı aynı `Ajanda → gün → + kayıt` yolculuğunda iki davranışı birlikte yaşar.
+- Ayrı Q açmak aynı ekran/feature ailesinde gereksiz ikinci implementation ve acceptance zinciri üretirdi.
+- Q03 hâlihazırda Hatırlatıcı Q02'den sonra ve daha geniş Proje Profili Q04'ten önce doğru konumdadır.
+- Q11 Puantaj→Ajanda otomatik kayıt ise mutation/duplicate/transaction/history nedeniyle ayrı CRITICAL iş olarak kalmalıdır; create-form UX ile birleştirilmez.
+- Q04–Q26'nın göreli önem/bağımlılık sırasını değiştirecek yeni bir neden oluşmadı.
+
+### Önceki değerlendirmelerle ilişki
+
+`REVIEW-004` sıralama bakımından **CURRENT** kalır; Q01–Q26 numaraları değişmez. Ancak REVIEW-004'teki Q03 kapsamı bu raporla **GENİŞLETİLMİŞTİR**: Q03 artık yalnız takvim görünümü değil, aynı zamanda hızlı Ajanda kayıt oluşturma akışını da kapsar.
+
+### ROADMAP etkisi
+
+`VAR — SIRA DEĞİŞMEDİ` — Q03 başlığı `Ajanda aktif-proje takvimi + hızlı kayıt oluşturma` olarak genişletildi; CAL-01..06 korunup FORM-01..07 eklendi; Q03 bitiş tanımı capture UX, legacy-note preservation, category semantics ve photo-priority sınırlarıyla genişletildi. Q01–Q26 numaraları ve Q-level öncelik sırası değişmedi.
