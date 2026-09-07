@@ -1,4 +1,4 @@
-import 'dart:ui' show Tristate;
+import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -75,33 +75,53 @@ void main() {
       await _pumpAgenda(
         tester,
         agenda,
-        size: const Size(390, 900),
+        size: const Size(320, 900),
         textScale: 2,
       );
       await _selectDate(tester, DateTime(2026, 9, 9));
 
-      final monday = _key('agenda-calendar-day-2026-09-07');
-      final tuesday = _key('agenda-calendar-day-2026-09-08');
-      expect(tester.getSize(monday).width, lessThan(48));
-      expect(
-        tester.getRect(monday).right,
-        lessThanOrEqualTo(tester.getRect(tuesday).left),
-      );
-      final mondaySemantics = tester
-          .getSemantics(
-            find
-                .ancestor(
-                  of: monday,
-                  matching: find.byWidgetPredicate(
-                    (widget) =>
-                        widget is Semantics &&
-                        widget.properties.label == '2026-09-07',
-                  ),
-                )
-                .first,
-          )
-          .getSemanticsData();
-      expect(mondaySemantics.flagsCollection.isButton, isFalse);
+      final visualDays = [
+        for (var day = 7; day <= 13; day += 1)
+          _key('agenda-calendar-day-2026-09-${day.toString().padLeft(2, '0')}'),
+      ];
+      final visualRects = visualDays.map(tester.getRect).toList();
+      final semanticsRects = <Rect>[];
+      for (var index = 0; index < visualDays.length; index += 1) {
+        final day = visualDays[index];
+        final label = '2026-09-${(index + 7).toString().padLeft(2, '0')}';
+        expect(day, findsOneWidget);
+        expect(tester.getSize(day).width, lessThan(48));
+        expect(day.hitTestable(), findsOneWidget);
+        expect(
+          visualRects.where((rect) => rect.contains(visualRects[index].center)),
+          hasLength(1),
+        );
+        final semanticsFinder = find
+            .ancestor(
+              of: day,
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Semantics && widget.properties.label == label,
+              ),
+            )
+            .first;
+        final semantics = tester
+            .getSemantics(semanticsFinder)
+            .getSemanticsData();
+        expect(semantics.flagsCollection.isButton, isFalse);
+        expect(semantics.hasAction(SemanticsAction.tap), isFalse);
+        expect(tester.getRect(semanticsFinder), visualRects[index]);
+        semanticsRects.add(tester.getRect(semanticsFinder));
+      }
+      for (var index = 0; index < visualRects.length - 1; index += 1) {
+        expect(visualRects[index].overlaps(visualRects[index + 1]), isFalse);
+        expect(
+          semanticsRects[index].overlaps(semanticsRects[index + 1]),
+          isFalse,
+        );
+      }
+
+      final monday = visualDays.first;
       final callsBeforeVisualTap = agenda.listAgendaCalls;
       await tester.tap(monday);
       await tester.pumpAndSettle();
@@ -115,6 +135,10 @@ void main() {
         expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
         expect(control.hitTestable(), findsOneWidget);
       }
+      expect(
+        tester.getRect(_key('agenda-calendar-days')).left,
+        greaterThanOrEqualTo(tester.getRect(_key('agenda-day-list')).left),
+      );
       expect(
         tester.getRect(_key('agenda-calendar-days')).right,
         lessThanOrEqualTo(tester.getRect(_key('agenda-day-list')).right),
