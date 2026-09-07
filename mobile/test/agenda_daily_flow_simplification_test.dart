@@ -1,259 +1,262 @@
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
-import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/platform/attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/capabilities.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_agenda_application.dart';
 
-const _projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-
-void main() {
-  setUpAll(CseTimeCodec.initialize);
-
-  for (final width in [320.0, 390.0]) {
-    testWidgets(
-      'labeled calendar modes and exact visible-day query fit ${width.toInt()} px at 2x text',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        try {
-          final initialDay = _istanbulToday();
-          final targetDay = _otherVisibleWeekDay(initialDay);
-          final initialLog = _log(
-            id: 'initial-log',
-            day: initialDay,
-            description: 'İlk gün saha kaydı',
-          );
-          final targetLog = _log(
-            id: 'target-log',
-            day: targetDay,
-            description: 'Seçilen gün saha kaydı',
-          );
-          final agenda = _DayFilteringAgenda(
-            projects: const [_project],
-            logs: [initialLog, targetLog],
-          );
-          await _pumpAgenda(tester, agenda, size: Size(width, 480));
-
-          final mode = find.byKey(const Key('agenda-calendar-mode'));
-          final modeScroll = find.byKey(
-            const Key('agenda-calendar-mode-scroll'),
-          );
-          final month = find.byKey(const Key('agenda-calendar-mode-month'));
-          final week = find.byKey(const Key('agenda-calendar-mode-week'));
-          expect(mode, findsOneWidget);
-          expect(modeScroll, findsOneWidget);
-          expect(month, findsOneWidget);
-          expect(week, findsOneWidget);
-          expect(tester.widget<Semantics>(month).properties.label, 'Aylık');
-          expect(tester.widget<Semantics>(week).properties.label, 'Haftalık');
-          expect(tester.getSize(mode).height, greaterThanOrEqualTo(48));
-          expect(tester.getRect(modeScroll).left, greaterThanOrEqualTo(0));
-          expect(tester.getRect(modeScroll).right, lessThanOrEqualTo(width));
-          expect(tester.widget<SegmentedButton<bool>>(mode).selected, {false});
-
-          final initialCalls = agenda.listAgendaCalls;
-          await tester.tap(month);
-          await tester.pumpAndSettle();
-          expect(agenda.listAgendaCalls, initialCalls);
-          expect(tester.widget<SegmentedButton<bool>>(mode).selected, {true});
-          await tester.ensureVisible(week);
-          await tester.pumpAndSettle();
-          await tester.tap(week);
-          await tester.pumpAndSettle();
-          expect(agenda.listAgendaCalls, initialCalls);
-          expect(tester.widget<SegmentedButton<bool>>(mode).selected, {false});
-
-          final initialProject = agenda.lastAgendaQuery!.projectId;
-          final target = find.byKey(Key('agenda-calendar-day-$targetDay'));
-          expect(target, findsOneWidget);
-          await _revealInAgenda(tester, target);
-          await tester.tap(target);
-          await tester.pumpAndSettle();
-          expect(agenda.listAgendaCalls, initialCalls + 1);
-          expect(agenda.lastAgendaQuery!.istanbulDay, targetDay);
-          expect(agenda.lastAgendaQuery!.projectId, initialProject);
-          expect(find.byKey(const Key('agenda-log-initial-log')), findsNothing);
-
-          final targetCard = find.byKey(const Key('agenda-log-target-log'));
-          await _revealInAgenda(tester, targetCard);
-          expect(targetCard, findsOneWidget);
-          expect(find.text('Seçilen gün saha kaydı'), findsOneWidget);
-          expect(tester.takeException(), isNull);
-        } finally {
-          semantics.dispose();
-        }
-      },
-    );
-  }
-
-  testWidgets(
-    'day selection retains active project and secondary tools before create',
-    (tester) async {
-      final initialDay = _istanbulToday();
-      final targetDay = _otherVisibleWeekDay(initialDay);
-      final agenda = _DayFilteringAgenda(
-        projects: const [_project],
-        logs: [
-          _log(
-            id: 'target-log',
-            day: targetDay,
-            description: 'Proje bağlamlı günlük kayıt',
-          ),
-        ],
-      );
-      await _pumpAgenda(tester, agenda, size: const Size(390, 520));
-
-      final initialProject = agenda.lastAgendaQuery!.projectId;
-      final targetDayAction = find.byKey(Key('agenda-calendar-day-$targetDay'));
-      await _revealInAgenda(tester, targetDayAction);
-      await tester.tap(targetDayAction);
-      await tester.pumpAndSettle();
-      expect(agenda.lastAgendaQuery!.istanbulDay, targetDay);
-      expect(agenda.lastAgendaQuery!.projectId, initialProject);
-
-      final search = find.byKey(const Key('agenda-search'));
-      final filters = find.byKey(const Key('agenda-filter-action'));
-      expect(search, findsOneWidget);
-      expect(filters, findsOneWidget);
-      expect(search.hitTestable(), findsOneWidget);
-      expect(filters.hitTestable(), findsOneWidget);
-      final callsBeforeSearch = agenda.listAgendaCalls;
-      await tester.tap(search);
-      await tester.pumpAndSettle();
-      expect(agenda.listAgendaCalls, callsBeforeSearch);
-      expect(
-        tester
-            .widget<TextField>(find.byKey(const Key('agenda-literal-search')))
-            .focusNode!
-            .hasFocus,
-        isTrue,
-      );
-
-      await tester.tap(filters);
-      await tester.pumpAndSettle();
-      final filterSheet = find.byKey(const Key('agenda-filter-sheet'));
-      final filterCancel = find.byKey(const Key('agenda-filter-cancel'));
-      expect(filterSheet, findsOneWidget);
-      await tester.scrollUntilVisible(
-        filterCancel,
-        120,
-        scrollable: find.descendant(
-          of: filterSheet,
-          matching: find.byType(Scrollable),
-        ),
-      );
-      await tester.tap(filterCancel);
-      await tester.pumpAndSettle();
-      expect(agenda.lastAgendaQuery!.istanbulDay, targetDay);
-      expect(agenda.lastAgendaQuery!.projectId, initialProject);
-
-      final create = find.byKey(const Key('create-agenda-log'));
-      expect(create.hitTestable(), findsOneWidget);
-      expect(tester.getSize(create).height, greaterThanOrEqualTo(48));
-      await tester.tap(create);
-      await tester.pumpAndSettle();
-      final form = tester.widget<LogFormPage>(find.byType(LogFormPage));
-      expect(form.initialProjectId, _projectId);
-      expect(form.initialIstanbulDay, targetDay);
-      expect(find.byKey(const Key('log-description')), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
-}
-
-Future<void> _pumpAgenda(
-  WidgetTester tester,
-  _DayFilteringAgenda agenda, {
-  required Size size,
-}) async {
-  tester.view.physicalSize = size;
-  tester.view.devicePixelRatio = 1;
-  addTearDown(tester.view.resetPhysicalSize);
-  addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpWidget(
-    MaterialApp(
-      theme: ThemeData(useMaterial3: true),
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(textScaler: const TextScaler.linear(2)),
-        child: child!,
-      ),
-      home: AgendaPage(agenda: agenda, activeProjectId: _projectId),
-    ),
-  );
-  await tester.pumpAndSettle();
-}
-
-Future<void> _revealInAgenda(WidgetTester tester, Finder target) async {
-  final scrollable = find
-      .descendant(
-        of: find.byKey(const Key('agenda-day-list')),
-        matching: find.byType(Scrollable),
-      )
-      .first;
-  await tester.scrollUntilVisible(target, 120, scrollable: scrollable);
-  await tester.ensureVisible(target);
-  await tester.pumpAndSettle();
-}
-
-String _istanbulToday() =>
-    CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(DateTime.now().toUtc()));
-
-String _otherVisibleWeekDay(String selectedDay) {
-  final selected = DateTime.parse('${selectedDay}T00:00:00Z');
-  final monday = selected.subtract(Duration(days: selected.weekday - 1));
-  final target = selected.weekday == DateTime.monday
-      ? monday.add(const Duration(days: 1))
-      : monday;
-  return '${target.year.toString().padLeft(4, '0')}-'
-      '${target.month.toString().padLeft(2, '0')}-'
-      '${target.day.toString().padLeft(2, '0')}';
-}
-
-AgendaLog _log({
-  required String id,
-  required String day,
-  required String description,
-}) => AgendaLog(
-  id: id,
-  projectId: _projectId,
-  projectName: _project.name,
-  observedAt: '${day}T06:00:00Z',
-  createdAt: '${day}T06:00:00Z',
-  updatedAt: '${day}T06:00:00Z',
-  revision: 1,
-  category: AgendaCategory.inspection,
-  description: description,
-  location: null,
-  notes: null,
-);
-
-class _DayFilteringAgenda extends FakeAgendaApplication {
-  _DayFilteringAgenda({required super.projects, required super.logs});
-
-  @override
-  Future<List<AgendaLog>> listAgenda(AgendaQuery query) async {
-    listAgendaCalls += 1;
-    lastAgendaQuery = query;
-    agendaQueries.add(query);
-    return logs
-        .where(
-          (log) =>
-              CseTimeCodec.istanbulDayKey(log.observedAt) ==
-                  query.istanbulDay &&
-              (query.projectId == null || log.projectId == query.projectId),
-        )
-        .toList(growable: false);
-  }
-}
-
 const _project = MobileProject(
-  id: _projectId,
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   name: 'Kuzey Şantiyesi',
   createdAt: '2026-09-05T06:00:00Z',
   updatedAt: '2026-09-05T06:00:00Z',
   revision: 1,
 );
+
+Finder _key(String value) => find.byKey(Key(value));
+
+void main() {
+  setUpAll(CseTimeCodec.initialize);
+
+  testWidgets('new capture follows locked active-project hierarchy', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(700, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final agenda = FakeAgendaApplication(projects: const [_project]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LogFormPage(
+          agenda: agenda,
+          initialProjectId: _project.id,
+          initialIstanbulDay: '2026-09-09',
+          attachments: _attachmentPicker(_QueuedPicker()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Aktif proje: ${_project.name}'), findsOneWidget);
+    expect(_key('log-project'), findsNothing);
+    expect(_key('create-project'), findsNothing);
+    expect(_key('log-time-details'), findsNothing);
+    expect(_key('log-optional-details'), findsNothing);
+    expect(_key('log-notes'), findsNothing);
+    expect(_key('open-location-catalog-from-log'), findsNothing);
+
+    final ordered = [
+      _key('log-project-context'),
+      _key('log-date-time-controls'),
+      _key('log-description'),
+      _key('log-location'),
+      _key('log-photo-panel'),
+      _key('log-category'),
+    ];
+    for (final target in ordered) {
+      expect(target, findsOneWidget);
+    }
+    for (var index = 1; index < ordered.length; index++) {
+      expect(
+        tester.getTopLeft(ordered[index - 1]).dy,
+        lessThan(tester.getTopLeft(ordered[index]).dy),
+      );
+    }
+    expect(tester.getSize(_key('log-date')).height, greaterThanOrEqualTo(48));
+    expect(tester.getSize(_key('log-time')).height, greaterThanOrEqualTo(48));
+    expect(
+      tester.getSize(_key('log-add-photo')).height,
+      greaterThanOrEqualTo(96),
+    );
+    expect(tester.getSize(_key('submit-log')).height, greaterThanOrEqualTo(48));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('new capture keeps selected day, category and active project', (
+    tester,
+  ) async {
+    final agenda = FakeAgendaApplication(projects: const [_project]);
+    await _pumpForm(
+      tester,
+      LogFormPage(
+        agenda: agenda,
+        initialProjectId: _project.id,
+        initialIstanbulDay: '2026-09-09',
+      ),
+    );
+    await tester.enterText(_key('log-description'), 'Beton kontrol kaydı');
+    await _selectDropdown<AgendaCategory>(
+      tester,
+      _key('log-category'),
+      AgendaCategory.concrete.label,
+    );
+    await _submit(tester);
+
+    expect(agenda.createLogCalls, 1);
+    expect(agenda.lastLogCommand?.projectId, _project.id);
+    expect(agenda.lastLogCommand?.category, AgendaCategory.concrete);
+    expect(
+      CseTimeCodec.istanbulDayKey(agenda.lastLogCommand!.observedAt),
+      '2026-09-09',
+    );
+    expect(agenda.lastLogCommand?.notes?.trim(), isEmpty);
+  });
+
+  testWidgets('photo preview, cancel and remove preserve the draft', (
+    tester,
+  ) async {
+    final picker = _QueuedPicker()
+      ..responses.add(
+        const SelectedAttachment(
+          name: 'saha.jpg',
+          bytes: [1, 2, 3],
+          source: AttachmentSource.photoLibrary,
+        ),
+      )
+      ..responses.add(null);
+    final agenda = FakeAgendaApplication(projects: const [_project]);
+    await _pumpForm(
+      tester,
+      LogFormPage(
+        agenda: agenda,
+        initialProjectId: _project.id,
+        attachments: _attachmentPicker(picker),
+      ),
+    );
+    await tester.enterText(_key('log-description'), 'Korunan fotoğraf taslağı');
+
+    await _pickFromLibrary(tester);
+    expect(_key('pending-log-photo-0'), findsOneWidget);
+    expect(_key('remove-pending-log-photo-0'), findsOneWidget);
+    expect(
+      tester.getSize(_key('remove-pending-log-photo-0')).height,
+      greaterThanOrEqualTo(48),
+    );
+    await _pickFromLibrary(tester);
+    expect(_key('pending-log-photo-0'), findsOneWidget);
+    expect(
+      tester.widget<TextFormField>(_key('log-description')).controller?.text,
+      'Korunan fotoğraf taslağı',
+    );
+    await tester.ensureVisible(_key('remove-pending-log-photo-0'));
+    await tester.tap(_key('remove-pending-log-photo-0'));
+    await tester.pumpAndSettle();
+    expect(_key('pending-log-photo-0'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('edit preserves project, legacy notes, category and revision', (
+    tester,
+  ) async {
+    final existing = AgendaLog(
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      projectId: _project.id,
+      projectName: _project.name,
+      observedAt: '2026-09-09T06:00:00Z',
+      createdAt: '2026-09-09T06:00:00Z',
+      updatedAt: '2026-09-09T06:00:00Z',
+      revision: 7,
+      category: AgendaCategory.inspection,
+      description: 'Eski açıklama',
+      location: 'A Blok',
+      notes: 'Korunacak ayrıntılı not',
+    );
+    final agenda = FakeAgendaApplication(
+      projects: const [_project],
+      logs: [existing],
+    );
+    await _pumpForm(tester, LogFormPage(agenda: agenda, existing: existing));
+    expect(_key('log-notes'), findsOneWidget);
+    expect(
+      tester.widget<TextFormField>(_key('log-notes')).controller?.text,
+      'Korunacak ayrıntılı not',
+    );
+    await tester.enterText(_key('log-description'), 'Yeni açıklama');
+    await _submit(tester);
+
+    final updated = agenda.logs.single;
+    expect(updated.projectId, _project.id);
+    expect(updated.notes, 'Korunacak ayrıntılı not');
+    expect(updated.category, AgendaCategory.inspection);
+    expect(updated.revision, 8);
+  });
+
+  testWidgets('new capture without active project cannot save globally', (
+    tester,
+  ) async {
+    final agenda = FakeAgendaApplication(projects: const [_project]);
+    await _pumpForm(tester, LogFormPage(agenda: agenda));
+    expect(
+      find.text('Ajanda kaydı için önce aktif proje seçin.'),
+      findsOneWidget,
+    );
+    expect(tester.widget<FilledButton>(_key('submit-log')).onPressed, isNull);
+    expect(agenda.createLogCalls, 0);
+  });
+}
+
+Future<void> _pumpForm(WidgetTester tester, LogFormPage form) async {
+  tester.view.physicalSize = const Size(500, 1000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(MaterialApp(home: form));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _submit(WidgetTester tester) async {
+  await tester.ensureVisible(_key('submit-log'));
+  await tester.tap(_key('submit-log'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _selectDropdown<T>(
+  WidgetTester tester,
+  Finder field,
+  String label,
+) async {
+  await tester.ensureVisible(field);
+  await tester.tap(field);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label).last);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pickFromLibrary(WidgetTester tester) async {
+  await tester.ensureVisible(_key('log-add-photo'));
+  await tester.tap(_key('log-add-photo'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.widgetWithText(ListTile, 'Sistem fotoğraf seçici'));
+  await tester.pumpAndSettle();
+}
+
+SafeAttachmentPicker _attachmentPicker(AttachmentPickerPort picker) =>
+    SafeAttachmentPicker(
+      permissions: SafeCapabilityService(_GrantedPermissions()),
+      picker: picker,
+    );
+
+class _GrantedPermissions implements PermissionGateway {
+  @override
+  Future<CapabilityStatus> request(DeviceCapability capability) async =>
+      CapabilityStatus.granted;
+}
+
+class _QueuedPicker
+    implements AttachmentPickerPort, MultipleAttachmentPickerPort {
+  final List<SelectedAttachment?> responses = [];
+
+  @override
+  Future<SelectedAttachment?> pick(AttachmentSource source) async =>
+      responses.removeAt(0);
+
+  @override
+  Future<List<SelectedAttachment>?> pickMany(AttachmentSource source) async {
+    final response = responses.removeAt(0);
+    return response == null ? null : [response];
+  }
+}

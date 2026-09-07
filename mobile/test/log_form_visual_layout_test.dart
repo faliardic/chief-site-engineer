@@ -19,15 +19,6 @@ Future<void> _show(WidgetTester tester, String value) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _toggle(WidgetTester tester, String value) async {
-  await _show(tester, value);
-  final label = value == 'log-time-details'
-      ? 'Zaman ve tür'
-      : 'İsteğe bağlı ayrıntılar';
-  await tester.tap(find.text(label));
-  await tester.pumpAndSettle();
-}
-
 void main() {
   for (final config in [
     (const Size(320, 760), 1.0, 0.0),
@@ -72,14 +63,12 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(_key('log-description'), findsOneWidget);
-      expect(
-        tester.state<FormFieldState<String>>(_key('log-project')).value,
-        _project.id,
-      );
-      expect(_key('log-date'), findsNothing);
-      expect(_key('log-category'), findsNothing);
+      expect(_key('log-project-context'), findsOneWidget);
+      expect(find.text('Aktif proje: ${_project.name}'), findsOneWidget);
+      expect(_key('log-date'), findsOneWidget);
+      expect(_key('log-category'), findsOneWidget);
       expect(_key('log-notes'), findsNothing);
-      expect(find.byType(TextFormField), findsOneWidget);
+      expect(find.byType(TextFormField), findsNWidgets(2));
       expect(
         find.descendant(
           of: _key('log-capture-group'),
@@ -102,12 +91,9 @@ void main() {
         ),
         findsNothing,
       );
-      await _toggle(tester, 'log-time-details');
       await _show(tester, 'log-date');
       expect(find.text('19.07.2026'), findsOneWidget);
       await _show(tester, 'log-category');
-      await _toggle(tester, 'log-optional-details');
-      await _show(tester, 'log-notes');
       expect(_key('submit-log').hitTestable(), findsOneWidget);
       await tester.tap(_key('submit-log'));
       await tester.pumpAndSettle();
@@ -118,7 +104,7 @@ void main() {
   }
 
   testWidgets(
-    'collapsed time category location notes retain exact edit command',
+    'visible time category location notes retain exact edit command',
     (tester) async {
       const existing = AgendaLog(
         id: 'log-a',
@@ -140,8 +126,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(_key('log-date'), findsNothing);
-      await _toggle(tester, 'log-time-details');
+      expect(_key('log-date'), findsOneWidget);
       expect(find.text('19.07.2026'), findsOneWidget);
       expect(
         tester
@@ -154,7 +139,6 @@ void main() {
             .initialValue,
         AgendaCategory.concrete,
       );
-      await _toggle(tester, 'log-optional-details');
       expect(
         tester.widget<TextFormField>(_key('log-location')).controller!.text,
         'A Blok',
@@ -163,8 +147,6 @@ void main() {
         tester.widget<TextFormField>(_key('log-notes')).controller!.text,
         'Korunan not',
       );
-      await _toggle(tester, 'log-optional-details');
-      await _toggle(tester, 'log-time-details');
       await _show(tester, 'log-description');
       await tester.enterText(_key('log-description'), 'Yeni açıklama');
       await tester.tap(_key('submit-log'));

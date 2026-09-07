@@ -379,21 +379,18 @@ void main() {
       _expectIndicator('Proje seçilmedi');
       await tester.tap(find.byKey(const Key('agenda-filter-action')));
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<DropdownButtonFormField<String?>>(
-              find.byKey(const Key('agenda-project-filter')),
-            )
-            .initialValue,
-        isNull,
-      );
+      expect(find.byKey(const Key('agenda-project-filter')), findsNothing);
       await tester.tap(find.byKey(const Key('agenda-filter-cancel')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('create-agenda-log')));
-      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('create-agenda-log')))
+            .onPressed,
+        isNull,
+      );
       expect(find.byType(LogFormPage), findsNothing);
       expect(
-        find.text('Önce aktif proje veya Ajanda proje filtresi seçin.'),
+        find.text('Ajanda kayıtlarını görmek için üstten aktif proje seçin.'),
         findsOneWidget,
       );
 
@@ -448,14 +445,7 @@ void main() {
       _expectIndicator(_projectB.name);
       await tester.tap(find.byKey(const Key('agenda-filter-action')));
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<DropdownButtonFormField<String?>>(
-              find.byKey(const Key('agenda-project-filter')),
-            )
-            .initialValue,
-        isNull,
-      );
+      expect(find.byKey(const Key('agenda-project-filter')), findsNothing);
       await tester.tap(find.byKey(const Key('agenda-filter-cancel')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('create-agenda-log')));
@@ -464,28 +454,8 @@ void main() {
         tester.widget<LogFormPage>(find.byType(LogFormPage)).initialProjectId,
         _projectB.id,
       );
-      await tester.tap(find.byKey(const Key('log-project')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(_projectA.name).last);
-      await tester.pumpAndSettle();
-      _popRoute(tester, find.byType(LogFormPage));
-      await tester.pumpAndSettle();
-      _expectIndicator(_projectB.name);
-
-      await tester.tap(find.byKey(const Key('agenda-filter-action')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('agenda-project-filter')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(_projectA.name).last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('agenda-filter-apply')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('create-agenda-log')));
-      await tester.pumpAndSettle();
-      expect(
-        tester.widget<LogFormPage>(find.byType(LogFormPage)).initialProjectId,
-        _projectA.id,
-      );
+      expect(find.byKey(const Key('log-project')), findsNothing);
+      expect(find.text('Aktif proje: ${_projectB.name}'), findsOneWidget);
       _popRoute(tester, find.byType(LogFormPage));
       await tester.pumpAndSettle();
       _expectIndicator(_projectB.name);

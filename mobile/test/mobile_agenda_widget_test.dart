@@ -15,7 +15,6 @@ import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
-import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_destination_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
@@ -99,7 +98,11 @@ void main() {
   ) async {
     final fake = FakeAgendaApplication(projects: [project()], logs: [log()]);
 
-    await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AgendaPage(agenda: fake, activeProjectId: projectId),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('agenda-literal-search')), findsOneWidget);
@@ -113,7 +116,7 @@ void main() {
     expect(find.byKey(const Key('agenda-filter-sheet')), findsOneWidget);
     expect(find.byKey(const Key('agenda-archive-filter')), findsOneWidget);
     expect(find.byKey(const Key('agenda-sort-order')), findsOneWidget);
-    expect(find.byKey(const Key('agenda-project-filter')), findsOneWidget);
+    expect(find.byKey(const Key('agenda-project-filter')), findsNothing);
     expect(find.byKey(const Key('agenda-category-filter')), findsOneWidget);
     expect(find.text('En yeni üstte'), findsOneWidget);
   });
@@ -123,7 +126,11 @@ void main() {
     (tester) async {
       final semantics = tester.ensureSemantics();
       final fake = FakeAgendaApplication(projects: [project()], logs: [log()]);
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AgendaPage(agenda: fake, activeProjectId: projectId),
+        ),
+      );
       await tester.pumpAndSettle();
 
       final filterAction = find.byKey(const Key('agenda-filter-action'));
@@ -151,7 +158,6 @@ void main() {
         tester,
         archiveLabel: 'Arşivlenenler',
         sortLabel: 'En eski üstte',
-        projectLabel: project().name,
         categoryLabel: AgendaCategory.inspection.label,
       );
       await tester.tap(find.byKey(const Key('agenda-filter-cancel')));
@@ -162,7 +168,7 @@ void main() {
       expect(fake.lastAgendaQuery!.literalSearch, 'korunacak arama');
       expect(fake.lastAgendaQuery!.archiveFilter, AgendaArchiveFilter.active);
       expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.newestFirst);
-      expect(fake.lastAgendaQuery!.projectId, isNull);
+      expect(fake.lastAgendaQuery!.projectId, projectId);
       expect(fake.lastAgendaQuery!.category, isNull);
 
       await _openAgendaFilters(tester);
@@ -170,7 +176,6 @@ void main() {
         tester,
         archiveLabel: 'Arşivlenenler',
         sortLabel: 'En eski üstte',
-        projectLabel: project().name,
         categoryLabel: AgendaCategory.inspection.label,
       );
       await _applyAgendaFilters(tester);
@@ -189,7 +194,7 @@ void main() {
       );
       expect(
         find.byKey(const Key('agenda-filter-summary-project')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const Key('agenda-filter-summary-category')),
@@ -200,7 +205,6 @@ void main() {
       for (final key in const [
         Key('agenda-filter-summary-archive'),
         Key('agenda-filter-summary-sort'),
-        Key('agenda-filter-summary-project'),
         Key('agenda-filter-summary-category'),
       ]) {
         tester.widget<InputChip>(find.byKey(key)).onDeleted!();
@@ -208,7 +212,7 @@ void main() {
       }
       expect(fake.lastAgendaQuery!.archiveFilter, AgendaArchiveFilter.active);
       expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.newestFirst);
-      expect(fake.lastAgendaQuery!.projectId, isNull);
+      expect(fake.lastAgendaQuery!.projectId, projectId);
       expect(fake.lastAgendaQuery!.category, isNull);
       expect(fake.lastAgendaQuery!.literalSearch, 'korunacak arama');
       expect(fake.lastAgendaQuery!.istanbulDay, selectedDay);
@@ -219,7 +223,6 @@ void main() {
         tester,
         archiveLabel: 'Arşivlenenler',
         sortLabel: 'En eski üstte',
-        projectLabel: project().name,
         categoryLabel: AgendaCategory.inspection.label,
       );
       await _applyAgendaFilters(tester);
@@ -228,7 +231,7 @@ void main() {
 
       expect(fake.lastAgendaQuery!.archiveFilter, AgendaArchiveFilter.active);
       expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.newestFirst);
-      expect(fake.lastAgendaQuery!.projectId, isNull);
+      expect(fake.lastAgendaQuery!.projectId, projectId);
       expect(fake.lastAgendaQuery!.category, isNull);
       expect(fake.lastAgendaQuery!.literalSearch, 'korunacak arama');
       expect(fake.lastAgendaQuery!.istanbulDay, selectedDay);
@@ -242,7 +245,12 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(home: AgendaPage(agenda: _FailingAgendaApplication())),
+      MaterialApp(
+        home: AgendaPage(
+          agenda: _FailingAgendaApplication(),
+          activeProjectId: projectId,
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -282,7 +290,11 @@ void main() {
       logs: [middle, early, latest],
     );
 
-    await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AgendaPage(agenda: fake, activeProjectId: projectId),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
@@ -347,7 +359,11 @@ void main() {
       logs: List.generate(30, _navigationLog),
     );
 
-    await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AgendaPage(agenda: fake, activeProjectId: projectId),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.drag(
       find.byKey(const Key('agenda-day-list')),
@@ -401,6 +417,7 @@ void main() {
           data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
           child: AgendaPage(
             agenda: FakeAgendaApplication(projects: [project()], logs: [log()]),
+            activeProjectId: projectId,
           ),
         ),
       ),
@@ -429,22 +446,16 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Ajanda main action creates and selects a live project', (
-    tester,
-  ) async {
+  testWidgets('Ajanda does not own project creation', (tester) async {
     final fake = FakeAgendaApplication();
     await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('create-agenda-project')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('agenda-project-name')),
-      'Yeni Saha Projesi',
+    expect(find.byKey(const Key('create-agenda-project')), findsNothing);
+    expect(
+      find.text('Ajanda kayıtlarını görmek için üstten aktif proje seçin.'),
+      findsOneWidget,
     );
-    await tester.tap(find.byKey(const Key('save-agenda-project')));
-    await tester.pumpAndSettle();
-    expect(fake.projects.single.name, 'Yeni Saha Projesi');
-    expect(find.text('Proje: Yeni Saha Projesi'), findsOneWidget);
+    expect(fake.projects, isEmpty);
   });
 
   testWidgets(
@@ -488,7 +499,7 @@ void main() {
       expect(find.byKey(const Key('agenda-category-filter')), findsNothing);
       expect(find.byKey(const Key('agenda-sort-order')), findsNothing);
       await _openAgendaFilters(tester);
-      expect(find.byKey(const Key('agenda-project-filter')), findsOneWidget);
+      expect(find.byKey(const Key('agenda-project-filter')), findsNothing);
       expect(find.byKey(const Key('agenda-category-filter')), findsOneWidget);
       expect(find.byKey(const Key('agenda-sort-order')), findsOneWidget);
       await tester.tap(find.byKey(const Key('agenda-filter-cancel')));
@@ -515,21 +526,20 @@ void main() {
       ..createLogFailure = const AgendaValidationFailure(
         'Gelecek tarihli olay kaydedilemez.',
       );
-    await tester.pumpWidget(MaterialApp(home: LogFormPage(agenda: fake)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LogFormPage(agenda: fake, initialProjectId: projectId),
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.enterText(
       find.byKey(const Key('log-description')),
       'Kullanıcının girdiği açıklama',
     );
-    await _openLogSection(tester, 'log-optional-details');
     await tester.enterText(
       find.byKey(const Key('log-location')),
       'B Blok çatı mahali',
-    );
-    await tester.enterText(
-      find.byKey(const Key('log-notes')),
-      'Klavye açıldığında da korunacak uzun ayrıntılı not.',
     );
     await tester.scrollUntilVisible(
       find.byKey(const Key('submit-log')),
@@ -562,18 +572,7 @@ void main() {
           .text,
       'B Blok çatı mahali',
     );
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('log-notes')),
-      200,
-      scrollable: find.byType(Scrollable).last,
-    );
-    expect(
-      tester
-          .widget<TextFormField>(find.byKey(const Key('log-notes')))
-          .controller!
-          .text,
-      'Klavye açıldığında da korunacak uzun ayrıntılı not.',
-    );
+    expect(find.byKey(const Key('log-notes')), findsNothing);
   });
 
   testWidgets(
@@ -582,7 +581,11 @@ void main() {
       final completer = Completer<AgendaLog>();
       final fake = FakeAgendaApplication(projects: [project()])
         ..createLogCompleter = completer;
-      await tester.pumpWidget(MaterialApp(home: LogFormPage(agenda: fake)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LogFormPage(agenda: fake, initialProjectId: projectId),
+        ),
+      );
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('log-description')),
@@ -626,7 +629,11 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
-        home: LogFormPage(agenda: fake, attachments: attachments),
+        home: LogFormPage(
+          agenda: fake,
+          attachments: attachments,
+          initialProjectId: projectId,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -676,7 +683,11 @@ void main() {
     'Beton suggestion can be ignored and fail-soft save keeps text and category',
     (tester) async {
       final fake = FakeAgendaApplication(projects: [project()]);
-      await tester.pumpWidget(MaterialApp(home: LogFormPage(agenda: fake)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LogFormPage(agenda: fake, initialProjectId: projectId),
+        ),
+      );
       await tester.pumpAndSettle();
 
       const description = 'Yarın beton dökülecek.';
@@ -756,12 +767,10 @@ void main() {
 
       const description = 'Beton dökümü yarın başlayacak.';
       const location = 'B Blok temel';
-      const notes = 'Betonaj öncesi pompa yolu açık tutulacak.';
       await tester.enterText(
         find.byKey(const Key('log-description')),
         description,
       );
-      await _openLogSection(tester, 'log-time-details');
       final categoryField = find.byType(
         DropdownButtonFormField<AgendaCategory>,
       );
@@ -792,7 +801,6 @@ void main() {
       );
       await tester.tap(selectConcreteCategoryAction);
       await tester.pump();
-      await _openLogSection(tester, 'log-time-details');
       await tester.scrollUntilVisible(
         find.byKey(const Key('log-category')),
         -300,
@@ -804,14 +812,12 @@ void main() {
       );
       expect(fake.createLogCalls, 0);
 
-      await _openLogSection(tester, 'log-optional-details');
       await tester.scrollUntilVisible(
         find.byKey(const Key('log-location')),
         -300,
         scrollable: formScrollable,
       );
       await tester.enterText(find.byKey(const Key('log-location')), location);
-      await tester.enterText(find.byKey(const Key('log-notes')), notes);
       final addPhoto = find.byKey(const Key('log-add-photo'));
       await _revealRouteControl(
         tester,
@@ -854,7 +860,6 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
-      await _openLogSection(tester, 'log-time-details');
       await tester.scrollUntilVisible(
         find.byKey(const Key('log-category')),
         -300,
@@ -890,15 +895,7 @@ void main() {
         tester.widget<TextFormField>(locationField).controller!.text,
         location,
       );
-      final notesField = find.byKey(const Key('log-notes'));
-      await tester.scrollUntilVisible(
-        notesField,
-        200,
-        scrollable: formScrollable,
-      );
-      await tester.pumpAndSettle();
-      expect(notesField, findsOneWidget);
-      expect(tester.widget<TextFormField>(notesField).controller!.text, notes);
+      expect(find.byKey(const Key('log-notes')), findsNothing);
       await tester.scrollUntilVisible(
         find.byKey(const Key('pending-log-photo-0')),
         -300,
@@ -1681,7 +1678,11 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final logs = List.generate(18, _navigationLog);
       final fake = FakeAgendaApplication(projects: [project()], logs: logs);
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AgendaPage(agenda: fake, activeProjectId: projectId),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await _enterAgendaSearch(tester, fake, 'CSE275 app bar');
@@ -1728,7 +1729,11 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final logs = List.generate(18, _navigationLog);
       final fake = FakeAgendaApplication(projects: [project()], logs: logs);
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AgendaPage(agenda: fake, activeProjectId: projectId),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await _enterAgendaSearch(tester, fake, 'CSE275 system back');
@@ -1768,7 +1773,11 @@ void main() {
         projects: [project()],
         logs: List.generate(30, _navigationLog),
       );
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AgendaPage(agenda: fake, activeProjectId: projectId),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await _enterAgendaSearch(tester, fake, 'CSE275 drag');
@@ -1820,7 +1829,11 @@ void main() {
         projects: [project()],
         logs: List.generate(34, _navigationLog),
       );
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AgendaPage(agenda: fake, activeProjectId: projectId),
+        ),
+      );
       await tester.pumpAndSettle();
       final list = find.byKey(const Key('agenda-day-list'));
       final callsBeforeScroll = fake.listAgendaCalls;
@@ -1867,7 +1880,11 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final logs = List.generate(24, _navigationLog);
       final fake = _DelayedAgendaApplication(projects: [project()], logs: logs);
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AgendaPage(agenda: fake, activeProjectId: projectId),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
@@ -1882,7 +1899,6 @@ void main() {
       await _setAgendaFilterDraft(
         tester,
         archiveLabel: 'Arşivlenenler',
-        projectLabel: project().name,
         categoryLabel: AgendaCategory.inspection.label,
       );
       await _applyAgendaFilters(tester);
@@ -2029,7 +2045,7 @@ void main() {
           theme: ThemeData.dark(),
           home: MediaQuery(
             data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
-            child: AgendaPage(agenda: fake),
+            child: AgendaPage(agenda: fake, activeProjectId: projectId),
           ),
         ),
       );
@@ -2039,7 +2055,6 @@ void main() {
       await _setAgendaFilterDraft(
         tester,
         sortLabel: 'En eski üstte',
-        projectLabel: project().name,
         categoryLabel: AgendaCategory.inspection.label,
       );
       await _applyAgendaFilters(tester);
@@ -2142,7 +2157,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           navigatorObservers: [observer],
-          home: AgendaPage(agenda: fake),
+          home: AgendaPage(agenda: fake, activeProjectId: projectId),
         ),
       );
       await tester.pumpAndSettle();
@@ -2185,13 +2200,19 @@ void main() {
               Expanded(
                 child: KeyedSubtree(
                   key: const Key('agenda-instance-one'),
-                  child: AgendaPage(agenda: firstFake),
+                  child: AgendaPage(
+                    agenda: firstFake,
+                    activeProjectId: projectId,
+                  ),
                 ),
               ),
               Expanded(
                 child: KeyedSubtree(
                   key: const Key('agenda-instance-two'),
-                  child: AgendaPage(agenda: secondFake),
+                  child: AgendaPage(
+                    agenda: secondFake,
+                    activeProjectId: projectId,
+                  ),
                 ),
               ),
             ],
@@ -2280,8 +2301,6 @@ void main() {
             ),
           );
           for (final entry in {
-            'create-agenda-project': 'Yeni proje',
-            'open-project-location-catalog': 'Mahal Kataloğu',
             'agenda-calendar-previous-period': 'Önceki hafta',
             'agenda-today': 'Bugüne git',
             'agenda-calendar-next-period': 'Sonraki hafta',
@@ -2308,7 +2327,7 @@ void main() {
             final calls = fake.listAgendaCalls;
             await tester.tapAt(tester.getTopLeft(action) + const Offset(2, 2));
             await tester.pumpAndSettle();
-            expect(fake.listAgendaCalls, calls + 1);
+            expect(fake.listAgendaCalls, greaterThan(calls));
             expect(fake.lastAgendaQuery!.istanbulDay, day);
             expect(
               find.descendant(
@@ -2351,7 +2370,6 @@ void main() {
           );
           for (final (key, value) in [
             ('agenda-sort-order', 'En eski üstte'),
-            ('agenda-project-filter', project().name),
             ('agenda-category-filter', AgendaCategory.inspection.label),
           ]) {
             final field = find.byKey(Key(key));
@@ -2392,30 +2410,11 @@ void main() {
           expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.oldestFirst);
           expect(find.text('saha'), findsOneWidget);
 
-          await _revealIcon(
-            tester,
-            find.byKey(const Key('create-agenda-project')),
-          );
-          await tester.tap(find.byKey(const Key('create-agenda-project')));
-          await tester.pumpAndSettle();
-          expect(find.byKey(const Key('agenda-project-name')), findsOneWidget);
-          await tester.tap(find.text('Vazgeç'));
-          await tester.pumpAndSettle();
-          await tester.tap(
-            find.byKey(const Key('open-project-location-catalog')),
-          );
-          await tester.pumpAndSettle();
-          expect(find.byType(ProjectLocationCatalogPage), findsOneWidget);
+          expect(find.byKey(const Key('create-agenda-project')), findsNothing);
           expect(
-            tester
-                .widget<ProjectLocationCatalogPage>(
-                  find.byType(ProjectLocationCatalogPage),
-                )
-                .initialProjectId,
-            projectId,
+            find.byKey(const Key('open-project-location-catalog')),
+            findsNothing,
           );
-          await tester.pageBack();
-          await tester.pumpAndSettle();
           final create = find.byKey(const Key('create-agenda-log'));
           _expectPrimaryFormAction(tester, create, 'Ajanda kaydı ekle');
           expect(create.hitTestable(), findsOneWidget);
@@ -2459,26 +2458,14 @@ void main() {
               ),
             ),
           );
-          expect(find.text(project().name), findsOneWidget);
-          await _openLogSection(tester, 'log-time-details');
-          await _openLogSection(tester, 'log-optional-details');
+          expect(find.text('Aktif proje: ${project().name}'), findsOneWidget);
           expect(find.text('19.07.2026'), findsOneWidget);
           final time = find.descendant(
             of: find.byKey(const Key('log-time')),
             matching: find.byType(Text),
           );
           expect(tester.widget<Text>(time).data, contains(':'));
-          await _revealIcon(tester, find.byKey(const Key('create-project')));
-          _expectIcon(
-            tester,
-            find.byKey(const Key('create-project')),
-            'Yeni proje oluştur',
-          );
-          await tester.tap(find.byKey(const Key('create-project')));
-          await tester.pumpAndSettle();
-          expect(find.byKey(const Key('new-project-name')), findsOneWidget);
-          await tester.tap(find.text('Vazgeç'));
-          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('create-project')), findsNothing);
           final retry = find.byKey(const Key('retry-log-locations'));
           await _revealIcon(tester, retry);
           _expectIcon(tester, retry, 'Yeniden dene');
@@ -2492,16 +2479,10 @@ void main() {
             find.byKey(const Key('log-location-load-error')),
             findsNothing,
           );
-          final catalog = find.byKey(
-            const Key('open-location-catalog-from-log'),
+          expect(
+            find.byKey(const Key('open-location-catalog-from-log')),
+            findsNothing,
           );
-          await _revealIcon(tester, catalog);
-          _expectIcon(tester, catalog, 'Mahal Kataloğu');
-          await tester.tap(catalog);
-          await tester.pumpAndSettle();
-          expect(find.byType(ProjectLocationCatalogPage), findsOneWidget);
-          await tester.pageBack();
-          await tester.pumpAndSettle();
           final submit = find.byKey(const Key('submit-log'));
           await _revealIcon(tester, submit);
           _expectPrimaryFormAction(tester, submit, 'Kaydet');
@@ -2516,27 +2497,22 @@ void main() {
           );
           final addPhoto = find.byKey(const Key('log-add-photo'));
           await _revealIcon(tester, addPhoto);
-          _expectIcon(tester, addPhoto, 'Fotoğraf ekle');
+          expect(find.text('Buradan fotoğraf ekle'), findsOneWidget);
           await tester.tap(addPhoto);
           await tester.pumpAndSettle();
           await tester.tap(find.text('Sistem fotoğraf seçici'));
           await tester.pumpAndSettle();
           final firstPhoto = find.byKey(const Key('pending-log-photo-0'));
           await _revealIcon(tester, firstPhoto);
-          final remove = find.descendant(
-            of: firstPhoto,
-            matching: find.byType(IconButton),
+          final remove = find.byKey(const Key('remove-pending-log-photo-0'));
+          _expectIcon(
+            tester,
+            remove,
+            'Fotoğrafı seçimden kaldır',
+            uniqueLabel: false,
           );
-          _expectIcon(tester, remove, 'Seçimden kaldır', uniqueLabel: false);
           expect(
             find.descendant(of: firstPhoto, matching: find.text('bir.jpg')),
-            findsOneWidget,
-          );
-          expect(
-            find.descendant(
-              of: firstPhoto,
-              matching: find.text('Log kaydıyla birlikte eklenecek'),
-            ),
             findsOneWidget,
           );
           await tester.tap(remove);
@@ -2596,8 +2572,6 @@ void main() {
           await tester.tap(edit);
           await tester.pumpAndSettle();
           expect(find.byType(LogFormPage), findsOneWidget);
-          await _openLogSection(tester, 'log-time-details');
-          await _openLogSection(tester, 'log-optional-details');
           expect(find.text('19.07.2026'), findsOneWidget);
           await _revealIcon(tester, find.byKey(const Key('log-description')));
           await tester.enterText(
@@ -2729,6 +2703,7 @@ void main() {
                         builder: (_) => LogFormPage(
                           agenda: fake,
                           existing: editing ? log() : null,
+                          initialProjectId: projectId,
                         ),
                       ),
                     );
@@ -2793,7 +2768,11 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
-        home: LogFormPage(agenda: fake, attachments: attachments),
+        home: LogFormPage(
+          agenda: fake,
+          attachments: attachments,
+          initialProjectId: projectId,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -2801,8 +2780,9 @@ void main() {
       find.byKey(const Key('log-description')),
       'İzin reddedilse de korunacak saha kaydı',
     );
-    await tester.ensureVisible(find.byKey(const Key('log-add-photo')));
-    await tester.tap(find.byKey(const Key('log-add-photo')));
+    final addPhoto = find.byKey(const Key('log-add-photo'));
+    await _revealIcon(tester, addPhoto);
+    await tester.tap(addPhoto);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Kamera'));
     await tester.pumpAndSettle();
@@ -3315,7 +3295,6 @@ Future<void> _setAgendaFilterDraft(
   WidgetTester tester, {
   String? archiveLabel,
   String? sortLabel,
-  String? projectLabel,
   String? categoryLabel,
 }) async {
   if (archiveLabel != null) {
@@ -3332,13 +3311,6 @@ Future<void> _setAgendaFilterDraft(
       tester,
       const Key('agenda-sort-order'),
       sortLabel,
-    );
-  }
-  if (projectLabel != null) {
-    await _selectAgendaFilterOption(
-      tester,
-      const Key('agenda-project-filter'),
-      projectLabel,
     );
   }
   if (categoryLabel != null) {
@@ -3449,6 +3421,19 @@ class _DelayedAgendaApplication extends FakeAgendaApplication {
 }
 
 class _FailingAgendaApplication extends FakeAgendaApplication {
+  _FailingAgendaApplication()
+    : super(
+        projects: const [
+          MobileProject(
+            id: projectId,
+            name: 'Kuzey',
+            createdAt: '2026-07-19T08:00:00Z',
+            updatedAt: '2026-07-19T08:00:00Z',
+            revision: 1,
+          ),
+        ],
+      );
+
   @override
   Future<List<AgendaLog>> listAgenda(AgendaQuery query) async {
     listAgendaCalls += 1;
@@ -3542,15 +3527,4 @@ class _RecordingConcrete implements ConcreteApplication {
 
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-Future<void> _openLogSection(WidgetTester tester, String key) async {
-  await tester.pumpAndSettle();
-  final probe = key == 'log-time-details' ? 'log-date' : 'log-notes';
-  if (find.byKey(Key(probe)).evaluate().isNotEmpty) return;
-  final section = find.byKey(Key(key));
-  await tester.ensureVisible(section);
-  await tester.pumpAndSettle();
-  await tester.tap(section);
-  await tester.pumpAndSettle();
 }

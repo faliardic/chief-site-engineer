@@ -1,265 +1,305 @@
 import 'dart:ui' show Tristate;
+
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import 'support/fake_agenda_application.dart';
 
-Finder _key(String key) => find.byKey(Key(key));
-Future<void> _tap(WidgetTester tester, Finder target) async {
-  await tester.pumpAndSettle();
-  await tester.ensureVisible(target);
-  await tester.pumpAndSettle();
-  await tester.tap(target);
-  await tester.pumpAndSettle();
-}
+const _projectA = MobileProject(
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  name: 'Kuzey',
+  createdAt: '2026-09-01T08:00:00Z',
+  updatedAt: '2026-09-01T08:00:00Z',
+  revision: 1,
+);
+const _projectB = MobileProject(
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  name: 'Güney',
+  createdAt: '2026-09-01T08:00:00Z',
+  updatedAt: '2026-09-01T08:00:00Z',
+  revision: 1,
+);
 
-Future<void> _date(WidgetTester tester, DateTime date) async {
-  await _tap(tester, _key('selected-day'));
-  final picker = tester.widget<DatePickerDialog>(find.byType(DatePickerDialog));
-  expect(picker.firstDate, DateTime(2000));
-  expect(picker.lastDate, DateTime(2100));
-  Navigator.of(tester.element(find.byType(DatePickerDialog))).pop(date);
-  await tester.pumpAndSettle();
-}
-
-Future<void> _mode(WidgetTester tester, bool month) async {
-  await _tap(
-    tester,
-    find.descendant(
-      of: _key('agenda-calendar-mode'),
-      matching: find.text(month ? 'Ay' : 'Hafta'),
-    ),
-  );
-}
+Finder _key(String value) => find.byKey(Key(value));
 
 void main() {
   setUpAll(CseTimeCodec.initialize);
+
+  testWidgets('>=336 usable width keeps direct 48x48 day targets', (
+    tester,
+  ) async {
+    final agenda = _FilteringAgenda(projects: const [_projectA]);
+    await _pumpAgenda(tester, agenda, size: const Size(520, 900));
+    await _selectDate(tester, DateTime(2026, 9, 9));
+    await _selectMode(tester, month: true);
+
+    final day = _key('agenda-calendar-day-2026-09-09');
+    expect(day, findsOneWidget);
+    expect(tester.getSize(day).width, greaterThanOrEqualTo(48));
+    expect(tester.getSize(day).height, greaterThanOrEqualTo(48));
+    expect(day.hitTestable(), findsOneWidget);
+    final semantics = tester
+        .getSemantics(
+          find
+              .ancestor(
+                of: day,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Semantics &&
+                      widget.properties.label == '2026-09-09',
+                ),
+              )
+              .first,
+        )
+        .getSemanticsData();
+    expect(semantics.flagsCollection.isButton, isTrue);
+    expect(semantics.flagsCollection.isSelected, Tristate.isTrue);
+    expect(
+      find.descendant(
+        of: _key('agenda-calendar-days'),
+        matching: find.byType(Scrollable),
+      ),
+      findsNothing,
+    );
+    expect(_key('agenda-compact-day-selector'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
-    'week Monday-Sunday, presentation-only mode and one query per exact day',
+    '<336 usable width shows seven visual columns and separate 48x48 selector',
     (tester) async {
-      final fake = FakeAgendaApplication();
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
-      await tester.pumpAndSettle();
-      expect(fake.listAgendaCalls, 1);
-      expect(
-        tester
-            .widget<SegmentedButton<bool>>(_key('agenda-calendar-mode'))
-            .selected,
-        {false},
+      final agenda = _FilteringAgenda(projects: const [_projectA]);
+      await _pumpAgenda(
+        tester,
+        agenda,
+        size: const Size(390, 900),
+        textScale: 2,
       );
-      expect(_key('previous-day'), findsNothing);
-      expect(_key('next-day'), findsNothing);
-      await _date(tester, DateTime(2026, 9, 9));
-      expect(fake.listAgendaCalls, 2);
-      for (var day = 7; day <= 13; day++) {
-        expect(
-          _key('agenda-calendar-day-2026-09-${day.toString().padLeft(2, '0')}'),
-          findsOneWidget,
-        );
+      await _selectDate(tester, DateTime(2026, 9, 9));
+
+      final monday = _key('agenda-calendar-day-2026-09-07');
+      final tuesday = _key('agenda-calendar-day-2026-09-08');
+      expect(tester.getSize(monday).width, lessThan(48));
+      expect(
+        tester.getRect(monday).right,
+        lessThanOrEqualTo(tester.getRect(tuesday).left),
+      );
+      final mondaySemantics = tester
+          .getSemantics(
+            find
+                .ancestor(
+                  of: monday,
+                  matching: find.byWidgetPredicate(
+                    (widget) =>
+                        widget is Semantics &&
+                        widget.properties.label == '2026-09-07',
+                  ),
+                )
+                .first,
+          )
+          .getSemanticsData();
+      expect(mondaySemantics.flagsCollection.isButton, isFalse);
+      final callsBeforeVisualTap = agenda.listAgendaCalls;
+      await tester.tap(monday);
+      await tester.pumpAndSettle();
+      expect(agenda.listAgendaCalls, callsBeforeVisualTap);
+      expect(find.text('2026-09-09'), findsOneWidget);
+
+      for (final key in ['previous-day', 'selected-day', 'next-day']) {
+        final control = _key(key);
+        expect(control, findsOneWidget);
+        expect(tester.getSize(control).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+        expect(control.hitTestable(), findsOneWidget);
       }
-      final before = fake.listAgendaCalls;
-      await _mode(tester, true);
-      expect(fake.listAgendaCalls, before);
-      expect(fake.lastAgendaQuery!.istanbulDay, '2026-09-09');
-      final monday = tester.getRect(_key('agenda-calendar-day-2026-09-07'));
-      final tuesday = tester.getRect(_key('agenda-calendar-day-2026-09-01'));
-      expect(tuesday.left - monday.left, 56);
-      expect(tuesday.top, lessThan(monday.top));
-      expect(_key('agenda-calendar-day-2026-08-31'), findsNothing);
-      expect(_key('agenda-calendar-day-2026-10-01'), findsNothing);
-      await _tap(tester, _key('agenda-calendar-day-2026-09-30'));
-      expect(fake.listAgendaCalls, before + 1);
-      expect(fake.lastAgendaQuery!.istanbulDay, '2026-09-30');
-      await _mode(tester, false);
-      expect(fake.listAgendaCalls, before + 1);
-      await _tap(tester, _key('agenda-calendar-day-2026-10-01'));
-      expect(fake.listAgendaCalls, before + 2);
-      expect(fake.lastAgendaQuery!.istanbulDay, '2026-10-01');
+      expect(
+        tester.getRect(_key('agenda-calendar-days')).right,
+        lessThanOrEqualTo(tester.getRect(_key('agenda-day-list')).right),
+      );
+      expect(
+        find.descendant(
+          of: _key('agenda-calendar-days'),
+          matching: find.byType(Scrollable),
+        ),
+        findsNothing,
+      );
+      await tester.tap(_key('previous-day'));
+      await tester.pumpAndSettle();
+      expect(find.text('2026-09-08'), findsOneWidget);
+      await tester.tap(_key('next-day'));
+      await tester.pumpAndSettle();
+      expect(find.text('2026-09-09'), findsOneWidget);
+      await tester.tap(_key('selected-day'));
+      await tester.pumpAndSettle();
+      expect(find.byType(DatePickerDialog), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets(
-    'calendar preserves exact non-default query and mode across day selection',
-    (tester) async {
-      const project = MobileProject(
-        id: 'project-a',
-        name: 'Kuzey',
-        createdAt: '2026-09-01T08:00:00Z',
-        updatedAt: '2026-09-01T08:00:00Z',
-        revision: 1,
-      );
-      final fake = FakeAgendaApplication(projects: [project]);
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
-      await tester.pumpAndSettle();
-      await _date(tester, DateTime(2026, 9, 9));
-      await _tap(tester, _key('agenda-filter-action'));
-      tester
-          .widget<SegmentedButton<AgendaArchiveFilter>>(
-            _key('agenda-archive-filter'),
-          )
-          .onSelectionChanged!({AgendaArchiveFilter.archived});
-      await tester.pump();
-      tester
-          .widget<DropdownButtonFormField<AgendaSortOrder>>(
-            _key('agenda-sort-order'),
-          )
-          .onChanged!(AgendaSortOrder.oldestFirst);
-      await tester.pump();
-      tester
-          .widget<DropdownButtonFormField<String?>>(
-            _key('agenda-project-filter'),
-          )
-          .onChanged!(project.id);
-      await tester.pump();
-      tester
-          .widget<DropdownButtonFormField<AgendaCategory?>>(
-            _key('agenda-category-filter'),
-          )
-          .onChanged!(AgendaCategory.inspection);
-      await tester.pump();
-      await _tap(tester, _key('agenda-filter-apply'));
-      await _tap(tester, _key('agenda-search'));
-      await tester.enterText(_key('agenda-literal-search'), '100% _ exact');
-      await tester.testTextInput.receiveAction(TextInputAction.search);
-      await tester.pumpAndSettle();
-      final calls = fake.listAgendaCalls;
-      await _mode(tester, true);
-      expect(fake.listAgendaCalls, calls);
-      await _tap(tester, _key('agenda-calendar-day-2026-09-18'));
-      expect(fake.listAgendaCalls, calls + 1);
-      final query = fake.lastAgendaQuery!;
-      expect(query.istanbulDay, '2026-09-18');
-      expect(query.literalSearch, '100% _ exact');
-      expect(query.projectId, project.id);
-      expect(query.category, AgendaCategory.inspection);
-      expect(query.archiveFilter, AgendaArchiveFilter.archived);
-      expect(query.sortOrder, AgendaSortOrder.oldestFirst);
-      await _mode(tester, false);
-      expect(fake.listAgendaCalls, calls + 1);
-      expect(fake.lastAgendaQuery, same(query));
-    },
-  );
-
-  testWidgets(
-    'periods use seven days and clamp month ends including leap year; today resets',
-    (tester) async {
-      final fake = FakeAgendaApplication();
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
-      await tester.pumpAndSettle();
-      await _date(tester, DateTime(2026, 12, 30));
-      var calls = fake.listAgendaCalls;
-      await _tap(tester, _key('agenda-calendar-next-period'));
-      expect(fake.lastAgendaQuery!.istanbulDay, '2027-01-06');
-      expect(fake.listAgendaCalls, ++calls);
-      await _tap(tester, _key('agenda-calendar-previous-period'));
-      expect(fake.lastAgendaQuery!.istanbulDay, '2026-12-30');
-      expect(fake.listAgendaCalls, ++calls);
-      await _mode(tester, true);
-      expect(fake.listAgendaCalls, calls);
-      for (final sample in [
-        (DateTime(2024, 1, 31), '2024-02-29'),
-        (DateTime(2025, 1, 31), '2025-02-28'),
-        (DateTime(2026, 12, 31), '2027-01-31'),
-      ]) {
-        await _date(tester, sample.$1);
-        calls = fake.listAgendaCalls;
-        await _tap(tester, _key('agenda-calendar-next-period'));
-        expect(fake.lastAgendaQuery!.istanbulDay, sample.$2);
-        expect(fake.listAgendaCalls, calls + 1);
-      }
-      await _date(tester, DateTime(2026, 3, 31));
-      calls = fake.listAgendaCalls;
-      await _tap(tester, _key('agenda-calendar-previous-period'));
-      expect(fake.lastAgendaQuery!.istanbulDay, '2026-02-28');
-      expect(fake.listAgendaCalls, calls + 1);
-      await _tap(tester, _key('agenda-today'));
-      expect(
-        fake.lastAgendaQuery!.istanbulDay,
-        CseTimeCodec.istanbulDayKey(
-          CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
-        ),
-      );
-      expect(fake.listAgendaCalls, calls + 2);
-    },
-  );
-
-  for (final size in [
-    const Size(320, 760),
-    const Size(390, 760),
-    const Size(320, 300),
-    const Size(390, 240),
-  ]) {
-    testWidgets(
-      'calendar horizontal scroll retains 48dp targets and semantics at $size 2x',
-      (tester) async {
-        tester.view.physicalSize = size;
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final semantics = tester.ensureSemantics();
-        try {
-          final fake = FakeAgendaApplication();
-          await tester.pumpWidget(
-            MaterialApp(
-              builder: (context, child) => MediaQuery(
-                data: MediaQuery.of(
-                  context,
-                ).copyWith(textScaler: TextScaler.linear(2)),
-                child: child!,
-              ),
-              home: AgendaPage(agenda: fake),
-            ),
-          );
-          await tester.pumpAndSettle();
-          await _date(tester, DateTime(2026, 9, 7));
-          for (final month in [false, true]) {
-            await _mode(tester, month);
-            final target = _key('agenda-calendar-day-2026-09-13');
-            await _tap(tester, target);
-            expect(target.hitTestable(), findsOneWidget);
-            expect(tester.getSize(target).width, greaterThanOrEqualTo(48));
-            expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
-            final data = tester
-                .getSemantics(
-                  find
-                      .ancestor(
-                        of: target,
-                        matching: find.byWidgetPredicate(
-                          (widget) =>
-                              widget is Semantics &&
-                              widget.properties.label == '2026-09-13',
-                        ),
-                      )
-                      .first,
-                )
-                .getSemanticsData();
-            expect(data.flagsCollection.isButton, isTrue);
-            expect(data.flagsCollection.isSelected, Tristate.isTrue);
-            expect(_key('create-agenda-log').hitTestable(), findsOneWidget);
-            final horizontal = find.descendant(
-              of: _key('agenda-calendar-days'),
-              matching: find.byType(Scrollable),
-            );
-            expect(
-              tester
-                  .state<ScrollableState>(horizontal)
-                  .position
-                  .maxScrollExtent,
-              greaterThan(0),
-            );
-            expect(
-              tester.getRect(_key('agenda-calendar')).right,
-              lessThanOrEqualTo(tester.getRect(_key('agenda-day-list')).right),
-            );
-            expect(tester.takeException(), isNull);
-          }
-        } finally {
-          semantics.dispose();
-        }
-      },
+  testWidgets('calendar density is bounded at 1-3 dots and count at 4+', (
+    tester,
+  ) async {
+    final agenda = _FilteringAgenda(
+      projects: const [_projectA],
+      logs: [
+        _log('one', '2026-09-07', _projectA),
+        for (var index = 0; index < 3; index++)
+          _log('three-$index', '2026-09-08', _projectA),
+        for (var index = 0; index < 100; index++)
+          _log('hundred-$index', '2026-09-09', _projectA),
+      ],
     );
+    await _pumpAgenda(tester, agenda, size: const Size(520, 900));
+    await _selectDate(tester, DateTime(2026, 9, 9));
+    await _selectMode(tester, month: true);
+
+    expect(_key('agenda-calendar-density-2026-09-07'), findsOneWidget);
+    expect(_key('agenda-calendar-density-2026-09-08'), findsOneWidget);
+    final crowded = _key('agenda-calendar-density-2026-09-09');
+    expect(crowded, findsOneWidget);
+    expect(
+      find.descendant(of: crowded, matching: find.text('100')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: crowded, matching: find.byType(Container)),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('active project switch only reloads context and never mutates', (
+    tester,
+  ) async {
+    final agenda = _FilteringAgenda(
+      projects: const [_projectA, _projectB],
+      logs: [
+        _log('north', _today(), _projectA),
+        _log('south', _today(), _projectB),
+      ],
+    );
+    await _pumpAgenda(tester, agenda, size: const Size(520, 900));
+    expect(_key('agenda-log-north'), findsOneWidget);
+    expect(_key('agenda-log-south'), findsNothing);
+    expect(
+      agenda.agendaQueries.every((query) => query.projectId == _projectA.id),
+      isTrue,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AgendaPage(agenda: agenda, activeProjectId: _projectB.id),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(_key('agenda-log-north'), findsNothing);
+    expect(_key('agenda-log-south'), findsOneWidget);
+    expect(agenda.lastAgendaQuery?.projectId, _projectB.id);
+    expect(agenda.createLogCalls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty states and tools follow active-project Q03 contract', (
+    tester,
+  ) async {
+    final agenda = _FilteringAgenda(projects: const [_projectA]);
+    await _pumpAgenda(tester, agenda, size: const Size(520, 900));
+    expect(find.text('Seçili gün için Ajanda kaydı yok.'), findsOneWidget);
+    expect(_key('agenda-empty-create'), findsOneWidget);
+    expect(_key('create-agenda-project'), findsNothing);
+    expect(_key('open-project-location-catalog'), findsNothing);
+    await _selectMode(tester, month: true);
+    expect(find.text('Bu ay için Ajanda kaydı bulunmuyor.'), findsOneWidget);
+
+    await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: agenda)));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Ajanda kayıtlarını görmek için üstten aktif proje seçin.'),
+      findsOneWidget,
+    );
+    expect(
+      tester.widget<FilledButton>(_key('create-agenda-log')).onPressed,
+      isNull,
+    );
+  });
+}
+
+Future<void> _pumpAgenda(
+  WidgetTester tester,
+  _FilteringAgenda agenda, {
+  required Size size,
+  double textScale = 1,
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: ThemeData(useMaterial3: true),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
+      home: AgendaPage(agenda: agenda, activeProjectId: _projectA.id),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _selectDate(WidgetTester tester, DateTime date) async {
+  await tester.ensureVisible(_key('selected-day'));
+  await tester.tap(_key('selected-day'));
+  await tester.pumpAndSettle();
+  Navigator.of(tester.element(find.byType(DatePickerDialog))).pop(date);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _selectMode(WidgetTester tester, {required bool month}) async {
+  final key = month
+      ? 'agenda-calendar-mode-month'
+      : 'agenda-calendar-mode-week';
+  await tester.ensureVisible(_key(key));
+  await tester.tap(_key(key));
+  await tester.pumpAndSettle();
+}
+
+String _today() =>
+    CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(DateTime.now().toUtc()));
+
+AgendaLog _log(String id, String day, MobileProject project) => AgendaLog(
+  id: id,
+  projectId: project.id,
+  projectName: project.name,
+  observedAt: '${day}T06:00:00Z',
+  createdAt: '${day}T06:00:00Z',
+  updatedAt: '${day}T06:00:00Z',
+  revision: 1,
+  category: AgendaCategory.inspection,
+  description: '$id kaydı',
+  location: null,
+  notes: null,
+);
+
+class _FilteringAgenda extends FakeAgendaApplication {
+  _FilteringAgenda({required super.projects, super.logs});
+
+  @override
+  Future<List<AgendaLog>> listAgenda(AgendaQuery query) async {
+    listAgendaCalls += 1;
+    lastAgendaQuery = query;
+    agendaQueries.add(query);
+    return logs
+        .where(
+          (log) =>
+              log.projectId == query.projectId &&
+              CseTimeCodec.istanbulDayKey(log.observedAt) == query.istanbulDay,
+        )
+        .toList(growable: false);
   }
 }

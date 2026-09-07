@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:flutter/material.dart';
@@ -8,131 +7,61 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_agenda_application.dart';
 
+const _projectA = MobileProject(
+  id: 'project-a',
+  name: 'Kuzey Şantiyesi',
+  createdAt: '2026-09-05T06:00:00Z',
+  updatedAt: '2026-09-05T06:00:00Z',
+  revision: 1,
+);
+const _projectB = MobileProject(
+  id: 'project-b',
+  name: 'Güney Şantiyesi',
+  createdAt: '2026-09-05T06:00:00Z',
+  updatedAt: '2026-09-05T06:00:00Z',
+  revision: 1,
+);
+
 void main() {
-  testWidgets(
-    'project creation waits for fresh projects and rejects stale reload',
-    (tester) async {
-      final agenda = FakeAgendaApplication();
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: agenda)));
-      await tester.pumpAndSettle();
+  testWidgets('stale active-project reload cannot retarget Agenda', (
+    tester,
+  ) async {
+    final agenda = FakeAgendaApplication(
+      projects: const [_projectA, _projectB],
+    );
+    Widget page(String projectId) => MaterialApp(
+      home: AgendaPage(agenda: agenda, activeProjectId: projectId),
+    );
 
-      final initialAgendaQueryCount = agenda.agendaQueries.length;
-      final staleProjectReload = Completer<List<MobileProject>>();
-      final freshProjectReload = Completer<List<MobileProject>>();
-      agenda.listProjectsResponses.addAll([
-        staleProjectReload.future,
-        freshProjectReload.future,
-      ]);
+    await tester.pumpWidget(page(_projectA.id));
+    await tester.pumpAndSettle();
+    expect(agenda.lastAgendaQuery?.projectId, _projectA.id);
 
-      FlutterErrorDetails? renderFailure;
-      final previousErrorWidgetBuilder = ErrorWidget.builder;
-      ErrorWidget.builder = (details) {
-        renderFailure = details;
-        return const SafeDiagnosticPanel(code: 'widget_render_error');
-      };
+    final staleReload = Completer<List<MobileProject>>();
+    final freshReload = Completer<List<MobileProject>>();
+    agenda.listProjectsResponses.addAll([
+      staleReload.future,
+      freshReload.future,
+    ]);
 
-      Future<DropdownButton<String?>> projectDropdown() async {
-        // Let the preceding dialog finish closing while project reads remain
-        // deliberately pending, then use the current filter-panel surface.
-        await tester.pump(const Duration(milliseconds: 300));
-        final filters = find.byKey(const Key('agenda-filter-action'));
-        expect(filters.hitTestable(), findsOneWidget);
-        await tester.tap(filters.hitTestable());
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 300));
-        final dropdown = tester.widget<DropdownButton<String?>>(
-          find.descendant(
-            of: find.byKey(const Key('agenda-project-filter')),
-            matching: find.byType(DropdownButton<String?>),
-          ),
-        );
-        await tester.tap(find.byKey(const Key('agenda-filter-cancel')));
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 300));
-        return dropdown;
-      }
+    await tester.pumpWidget(page(_projectB.id));
+    await tester.pump();
+    await tester.pumpWidget(page(_projectA.id));
+    await tester.pump();
 
-      try {
-        await tester.tap(find.byKey(const Key('create-agenda-project')));
-        await tester.pumpAndSettle();
-        await tester.enterText(
-          find.byKey(const Key('agenda-project-name')),
-          'Gecikmeli Yeni Proje',
-        );
-        await tester.tap(find.byKey(const Key('save-agenda-project')));
-        for (
-          var index = 0;
-          index < 10 && agenda.listProjectsCalls < 3;
-          index += 1
-        ) {
-          await tester.pump();
-        }
+    freshReload.complete(const [_projectA, _projectB]);
+    await tester.pumpAndSettle();
+    expect(agenda.lastAgendaQuery?.projectId, _projectA.id);
+    final queryCount = agenda.agendaQueries.length;
 
-        expect(agenda.listProjectsCalls, 3);
-        expect(agenda.projects, hasLength(1));
-        final createdProject = agenda.projects.single;
-        var dropdown = await projectDropdown();
-        expect(dropdown.value, isNull);
-        expect(
-          dropdown.items!.where((item) => item.value == createdProject.id),
-          isEmpty,
-        );
-        expect(find.byType(SafeDiagnosticPanel), findsNothing);
-        expect(renderFailure, isNull);
-        expect(tester.takeException(), isNull);
-
-        freshProjectReload.complete(List.unmodifiable(agenda.projects));
-        for (var index = 0; index < 10; index += 1) {
-          await tester.pump();
-          dropdown = await projectDropdown();
-          if (dropdown.value == createdProject.id) break;
-        }
-
-        dropdown = await projectDropdown();
-        expect(dropdown.value, createdProject.id);
-        expect(
-          dropdown.items!.where((item) => item.value == createdProject.id),
-          hasLength(1),
-        );
-        expect(
-          agenda.agendaQueries.skip(initialAgendaQueryCount),
-          everyElement(
-            isA<AgendaQuery>().having(
-              (query) => query.projectId,
-              'projectId',
-              createdProject.id,
-            ),
-          ),
-        );
-
-        staleProjectReload.complete(const []);
-        await tester.pumpAndSettle();
-
-        dropdown = await projectDropdown();
-        expect(dropdown.value, createdProject.id);
-        expect(
-          dropdown.items!.where((item) => item.value == createdProject.id),
-          hasLength(1),
-        );
-        expect(
-          agenda.projects.where((item) => item.id == createdProject.id),
-          hasLength(1),
-        );
-        expect(agenda.lastAgendaQuery?.projectId, createdProject.id);
-        expect(agenda.agendaQueries, hasLength(initialAgendaQueryCount + 1));
-        expect(find.byType(SafeDiagnosticPanel), findsNothing);
-      } finally {
-        if (!freshProjectReload.isCompleted) {
-          freshProjectReload.complete(List.unmodifiable(agenda.projects));
-        }
-        if (!staleProjectReload.isCompleted) {
-          staleProjectReload.complete(const []);
-        }
-        ErrorWidget.builder = previousErrorWidgetBuilder;
-      }
-
-      expect(renderFailure, isNull);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    staleReload.complete(const []);
+    await tester.pumpAndSettle();
+    expect(agenda.lastAgendaQuery?.projectId, _projectA.id);
+    expect(agenda.agendaQueries, hasLength(queryCount));
+    expect(
+      find.text('Aktif proje seçilmeden Ajanda kaydı gösterilmez.'),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
