@@ -58,7 +58,7 @@ Bu tamamlanmış temel, ilerideki queue maddelerinde sessizce geri alınmaz.
 
 ### Q01 — İSG hızlı belge kartları + arşiv lifecycle / geri yükleme
 
-**Kaynak:** #617 Phase 4 / item 20B, Issue #708, current PR #715  
+**Kaynak:** #617 Phase 4 / item 20B, Issue #708, PR #715 (merged)\
 **Durum:** `COMPLETE` — Issue #708 closed, PR #715 merged; required focused validation, bağımsız CRITICAL re-review, exact Acceptance build/install ve Fatih manuel Acceptance PASS.
 
 Bitiş tanımı:
