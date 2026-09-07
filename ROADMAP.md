@@ -277,7 +277,7 @@ Hedef günlük create sırası:
 ### Q03-R1 — Ajanda compact takvim günlerine doğrudan dokunma
 
 **Kaynak:** Issue #736 owner kararı — Q03 sonrası dar responsive interaction refinement.
-**Durum:** `NEXT` — Q04'ten önce tamamlanacak owner-inserted refinement.
+**Durum:** `COMPLETE` — Issue #736 closed, PR #738 merged; bağımsız review ve focused validation PASS, exact head `79f95be609badea4820f76e03509fd59b4adf02c` Acceptance APK `com.faliardic.sefim.acceptance` paketine veri korunarak kuruldu ve Fatih manuel Acceptance PASS verdi.
 
 Bu refinement yalnız `<336 dp` compact takvim etkileşimini değiştirir; tarihsel Q03 `COMPLETE` kalır ve diğer Ajanda/persistence/identity/attachment sözleşmeleri yeniden açılmaz.
 
@@ -288,6 +288,21 @@ Bitiş tanımı:
 - hücre hit-area ve Semantics sınırları gerçek görsel hücre dışına veya komşu güne taşmaz; gizli/örtüşen 48 dp hedef kullanılmaz;
 - mevcut en az 48×48 dp önceki gün / seçili tarih / sonraki gün selector'ı ile standart DatePicker erişilebilir ana/primary yol olarak korunur; doğrudan compact hücre tap'i yalnız ek hızlı etkileşimdir;
 - source kayıt, active-project context veya persistence mutation semantiği değişmez.
+
+### Q03-R2 — Ajanda literal arama yüzeyini kaldır + tarih seçiminde scroll konumunu koru
+
+**Kaynak:** Issue #739 owner kararı — Q03-R1 sonrası dar Ajanda interaction refinement.
+**Durum:** `NEXT` — Q04'ten önce tamamlanacak owner-inserted refinement.
+
+Bu refinement yalnız Ajanda'nın görünür arama kontrolünü ve tarih seçimi sırasındaki sayfa konumunu değiştirir; tarihsel Q03 ile Q03-R1 `COMPLETE` kalır ve backend/query sözleşmeleri yeniden açılmaz.
+
+Bitiş tanımı:
+
+- görünür `Literal ara` UI'sı ve yalnız bu alanı açan `Ara` eylemi kaldırılır;
+- backend/query literal-search capability ve contract'ı silinmez, yeniden yazılmaz veya migration'a dönüştürülmez; mevcut literal-search yeteneği ileride güvenli biçimde yeniden kullanılmak üzere korunur;
+- doğrudan takvim gününe dokunma, önceki/sonraki gün kontrolleri ve DatePicker ile tarih seçimi mevcut dikey scroll offset'ini korur;
+- tarih seçimi sonrası günlük liste yenilendiğinde mevcut güvenli restore/clamp davranışı kullanılır; içerik sınırı değişirse offset geçerli aralığa sıkıştırılır ve sayfa gereksiz yere en üste sıçramaz;
+- active-project, kayıt, persistence, identity, event, attachment ve query semantiği değişmez.
 
 ### Q04 — İş Gücü / Sicil first-class alanı + Firma → Personel + Günlük Puantaj sadeleştirmesi
 
