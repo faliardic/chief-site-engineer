@@ -11,6 +11,354 @@ import 'package:chief_site_engineer/features/agenda/project_location_catalog_pag
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
+class ReminderQuickCaptureSheet extends StatefulWidget {
+  const ReminderQuickCaptureSheet({
+    required this.agenda,
+    required this.projectId,
+    super.key,
+  });
+
+  final AgendaApplication agenda;
+  final String projectId;
+
+  @override
+  State<ReminderQuickCaptureSheet> createState() =>
+      _ReminderQuickCaptureSheetState();
+}
+
+class _ReminderQuickCaptureSheetState extends State<ReminderQuickCaptureSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _text = TextEditingController();
+  final _recordId = RecordId.randomUuid();
+  final _eventId = RecordId.randomUuid();
+  late final String _projectId;
+  late final String _today;
+  late String _day;
+  TimeOfDay? _time;
+  String? _projectName;
+  String? _error;
+  bool _loading = true;
+  bool _submitting = false;
+  bool _done = false;
+  CreateReminderCommand? _command;
+
+  @override
+  void initState() {
+    super.initState();
+    _projectId = widget.projectId;
+    _today = CseTimeCodec.istanbulDayKey(
+      CseTimeCodec.encodeUtc(clock.now().toUtc()),
+    );
+    _day = _today;
+    _loadProject();
+  }
+
+  Future<MobileProject> _requireProject() async {
+    final projects = await widget.agenda.listProjects();
+    return projects.firstWhere(
+      (p) => p.id == _projectId && !p.isArchived,
+      orElse: () => throw const AgendaValidationFailure(
+        'Aktif proje doğrulanamadı. Proje seçin veya oluşturun; Unutma’yı yeniden açın.',
+      ),
+    );
+  }
+
+  Future<void> _loadProject() async {
+    try {
+      final project = await _requireProject();
+      if (mounted) setState(() => _projectName = project.name);
+    } on Object {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Aktif proje doğrulanamadı. Proje seçin veya oluşturun; Unutma’yı yeniden açın.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  bool get _editable => !_submitting && _command == null;
+
+  Future<void> _submit() async {
+    if (_submitting ||
+        _done ||
+        _loading ||
+        _projectName == null ||
+        !_formKey.currentState!.validate()) {
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await _requireProject();
+      final date = DateTime.parse(_day);
+      // Freeze the complete attempt, including dates, across response loss.
+      _command ??= CreateReminderCommand(
+        id: _recordId,
+        eventId: _eventId,
+        projectId: _projectId,
+        title: _text.text.trim(),
+        captureText: _text.text.trim(),
+        kind: ReminderKind.action,
+        schedule: ReminderScheduleKind.custom,
+        allDayLocalDate: _time == null ? _day : null,
+        customAttentionAt: _time == null
+            ? null
+            : CseTimeCodec.canonicalFromIstanbulComponents(
+                year: date.year,
+                month: date.month,
+                day: date.day,
+                hour: _time!.hour,
+                minute: _time!.minute,
+              ),
+      );
+      final reminder = await widget.agenda.createReminder(_command!);
+      if (!mounted) return;
+      if (reminder.nextAttentionAt != null) {
+        var scheduled = false;
+        try {
+          final detail = await widget.agenda.getReminderLifecycleDetail(
+            reminder.id,
+          );
+          scheduled =
+              detail.notification.syncState == NotificationSyncState.scheduled;
+        } on Object {
+          scheduled = false;
+        }
+        if (!mounted) return;
+        if (!scheduled) {
+          await showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Kayıt oluşturuldu'),
+              content: const Text(
+                'Kayıt korundu ancak arka plan bildirimi doğrulanamadı. Kayıt detayındaki teslimat tanısını kontrol edin.',
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Anladım'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _done = true;
+        _submitting = false;
+      });
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted) Navigator.pop(context, reminder);
+    } on AgendaValidationFailure catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } on Object {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Kayıt sonucu doğrulanamadı. Aynı kayıtla tekrar deneyin.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _pickDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.parse(_day),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (date != null && mounted) {
+      setState(
+        () => _day =
+            '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+      );
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _time ?? const TimeOfDay(hour: 9, minute: 0),
+    );
+    if (time != null && mounted) setState(() => _time = time);
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_submitting,
+    child: Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          key: const Key('reminder-quick-capture-sheet'),
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '+ Unutma',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      key: const Key('quick-capture-close'),
+                      tooltip: 'Kapat',
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
+                      ),
+                      onPressed: _submitting
+                          ? null
+                          : () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                if (_loading) const LinearProgressIndicator(),
+                if (_projectName != null)
+                  Text(
+                    'Aktif proje: $_projectName',
+                    key: const Key('quick-capture-project'),
+                  ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  key: const Key('quick-capture-text'),
+                  controller: _text,
+                  enabled: _editable,
+                  minLines: 1,
+                  maxLines: 4,
+                  maxLength: 500,
+                  decoration: const InputDecoration(
+                    labelText: 'Ne unutulmamalı?',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Hatırlatıcı metni zorunludur.'
+                      : null,
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _dateAction('Bugün', 'quick-capture-today', _today),
+                    _dateAction(
+                      'Yarın',
+                      'quick-capture-tomorrow',
+                      CseTimeCodec.shiftIstanbulDay(_today, 1),
+                    ),
+                    OutlinedButton(
+                      key: const Key('quick-capture-date'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                      ),
+                      onPressed: _editable ? _pickDate : null,
+                      child: const Text('Tarih seç'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  CseTimeCodec.formatIstanbulDay(_day),
+                  key: const Key('quick-capture-selected-date'),
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    OutlinedButton(
+                      key: const Key('quick-capture-time'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                      ),
+                      onPressed: _editable ? _pickTime : null,
+                      child: Text(
+                        _time == null
+                            ? 'Saat seç (isteğe bağlı)'
+                            : _time!.format(context),
+                      ),
+                    ),
+                    if (_time != null)
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                        ),
+                        onPressed: _editable
+                            ? () => setState(() => _time = null)
+                            : null,
+                        child: const Text('Saati kaldır'),
+                      ),
+                  ],
+                ),
+                if (_time == null)
+                  const Text('Tam gün; saatli bildirim kurulmaz.'),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(_error!, key: const Key('quick-capture-error')),
+                  ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  key: const Key('quick-capture-save'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                  ),
+                  onPressed:
+                      _submitting || _done || _loading || _projectName == null
+                      ? null
+                      : _submit,
+                  child: Text(
+                    _submitting
+                        ? 'Kaydediliyor…'
+                        : _command == null
+                        ? 'Kaydet'
+                        : 'Tekrar dene',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _dateAction(String label, String key, String day) => Semantics(
+    selected: _day == day,
+    child: OutlinedButton(
+      key: Key(key),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        backgroundColor: _day == day
+            ? Theme.of(context).colorScheme.secondaryContainer
+            : null,
+      ),
+      onPressed: _editable ? () => setState(() => _day = day) : null,
+      child: Text(label),
+    ),
+  );
+}
+
 class ReminderFormPage extends StatefulWidget {
   const ReminderFormPage({
     required this.agenda,
@@ -18,6 +366,7 @@ class ReminderFormPage extends StatefulWidget {
     this.projectLocations,
     this.log,
     this.preferredProjectId,
+    this.requirePreferredProject = false,
     this.initialSchedule = ReminderScheduleKind.in15Minutes,
     super.key,
   });
@@ -27,6 +376,7 @@ class ReminderFormPage extends StatefulWidget {
   final ProjectLocationApplication? projectLocations;
   final AgendaLog? log;
   final String? preferredProjectId;
+  final bool requirePreferredProject;
   final ReminderScheduleKind initialSchedule;
 
   @override
@@ -45,6 +395,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   List<MobileProject> _projects = const [];
   List<MobileProjectLocation> _locations = const [];
   String? _projectId;
+  late final String? _lockedProjectId;
   String? _locationId;
   bool _loadingLocations = false;
   String? _locationError;
@@ -91,6 +442,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   void initState() {
     super.initState();
     _title = TextEditingController(text: widget.log?.description ?? '');
+    _lockedProjectId = widget.preferredProjectId;
     _projectId = widget.log?.projectId ?? widget.preferredProjectId;
     _schedule = widget.initialSchedule;
     _locationId = widget.log?.locationId;
@@ -129,7 +481,8 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
           .toList(growable: false);
       if (!mounted || generation != _projectLoadGeneration) return;
       final selected =
-          widget.log == null &&
+          !widget.requirePreferredProject &&
+              widget.log == null &&
               !projects.any((project) => project.id == _projectId)
           ? null
           : _projectId;
@@ -160,7 +513,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
           _location.text != _baselineLocation;
       setState(() {
         _projects = const [];
-        if (widget.log == null) {
+        if (widget.log == null && !widget.requirePreferredProject) {
           _projectId = null;
           _locationId = null;
           _location.clear();
@@ -396,6 +749,17 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
       _error = null;
     });
     try {
+      if (widget.requirePreferredProject) {
+        final projects = await widget.agenda.listProjects();
+        if (_lockedProjectId == null ||
+            _projectId != _lockedProjectId ||
+            (widget.log != null && widget.log!.projectId != _lockedProjectId) ||
+            !projects.any((p) => p.id == _lockedProjectId && !p.isArchived)) {
+          throw const AgendaValidationFailure(
+            'Aktif proje doğrulanamadı. Proje seçin veya oluşturun; bu formu yeniden açın.',
+          );
+        }
+      }
       final custom = !_allDay
           ? _schedule == ReminderScheduleKind.custom
                 ? CseTimeCodec.canonicalFromIstanbulComponents(
@@ -600,7 +964,23 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                               ),
                               if (_loadingProjects)
                                 const LinearProgressIndicator(),
+                              if (widget.requirePreferredProject &&
+                                  !_loadingProjects)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  child: Text(
+                                    _projects.any(
+                                          (p) => p.id == _lockedProjectId,
+                                        )
+                                        ? 'Aktif proje: ${_projects.firstWhere((p) => p.id == _lockedProjectId).name}'
+                                        : 'Aktif proje doğrulanamadı. Proje seçin veya oluşturun; bu formu yeniden açın.',
+                                    key: const Key('reminder-locked-project'),
+                                  ),
+                                ),
                               if (widget.log == null &&
+                                  !widget.requirePreferredProject &&
                                   _projects.isNotEmpty) ...[
                                 DropdownButtonFormField<String?>(
                                   key: const Key('reminder-project'),
