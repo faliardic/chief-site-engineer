@@ -48,6 +48,7 @@ Bu tamamlanmış temel, ilerideki queue maddelerinde sessizce geri alınmaz.
 
 ### Durum etiketleri
 
+- `COMPLETE` — kapsam merged; gerekli review, validation ve Acceptance kapıları tamamlandı.
 - `ACTIVE` — current production child; önce bunun gate'leri kapanır.
 - `NEXT` — active child tamamlanınca başlanacak ilk iş.
 - `QUEUED` — sırayla bekleyen pre-release işi.
@@ -58,7 +59,7 @@ Bu tamamlanmış temel, ilerideki queue maddelerinde sessizce geri alınmaz.
 ### Q01 — İSG hızlı belge kartları + arşiv lifecycle / geri yükleme
 
 **Kaynak:** #617 Phase 4 / item 20B, Issue #708, current PR #715  
-**Durum:** `ACTIVE` — PR #715 owner Acceptance FAIL, CRITICAL correction required; yeni review/Acceptance gate'leri tamamlanmadan Ready/merge yok.
+**Durum:** `COMPLETE` — Issue #708 closed, PR #715 merged; required focused validation, bağımsız CRITICAL re-review, exact Acceptance build/install ve Fatih manuel Acceptance PASS.
 
 Bitiş tanımı:
 
@@ -69,12 +70,12 @@ Bitiş tanımı:
 - `Geri yükle` yalnız archived exact kaydı yeni kopya üretmeden aynı record ID ile yeniden aktif eder; `archived_at` temizlenir, revision `+1` olur ve aynı transaction'da append-only `compliance.reopened` olayı mevcut sequence'in sonuna eklenir;
 - önceki lifecycle event'leri korunur; aynı türden başka aktif kayıt restore'u engellemez, merge/dedupe veya latest-wins uygulanmaz;
 - exact kişi/proje isolation korunur; ekranı açmak, geçmişi okumak veya karta bakmak mutation üretmez;
-- restore/quick-add correction için focused validation, bağımsız yeni review ve exact Acceptance build üzerinde Fatih PASS gerekir; PR #715 bu kapılar geçmeden Draft kalır.
+- restore/quick-add correction için required focused validation, bağımsız yeni review ve exact Acceptance build üzerinde Fatih PASS tamamlandı; PR #715 bu kapılar geçtikten sonra merge edildi.
 
 ### Q02 — Hatırlatıcı aktif-proje bağlamı + hızlı Unutma akışı
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi — `Hatırlatıcı` başlığı; #617 daily-core ilkeleri; eski notification-panel `Ertele` Q'su bu maddeye birleştirildi.  
-**Durum:** `NEXT` — Q01 gate'leri kapanıp PR #715 merge edilmeden production implementation başlamaz.
+**Durum:** `COMPLETE` — Slice A Issue #727 / PR #728 ve Slice B Issue #729 / PR #730 tamamlandı; iki Issue closed, iki PR merged; required review, exact Acceptance build/install ve Fatih manuel Acceptance PASS.
 
 Bu madde, notification kolaylığından önce Hatırlatıcı'nın doğru proje bağlamını ve birkaç saniyelik yakalama akışını güvenilir hale getirir.
 
@@ -143,7 +144,7 @@ Bu alt dilim background/reboot engine değişikliği gerektirirse aynı STANDARD
 ### Q03 — Ajanda aktif-proje takvimi + hızlı kayıt oluşturma
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimleri — `Ajanda — Takvim` ve `Ajanda Kaydı Oluşturma` başlıkları; #617 daily-core ilkeleri.  
-**Durum:** `QUEUED`
+**Durum:** `NEXT` — Q01 ve Q02 tamamlandı; sıradaki uygulanabilir production maddesi.
 
 Ajanda, proje yönetimi menüsü değil **aktif projenin takvim tabanlı saha zaman çizgisi ve hızlı kayıt yüzeyi** olarak çalışır. Bu Q mevcut Ajanda stable identity, `AgendaCategory`, history/event ve attachment sözleşmelerini yeniden yazmaz; takvim ile `+ Ajanda kaydı` akışını aynı günlük-core işi altında sadeleştirir.
 
