@@ -163,7 +163,7 @@ Ajanda, proje yönetimi menüsü değil **aktif projenin takvim tabanlı saha za
 - `1–3` kayıt için aynı sayıda küçük nokta kullanılabilir.
 - `4+` kayıtta sınırsız nokta veya spiral çizilmez; bounded nokta + sayısal badge/count ile toplam yoğunluk görünür tutulur.
 - Örneğin 100 kayıtta 100 ayrı nokta üretilmez; tarih hücresi kayıt sayacı yüzünden okunamaz hale gelmez.
-- Gösterge yalnız kayıt yoğunluğunu anlatır. Hem `>=336 dp` hem `<336 dp` compact modda doğrudan görsel gün hücresine dokunmak kayıt gününü seçer ve gerçek kayıt listesini görünür kılar; compact moddaki ayrı responsive selector erişilebilir alternatif olarak korunur.
+- Gösterge yalnız kayıt yoğunluğunu anlatır. Hem `>=336 dp` hem `<336 dp` compact modda doğrudan görsel gün hücresine dokunmak kayıt gününü seçer ve gerçek kayıt listesini görünür kılar; compact moddaki ayrı responsive selector + DatePicker erişilebilir ana/primary yol olarak korunur.
 
 #### CAL-03 — Yalnız aktif projenin Ajanda kayıtları
 
@@ -191,7 +191,7 @@ Ajanda, proje yönetimi menüsü değil **aktif projenin takvim tabanlı saha za
 
 - `>=336 dp` modunda kullanıcı doğrudan gün hücresine dokunduğunda o günün kayıtları aynı Ajanda bağlamında görünür; sırf günlük listeyi görmek için gereksiz ayrı navigasyon dayatılmaz.
 - `<336 dp` compact modda kullanıcı doğrudan görsel gün hücresine dokunarak tarihi seçer ve aynı Ajanda bağlamındaki günlük listeyi günceller. Hücrenin hit-area/Semantics sınırı gerçek görsel sınırın dışına taşmaz; komşu hücrelerle örtüşen gizli 48 dp hedef üretilmez.
-- Compact moddaki en az 48×48 dp önceki gün / seçili tarih / sonraki gün selector'ı ve seçili tarih kontrolünün açtığı standart DatePicker erişilebilir alternatif olarak korunur; doğrudan hücre tap'i bu yolu kaldırmaz.
+- Compact moddaki en az 48×48 dp önceki gün / seçili tarih / sonraki gün selector'ı ve seçili tarih kontrolünün açtığı standart DatePicker erişilebilir ana/primary yol olarak korunur; doğrudan hücre tap'i yalnız ek hızlı etkileşimdir ve bu yolu kaldırmaz.
 - Fatih'in Q03 Acceptance sırasında bildirdiği “Ajanda üzerinde tıklama yok” gözleminin non-blocking sayıldığı önceki compact davranış, Issue #736 owner kararıyla yalnız doğrudan gün seçimi bakımından supersede edilmiştir; Q03'ün diğer tamamlanmış kapsamı ve Acceptance geçmişi değişmez.
 - `Bu ay için Ajanda kaydı bulunmuyor.` ile `Bugün için kayıt yok.` gibi ay ve seçili-gün empty state'leri ayrılır.
 - Boş seçili günde görünür `+ Ajanda kaydı` ana eylemi sunulabilir.
@@ -286,7 +286,7 @@ Bitiş tanımı:
 - yedi görsel gün sütunu normal yatay kaydırma olmadan görünür kalır;
 - compact görsel gün hücresine doğrudan dokunmak exact tarihi seçer ve aynı Ajanda bağlamındaki günlük listeyi günceller;
 - hücre hit-area ve Semantics sınırları gerçek görsel hücre dışına veya komşu güne taşmaz; gizli/örtüşen 48 dp hedef kullanılmaz;
-- mevcut en az 48×48 dp önceki gün / seçili tarih / sonraki gün selector'ı ile standart DatePicker erişilebilir alternatif olarak korunur;
+- mevcut en az 48×48 dp önceki gün / seçili tarih / sonraki gün selector'ı ile standart DatePicker erişilebilir ana/primary yol olarak korunur; doğrudan compact hücre tap'i yalnız ek hızlı etkileşimdir;
 - source kayıt, active-project context veya persistence mutation semantiği değişmez.
 
 ### Q04 — İş Gücü / Sicil first-class alanı + Firma → Personel + Günlük Puantaj sadeleştirmesi
