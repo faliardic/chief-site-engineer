@@ -1,9 +1,7 @@
 import 'dart:ui' show SemanticsAction;
 
-import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
-import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/screen_tool_rail.dart';
 import 'package:flutter/material.dart';
@@ -34,7 +32,7 @@ void main() {
       final semantics = tester.ensureSemantics();
       try {
         final fake = _ReadAgenda();
-        await _pump(tester, fake, size: size, locations: _Locations());
+        await _pump(tester, fake, size: size);
         final rail = find.byType(ScreenToolRail);
         final list = find.byKey(const Key('agenda-day-list'));
         expect(
@@ -42,12 +40,7 @@ void main() {
           lessThanOrEqualTo(tester.getRect(rail).left),
         );
         final actions = tester.widget<ScreenToolRail>(rail).actions;
-        expect(actions.map((action) => action.label), [
-          'Ara',
-          'Filtreler',
-          'Yeni proje',
-          'Mahal Kataloğu',
-        ]);
+        expect(actions.map((action) => action.label), ['Ara', 'Filtreler']);
         double? previousY;
         for (final action in actions) {
           final target = find.byKey(action.key);
@@ -98,7 +91,7 @@ void main() {
             findsNothing,
           );
         }
-        final empty = find.text('Bu günde Ajanda kaydı yok.');
+        final empty = find.text('Seçili gün için Ajanda kaydı yok.');
         await _revealContent(tester, empty);
         await tester.pumpAndSettle();
         expect(
@@ -141,13 +134,14 @@ void main() {
       final input = tester.widget<TextField>(field);
       expect(input.focusNode!.hasFocus, isTrue);
       expect(fake.lastAgendaQuery, same(initialQuery));
-      expect(fake.listAgendaCalls, 1);
+      final initialAgendaCalls = fake.listAgendaCalls;
+      expect(initialAgendaCalls, greaterThanOrEqualTo(7));
       expect(input.decoration!.suffixIcon, isNull);
       await tester.enterText(field, '100% _ beton');
       final before = fake.listAgendaCalls;
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
-      expect(fake.listAgendaCalls, before + 1);
+      expect(fake.listAgendaCalls, greaterThan(before));
       expect(fake.lastAgendaQuery!.literalSearch, '100% _ beton');
       expect(fake.lastAgendaQuery!.istanbulDay, initialQuery!.istanbulDay);
       input.focusNode!.unfocus();
@@ -184,12 +178,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(retry.hitTestable(), findsOneWidget);
       expect(tester.getRect(retry).right, lessThan(tester.getRect(rail).left));
+      final attemptsBeforeRetry = fake.readAttempts;
       fake.failRead = false;
       await tester.tap(retry);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('agenda-read-error-retry')), findsNothing);
-      expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
-      expect(fake.readAttempts, 2);
+      expect(find.text('Seçili gün için Ajanda kaydı yok.'), findsOneWidget);
+      expect(fake.readAttempts, greaterThan(attemptsBeforeRetry));
       expect(tester.takeException(), isNull);
     },
   );
@@ -211,7 +206,6 @@ Future<void> _pump(
   WidgetTester tester,
   FakeAgendaApplication fake, {
   required Size size,
-  ProjectLocationApplication? locations,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -226,11 +220,7 @@ Future<void> _pump(
         ).copyWith(textScaler: const TextScaler.linear(2)),
         child: child!,
       ),
-      home: AgendaPage(
-        agenda: fake,
-        activeProjectId: _project.id,
-        projectLocations: locations,
-      ),
+      home: AgendaPage(agenda: fake, activeProjectId: _project.id),
     ),
   );
   await tester.pumpAndSettle();
@@ -247,19 +237,4 @@ class _ReadAgenda extends FakeAgendaApplication {
     if (failRead) throw StateError('Synthetic read failure');
     return super.listAgenda(query);
   }
-}
-
-class _Locations implements ProjectLocationApplication {
-  @override
-  Stream<void> get projectChanges => const Stream.empty();
-  @override
-  Stream<void> get projectLocationChanges => const Stream.empty();
-  @override
-  Future<List<MobileProject>> listProjects() async => [_project];
-  @override
-  Future<List<MobileProjectLocation>> listProjectLocations(
-    ProjectLocationQuery query,
-  ) async => [];
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

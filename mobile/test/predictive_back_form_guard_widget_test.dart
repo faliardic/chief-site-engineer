@@ -50,6 +50,7 @@ void main() {
       tester,
       (_) => LogFormPage(
         agenda: FakeAgendaApplication(projects: const [_project]),
+        initialProjectId: _project.id,
       ),
     );
 
@@ -72,6 +73,7 @@ void main() {
       tester,
       form: (_) => LogFormPage(
         agenda: FakeAgendaApplication(projects: const [_project]),
+        initialProjectId: _project.id,
       ),
       formType: LogFormPage,
       fieldKey: const Key('log-description'),
@@ -169,7 +171,10 @@ void main() {
     final logCompleter = Completer<AgendaLog>();
     final logAgenda = FakeAgendaApplication(projects: const [_project])
       ..createLogCompleter = logCompleter;
-    harness = await _openForm(tester, (_) => LogFormPage(agenda: logAgenda));
+    harness = await _openForm(
+      tester,
+      (_) => LogFormPage(agenda: logAgenda, initialProjectId: _project.id),
+    );
     await tester.enterText(
       find.byKey(const Key('log-description')),
       'Tamamlanan saha logu',
@@ -223,12 +228,9 @@ void main() {
       tester,
       (_) => LogFormPage(
         agenda: FakeAgendaApplication(projects: const [_project]),
+        initialProjectId: _project.id,
       ),
     );
-    final timeDetails = find.byKey(const Key('log-time-details'));
-    await tester.ensureVisible(timeDetails);
-    await tester.tap(timeDetails);
-    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('log-date')));
     await tester.tap(find.byKey(const Key('log-date')));
     await tester.pumpAndSettle();

@@ -2,13 +2,10 @@ import 'dart:async';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
-import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
-import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
-import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/screen_tool_rail.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
@@ -43,8 +40,8 @@ class _AgendaPageState extends State<AgendaPage> {
   final GlobalKey _searchFieldKey = GlobalKey();
   late String _selectedDay;
   bool _calendarMonth = false;
-  List<MobileProject> _projects = const [];
   List<AgendaLog> _logs = const [];
+  Map<String, int> _calendarDensity = const {};
   Map<String, MobileReminder> _linkedReminders = const {};
   String? _projectId;
   AgendaCategory? _category;
@@ -58,7 +55,6 @@ class _AgendaPageState extends State<AgendaPage> {
   bool _detailNavigationBusy = false;
   bool _preservingDetailReload = false;
   int _reloadGeneration = 0;
-  String? _preferredProjectId;
 
   @override
   void initState() {
@@ -81,43 +77,17 @@ class _AgendaPageState extends State<AgendaPage> {
     super.dispose();
   }
 
-  Future<void> _createProject() async {
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => const OwnedTextInputDialog(
-        title: 'Yeni proje',
-        label: 'Proje adı',
-        confirmLabel: 'Oluştur',
-        inputKey: Key('agenda-project-name'),
-        confirmKey: Key('save-agenda-project'),
-      ),
-    );
-    if (name == null) return;
-    try {
-      final project = await widget.agenda.createProject(
-        CreateProjectCommand(id: RecordId.randomUuid(), name: name),
-      );
-      if (!mounted) return;
-      await _reload(preferredProjectId: project.id);
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(
-        () => _error = error is AgendaValidationFailure
-            ? error.message
-            : 'Proje oluşturulamadı.',
-      );
+  @override
+  void didUpdateWidget(covariant AgendaPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.activeProjectId != widget.activeProjectId) {
+      unawaited(_reload());
     }
   }
 
-  Future<void> _reload({
-    double? restoreOffset,
-    String? preferredProjectId,
-  }) async {
-    if (preferredProjectId != null) {
-      _preferredProjectId = preferredProjectId;
-    }
+  Future<void> _reload({double? restoreOffset}) async {
     final generation = ++_reloadGeneration;
-    final requestedProjectId = _preferredProjectId ?? _projectId;
+    final requestedProjectId = widget.activeProjectId;
     setState(() {
       _loading = true;
       _error = null;
@@ -129,19 +99,32 @@ class _AgendaPageState extends State<AgendaPage> {
       if (!mounted || generation != _reloadGeneration) return;
       final selectedProjectId =
           requestedProjectId != null &&
-              projects.any((project) => project.id == requestedProjectId)
+              projects.any(
+                (project) =>
+                    project.id == requestedProjectId && !project.isArchived,
+              )
           ? requestedProjectId
           : null;
-      final logs = await widget.agenda.listAgenda(
-        AgendaQuery(
-          istanbulDay: _selectedDay,
-          projectId: selectedProjectId,
-          category: _category,
-          literalSearch: _search,
-          archiveFilter: _archiveFilter,
-          sortOrder: _sortOrder,
-        ),
-      );
+      final visibleDays = _visibleCalendarDays();
+      final otherDensityEntries = selectedProjectId == null
+          ? const <MapEntry<String, int>>[]
+          : await Future.wait(
+              visibleDays.where((day) => day != _selectedDay).map((day) async {
+                final dayLogs = await widget.agenda.listAgenda(
+                  _agendaQuery(day, selectedProjectId),
+                );
+                return MapEntry(day, dayLogs.length);
+              }),
+            );
+      final logs = selectedProjectId == null
+          ? const <AgendaLog>[]
+          : await widget.agenda.listAgenda(
+              _agendaQuery(_selectedDay, selectedProjectId),
+            );
+      final densityEntries = [
+        ...otherDensityEntries,
+        if (selectedProjectId != null) MapEntry(_selectedDay, logs.length),
+      ];
       if (!mounted || generation != _reloadGeneration) return;
       final linkedReminders = <String, MobileReminder>{};
       await Future.wait(
@@ -161,12 +144,9 @@ class _AgendaPageState extends State<AgendaPage> {
       );
       if (!mounted || generation != _reloadGeneration) return;
       setState(() {
-        _projects = projects;
         _projectId = selectedProjectId;
-        if (_preferredProjectId == selectedProjectId) {
-          _preferredProjectId = null;
-        }
         _logs = logs;
+        _calendarDensity = Map.unmodifiable(Map.fromEntries(densityEntries));
         _linkedReminders = linkedReminders;
         _loading = false;
         _preservingDetailReload = false;
@@ -182,6 +162,34 @@ class _AgendaPageState extends State<AgendaPage> {
     if (!mounted || generation != _reloadGeneration) return;
     _restoreScrollOffset(restoreOffset);
   }
+
+  AgendaQuery _agendaQuery(String day, String projectId) => AgendaQuery(
+    istanbulDay: day,
+    projectId: projectId,
+    category: _category,
+    literalSearch: _search,
+    archiveFilter: _archiveFilter,
+    sortOrder: _sortOrder,
+  );
+
+  List<String> _visibleCalendarDays() {
+    final selected = DateTime.parse('${_selectedDay}T00:00:00Z');
+    final first = _calendarMonth
+        ? DateTime.utc(selected.year, selected.month)
+        : selected.subtract(Duration(days: selected.weekday - 1));
+    final count = _calendarMonth
+        ? DateTime.utc(selected.year, selected.month + 1, 0).day
+        : 7;
+    return [
+      for (var offset = 0; offset < count; offset++)
+        _dayKey(first.add(Duration(days: offset))),
+    ];
+  }
+
+  String _dayKey(DateTime day) =>
+      '${day.year.toString().padLeft(4, '0')}-'
+      '${day.month.toString().padLeft(2, '0')}-'
+      '${day.day.toString().padLeft(2, '0')}';
 
   void _moveDay(int delta) {
     setState(() {
@@ -209,17 +217,11 @@ class _AgendaPageState extends State<AgendaPage> {
   }
 
   Future<void> _openCreateLog() async {
-    final requestedProjectId = _projectId ?? widget.activeProjectId;
-    final initialProjectId =
-        _projects.any(
-          (project) => !project.isArchived && project.id == requestedProjectId,
-        )
-        ? requestedProjectId
-        : null;
+    final initialProjectId = _projectId;
     if (initialProjectId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Önce aktif proje veya Ajanda proje filtresi seçin.'),
+          content: Text('Ajanda kaydı için önce üstten aktif proje seçin.'),
         ),
       );
       return;
@@ -240,19 +242,6 @@ class _AgendaPageState extends State<AgendaPage> {
     if (day == null || !mounted) return;
     setState(() => _selectedDay = day);
     await _reload();
-  }
-
-  Future<void> _openProjectLocationCatalog() async {
-    final projectLocations = widget.projectLocations;
-    if (projectLocations == null) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => ProjectLocationCatalogPage(
-          application: projectLocations,
-          initialProjectId: _projectId,
-        ),
-      ),
-    );
   }
 
   Future<void> _openDetail(AgendaLog log) async {
@@ -319,20 +308,17 @@ class _AgendaPageState extends State<AgendaPage> {
   _AgendaFilterSelection get _filters => _AgendaFilterSelection(
     archiveFilter: _archiveFilter,
     sortOrder: _sortOrder,
-    projectId: _projectId,
     category: _category,
   );
 
   bool get _hasActiveFilters =>
       _archiveFilter != AgendaArchiveFilter.active ||
       _sortOrder != AgendaSortOrder.newestFirst ||
-      _projectId != null ||
       _category != null;
 
   Future<void> _showFilters() async {
     var archiveFilter = _archiveFilter;
     var sortOrder = _sortOrder;
-    var projectId = _projectId;
     var category = _category;
     final selection = await showModalBottomSheet<_AgendaFilterSelection>(
       context: context,
@@ -388,32 +374,6 @@ class _AgendaPageState extends State<AgendaPage> {
                 },
               ),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                key: const Key('agenda-project-filter'),
-                initialValue: projectId,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Proje filtresi',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  const DropdownMenuItem(
-                    value: null,
-                    child: Text('Tüm projeler'),
-                  ),
-                  ..._projects.map(
-                    (project) => DropdownMenuItem(
-                      value: project.id,
-                      child: Text(
-                        project.name,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                ],
-                onChanged: (value) => setSheetState(() => projectId = value),
-              ),
-              const SizedBox(height: 12),
               DropdownButtonFormField<AgendaCategory?>(
                 key: const Key('agenda-category-filter'),
                 initialValue: category,
@@ -451,7 +411,6 @@ class _AgendaPageState extends State<AgendaPage> {
                       _AgendaFilterSelection(
                         archiveFilter: archiveFilter,
                         sortOrder: sortOrder,
-                        projectId: projectId,
                         category: category,
                       ),
                     ),
@@ -474,7 +433,6 @@ class _AgendaPageState extends State<AgendaPage> {
     setState(() {
       _archiveFilter = selection.archiveFilter;
       _sortOrder = selection.sortOrder;
-      _projectId = selection.projectId;
       _category = selection.category;
     });
     await _reload();
@@ -492,7 +450,6 @@ class _AgendaPageState extends State<AgendaPage> {
     _AgendaFilterSelection(
       archiveFilter: AgendaArchiveFilter.active,
       sortOrder: _sortOrder,
-      projectId: _projectId,
       category: _category,
     ),
   );
@@ -501,16 +458,6 @@ class _AgendaPageState extends State<AgendaPage> {
     _AgendaFilterSelection(
       archiveFilter: _archiveFilter,
       sortOrder: AgendaSortOrder.newestFirst,
-      projectId: _projectId,
-      category: _category,
-    ),
-  );
-
-  Future<void> _clearProjectFilter() => _applyFilters(
-    _AgendaFilterSelection(
-      archiveFilter: _archiveFilter,
-      sortOrder: _sortOrder,
-      projectId: null,
       category: _category,
     ),
   );
@@ -519,7 +466,6 @@ class _AgendaPageState extends State<AgendaPage> {
     _AgendaFilterSelection(
       archiveFilter: _archiveFilter,
       sortOrder: _sortOrder,
-      projectId: _projectId,
       category: null,
     ),
   );
@@ -528,7 +474,6 @@ class _AgendaPageState extends State<AgendaPage> {
     const _AgendaFilterSelection(
       archiveFilter: AgendaArchiveFilter.active,
       sortOrder: AgendaSortOrder.newestFirst,
-      projectId: null,
       category: null,
     ),
   );
@@ -590,162 +535,247 @@ class _AgendaPageState extends State<AgendaPage> {
     final today = CseTimeCodec.istanbulDayKey(
       CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
     );
-    return Column(
-      key: const Key('agenda-calendar'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SingleChildScrollView(
-          key: const Key('agenda-calendar-mode-scroll'),
-          scrollDirection: Axis.horizontal,
-          child: SegmentedButton<bool>(
-            key: const Key('agenda-calendar-mode'),
-            segments: [
-              ButtonSegment(
-                value: true,
-                label: Semantics(
-                  key: Key('agenda-calendar-mode-month'),
-                  label: 'Aylık',
-                  excludeSemantics: true,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [Text('Ay'), Text('lık')],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final compact = width < 336;
+        final cellWidth = width / 7;
+        return Column(
+          key: const Key('agenda-calendar'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SingleChildScrollView(
+              key: const Key('agenda-calendar-mode-scroll'),
+              scrollDirection: Axis.horizontal,
+              child: SegmentedButton<bool>(
+                key: const Key('agenda-calendar-mode'),
+                segments: [
+                  ButtonSegment(
+                    value: true,
+                    label: Semantics(
+                      key: const Key('agenda-calendar-mode-month'),
+                      label: 'Aylık',
+                      excludeSemantics: true,
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [Text('Ay'), Text('lık')],
+                      ),
+                    ),
                   ),
+                  ButtonSegment(
+                    value: false,
+                    label: Semantics(
+                      key: const Key('agenda-calendar-mode-week'),
+                      label: 'Haftalık',
+                      excludeSemantics: true,
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [Text('Hafta'), Text('lık')],
+                      ),
+                    ),
+                  ),
+                ],
+                selected: {_calendarMonth},
+                style: const ButtonStyle(
+                  minimumSize: WidgetStatePropertyAll(Size(0, 48)),
                 ),
+                onSelectionChanged: (values) {
+                  setState(() => _calendarMonth = values.single);
+                  unawaited(_reload());
+                },
               ),
-              ButtonSegment(
-                value: false,
-                label: Semantics(
-                  key: Key('agenda-calendar-mode-week'),
-                  label: 'Haftalık',
-                  excludeSemantics: true,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [Text('Hafta'), Text('lık')],
-                  ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _listIconAction(
+                  key: const Key('agenda-calendar-previous-period'),
+                  onPressed: () => _movePeriod(-1),
+                  icon: const Icon(Icons.chevron_left),
+                  label: _calendarMonth ? 'Önceki ay' : 'Önceki hafta',
                 ),
+                _listIconAction(
+                  key: const Key('agenda-today'),
+                  onPressed: () {
+                    setState(() {
+                      _selectedDay = CseTimeCodec.istanbulDayKey(
+                        CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+                      );
+                    });
+                    unawaited(_reload());
+                  },
+                  icon: const Icon(Icons.today_outlined),
+                  label: 'Bugüne git',
+                ),
+                if (!compact) _selectedDayButton(),
+                _listIconAction(
+                  key: const Key('agenda-calendar-next-period'),
+                  onPressed: () => _movePeriod(1),
+                  icon: const Icon(Icons.chevron_right),
+                  label: _calendarMonth ? 'Sonraki ay' : 'Sonraki hafta',
+                ),
+              ],
+            ),
+            if (compact) ...[
+              const SizedBox(height: 8),
+              Row(
+                key: const Key('agenda-compact-day-selector'),
+                children: [
+                  _listIconAction(
+                    key: const Key('previous-day'),
+                    onPressed: () => _moveDay(-1),
+                    icon: const Icon(Icons.chevron_left),
+                    label: 'Önceki gün',
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: _selectedDayButton()),
+                  const SizedBox(width: 8),
+                  _listIconAction(
+                    key: const Key('next-day'),
+                    onPressed: () => _moveDay(1),
+                    icon: const Icon(Icons.chevron_right),
+                    label: 'Sonraki gün',
+                  ),
+                ],
               ),
             ],
-            selected: {_calendarMonth},
-            style: const ButtonStyle(
-              minimumSize: WidgetStatePropertyAll(Size(0, 48)),
+            const SizedBox(height: 8),
+            Text(
+              MaterialLocalizations.of(context).formatMonthYear(selected),
+              style: Theme.of(context).textTheme.titleMedium,
             ),
-            onSelectionChanged: (values) =>
-                setState(() => _calendarMonth = values.single),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            _listIconAction(
-              key: const Key('agenda-calendar-previous-period'),
-              onPressed: () => _movePeriod(-1),
-              icon: const Icon(Icons.chevron_left),
-              label: _calendarMonth ? 'Önceki ay' : 'Önceki hafta',
-            ),
-            _listIconAction(
-              key: const Key('agenda-today'),
-              onPressed: () {
-                setState(() {
-                  _selectedDay = CseTimeCodec.istanbulDayKey(
-                    CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
-                  );
-                });
-                _reload();
-              },
-              icon: const Icon(Icons.today_outlined),
-              label: 'Bugüne git',
-            ),
-            OutlinedButton.icon(
-              key: const Key('selected-day'),
-              onPressed: _selectDate,
-              icon: const Icon(Icons.calendar_month_outlined),
-              label: Text(_selectedDay),
-            ),
-            _listIconAction(
-              key: const Key('agenda-calendar-next-period'),
-              onPressed: () => _movePeriod(1),
-              icon: const Icon(Icons.chevron_right),
-              label: _calendarMonth ? 'Sonraki ay' : 'Sonraki hafta',
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 8),
-        Text(
-          MaterialLocalizations.of(context).formatMonthYear(selected),
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          key: const Key('agenda-calendar-days'),
-          scrollDirection: Axis.horizontal,
-          child: Column(
-            children: [
-              Row(
+            const SizedBox(height: 8),
+            SizedBox(
+              key: const Key('agenda-calendar-days'),
+              width: width,
+              child: Column(
                 children: [
-                  for (final label in const [
-                    'Pzt',
-                    'Sal',
-                    'Çar',
-                    'Per',
-                    'Cum',
-                    'Cmt',
-                    'Paz',
-                  ])
-                    SizedBox(
-                      width: 56,
-                      child: Center(
-                        child: Text(
-                          label,
-                          style: Theme.of(context).textTheme.labelMedium,
+                  Row(
+                    children: [
+                      for (final label in const [
+                        'Pzt',
+                        'Sal',
+                        'Çar',
+                        'Per',
+                        'Cum',
+                        'Cmt',
+                        'Paz',
+                      ])
+                        SizedBox(
+                          width: cellWidth,
+                          height: 32,
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                label,
+                                style: Theme.of(context).textTheme.labelMedium,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                    ],
+                  ),
+                  for (var row = 0; row < rows; row++)
+                    Row(
+                      children: [
+                        for (var column = 0; column < 7; column++)
+                          if (row * 7 + column < leading ||
+                              row * 7 + column >= leading + count)
+                            SizedBox(width: cellWidth, height: 56)
+                          else
+                            _calendarDay(
+                              first.add(
+                                Duration(days: row * 7 + column - leading),
+                              ),
+                              today,
+                              width: cellWidth,
+                              interactive: !compact,
+                            ),
+                      ],
                     ),
                 ],
               ),
-              for (var row = 0; row < rows; row++)
-                Row(
-                  children: [
-                    for (var column = 0; column < 7; column++)
-                      if (row * 7 + column < leading ||
-                          row * 7 + column >= leading + count)
-                        const SizedBox.square(dimension: 56)
-                      else
-                        _calendarDay(
-                          first.add(Duration(days: row * 7 + column - leading)),
-                          today,
-                        ),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _calendarDay(DateTime day, String today) {
-    final key =
-        '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+  Widget _selectedDayButton() => OutlinedButton.icon(
+    key: const Key('selected-day'),
+    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+    onPressed: _selectDate,
+    icon: const Icon(Icons.calendar_month_outlined),
+    label: FittedBox(fit: BoxFit.scaleDown, child: Text(_selectedDay)),
+  );
+
+  Widget _calendarDay(
+    DateTime day,
+    String today, {
+    required double width,
+    required bool interactive,
+  }) {
+    final key = _dayKey(day);
     final selected = key == _selectedDay;
     final colors = Theme.of(context).colorScheme;
+    final count = _calendarDensity[key] ?? 0;
     void select() {
       setState(() => _selectedDay = key);
-      _reload();
+      unawaited(_reload());
     }
 
+    final content = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: width - 8,
+          height: 22,
+          child: FittedBox(fit: BoxFit.scaleDown, child: Text('${day.day}')),
+        ),
+        if (count > 0) ...[
+          const SizedBox(height: 2),
+          _calendarDensityIndicator(key, count, colors.primary, width - 8),
+        ],
+      ],
+    );
+    if (!interactive) {
+      return Semantics(
+        label: key,
+        selected: selected,
+        hint: count == 0 ? 'Görsel gün' : '$count Ajanda kaydı, görsel gün',
+        excludeSemantics: true,
+        child: Container(
+          key: Key('agenda-calendar-day-$key'),
+          width: width,
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? colors.primaryContainer : null,
+            border: key == today ? Border.all(color: colors.outline) : null,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: content,
+        ),
+      );
+    }
     return Semantics(
       label: key,
       selected: selected,
       button: true,
-      hint: key == today ? 'Bugün' : null,
+      hint: [
+        if (key == today) 'Bugün',
+        if (count > 0) '$count Ajanda kaydı',
+      ].join(', '),
       excludeSemantics: true,
       onTap: select,
-      child: SizedBox.square(
-        dimension: 56,
+      child: SizedBox(
+        width: width,
+        height: 56,
         child: TextButton(
           key: Key('agenda-calendar-day-$key'),
           onPressed: select,
@@ -763,11 +793,59 @@ class _AgendaPageState extends State<AgendaPage> {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          child: Text('${day.day}'),
+          child: content,
         ),
       ),
     );
   }
+
+  Widget _calendarDensityIndicator(
+    String day,
+    int count,
+    Color color,
+    double maxWidth,
+  ) => Semantics(
+    key: Key('agenda-calendar-density-$day'),
+    label: '$count Ajanda kaydı',
+    child: SizedBox(
+      width: maxWidth,
+      height: 10,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: count <= 3
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var index = 0; index < count; index++)
+                    Container(
+                      width: 4,
+                      height: 4,
+                      margin: const EdgeInsets.symmetric(horizontal: 1),
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Text('$count', style: Theme.of(context).textTheme.labelSmall),
+                ],
+              ),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -831,13 +909,6 @@ class _AgendaPageState extends State<AgendaPage> {
                               label: 'Sıralama: ${_sortOrder.label}',
                               onDeleted: () => unawaited(_clearSortOrder()),
                             ),
-                          if (_projectId case final projectId?)
-                            _filterSummary(
-                              key: const Key('agenda-filter-summary-project'),
-                              label:
-                                  'Proje: ${_projects.where((project) => project.id == projectId).map((project) => project.name).firstOrNull ?? projectId}',
-                              onDeleted: () => unawaited(_clearProjectFilter()),
-                            ),
                           if (_category case final category?)
                             _filterSummary(
                               key: const Key('agenda-filter-summary-category'),
@@ -872,10 +943,28 @@ class _AgendaPageState extends State<AgendaPage> {
                           onPressed: _loading ? null : _retryRead,
                         ),
                       )
-                    else if (_logs.isEmpty)
+                    else if (_projectId == null)
                       const _MessageCard(
+                        icon: Icons.folder_off_outlined,
+                        message:
+                            'Ajanda kayıtlarını görmek için üstten aktif proje seçin.',
+                      )
+                    else if (_logs.isEmpty)
+                      _MessageCard(
                         icon: Icons.event_available_outlined,
-                        message: 'Bu günde Ajanda kaydı yok.',
+                        message:
+                            _calendarMonth &&
+                                _calendarDensity.values.every(
+                                  (count) => count == 0,
+                                )
+                            ? 'Bu ay için Ajanda kaydı bulunmuyor.'
+                            : 'Seçili gün için Ajanda kaydı yok.',
+                        action: FilledButton.icon(
+                          key: const Key('agenda-empty-create'),
+                          onPressed: _openCreateLog,
+                          icon: const Icon(Icons.note_add_outlined),
+                          label: const Text('+ Ajanda kaydı'),
+                        ),
                       )
                     else
                       ..._logs.map((log) {
@@ -981,19 +1070,6 @@ class _AgendaPageState extends State<AgendaPage> {
                   icon: Icons.filter_list_outlined,
                   onPressed: _showFilters,
                 ),
-                ScreenToolAction(
-                  key: const Key('create-agenda-project'),
-                  label: 'Yeni proje',
-                  icon: Icons.create_new_folder_outlined,
-                  onPressed: _createProject,
-                ),
-                if (widget.projectLocations != null)
-                  ScreenToolAction(
-                    key: const Key('open-project-location-catalog'),
-                    label: 'Mahal Kataloğu',
-                    icon: Icons.account_tree_outlined,
-                    onPressed: _openProjectLocationCatalog,
-                  ),
               ],
             ),
           ],
@@ -1005,16 +1081,16 @@ class _AgendaPageState extends State<AgendaPage> {
         child: Semantics(
           container: true,
           button: true,
-          enabled: true,
+          enabled: _projectId != null,
           label: 'Ajanda kaydı ekle',
           excludeSemantics: true,
-          onTap: _openCreateLog,
+          onTap: _projectId == null ? null : _openCreateLog,
           child: Tooltip(
             message: 'Ajanda kaydı ekle',
             child: FilledButton(
               key: const Key('create-agenda-log'),
               style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-              onPressed: _openCreateLog,
+              onPressed: _projectId == null ? null : _openCreateLog,
               child: const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Row(
@@ -1054,13 +1130,11 @@ class _AgendaFilterSelection {
   const _AgendaFilterSelection({
     required this.archiveFilter,
     required this.sortOrder,
-    required this.projectId,
     required this.category,
   });
 
   final AgendaArchiveFilter archiveFilter;
   final AgendaSortOrder sortOrder;
-  final String? projectId;
   final AgendaCategory? category;
 
   @override
@@ -1068,12 +1142,10 @@ class _AgendaFilterSelection {
       other is _AgendaFilterSelection &&
       other.archiveFilter == archiveFilter &&
       other.sortOrder == sortOrder &&
-      other.projectId == projectId &&
       other.category == category;
 
   @override
-  int get hashCode =>
-      Object.hash(archiveFilter, sortOrder, projectId, category);
+  int get hashCode => Object.hash(archiveFilter, sortOrder, category);
 }
 
 Widget _listIconAction({

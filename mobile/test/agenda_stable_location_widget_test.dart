@@ -5,7 +5,6 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
-import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -70,7 +69,7 @@ void main() {
   });
 
   testWidgets(
-    'project switch reloads and clears the previous stable selection',
+    'active project is locked while stable locations stay project-scoped',
     (tester) async {
       final agenda = RecordingAgendaApplication(
         projects: [
@@ -91,20 +90,19 @@ void main() {
         const Key('log-location-selector'),
         'A Blok',
       );
-      await _selectDropdownText(tester, const Key('log-project'), 'Güney');
-
-      expect(locations.lastListedProjectId, _projectB);
+      expect(find.byKey(const Key('log-project')), findsNothing);
+      expect(locations.lastListedProjectId, _projectA);
       final selector = tester.widget<DropdownButtonFormField<String>>(
         find.byKey(const Key('log-location-selector')),
       );
-      expect(selector.initialValue, isNull);
+      expect(selector.initialValue, _root);
       await tester.ensureVisible(
         find.byKey(const Key('log-location-selector')),
       );
       await tester.tap(find.byKey(const Key('log-location-selector')));
       await tester.pumpAndSettle();
-      expect(find.text('Güney Blok'), findsOneWidget);
-      expect(find.text('A Blok'), findsNothing);
+      expect(find.text('A Blok'), findsWidgets);
+      expect(find.text('Güney Blok'), findsNothing);
     },
   );
 
@@ -128,37 +126,15 @@ void main() {
     expect(find.byKey(const Key('log-location-empty')), findsOneWidget);
   });
 
-  testWidgets('catalog round-trip refreshes locations without losing draft', (
-    tester,
-  ) async {
+  testWidgets('form does not expose Mahal catalog management', (tester) async {
     final agenda = RecordingAgendaApplication(projects: [_project(_projectA)]);
     final locations = FakeLocationApplication(projects: agenda.projects);
     await _pumpForm(tester, agenda: agenda, locations: locations);
-    await tester.enterText(
-      find.byKey(const Key('log-description')),
-      'Korunan taslak',
-    );
-
-    await tester.ensureVisible(
+    expect(
       find.byKey(const Key('open-location-catalog-from-log')),
+      findsNothing,
     );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('open-location-catalog-from-log')));
-    await tester.pumpAndSettle();
-    expect(find.byType(ProjectLocationCatalogPage), findsOneWidget);
-    locations.locations = [_location(_root, _projectA, 'Yeni Mahal')];
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-
-    final description = tester.widget<TextFormField>(
-      find.byKey(const Key('log-description')),
-    );
-    expect(description.controller?.text, 'Korunan taslak');
-    await tester.ensureVisible(find.byKey(const Key('log-location-selector')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('log-location-selector')));
-    await tester.pumpAndSettle();
-    expect(find.text('Yeni Mahal'), findsOneWidget);
+    expect(find.text('Mahal Kataloğu'), findsNothing);
   });
 
   testWidgets('active linked log preselects the current location', (
@@ -280,7 +256,11 @@ void main() {
         projects: [_project(_projectA)],
         logs: [linked],
       );
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: agenda)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AgendaPage(agenda: agenda, activeProjectId: _projectA),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.textContaining('Güncel Ad'), findsOneWidget);
       expect(find.textContaining('Tarihsel Ad'), findsNothing);
@@ -340,13 +320,10 @@ Future<void> _pumpForm(
         agenda: agenda,
         projectLocations: locations,
         existing: existing,
+        initialProjectId: existing?.projectId ?? _projectA,
       ),
     ),
   );
-  await tester.pumpAndSettle();
-  final optional = find.byKey(const Key('log-optional-details'));
-  await tester.ensureVisible(optional);
-  await tester.tap(optional);
   await tester.pumpAndSettle();
 }
 

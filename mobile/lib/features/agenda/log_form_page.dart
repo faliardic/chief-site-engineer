@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
@@ -8,9 +9,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_concrete_signal.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_concrete_suggestion_card.dart';
-import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_destination_page.dart';
-import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:flutter/material.dart';
 
@@ -161,14 +160,25 @@ class _LogFormPageState extends State<LogFormPage> {
     try {
       final projects = await widget.agenda.listProjects();
       if (!mounted) return;
-      final selectedProjectId =
-          _projectId ?? (projects.isEmpty ? null : projects.first.id);
+      final requestedProjectId = _projectId;
+      final selectedProjectId = widget.existing != null
+          ? widget.existing!.projectId
+          : requestedProjectId != null &&
+                projects.any(
+                  (project) =>
+                      project.id == requestedProjectId && !project.isArchived,
+                )
+          ? requestedProjectId
+          : null;
       final projectWasDirty = _projectId != _baselineProjectId;
       setState(() {
         _projects = projects;
         _projectId = selectedProjectId;
         if (!projectWasDirty) _baselineProjectId = selectedProjectId;
         _loadingProjects = false;
+        if (selectedProjectId == null && widget.existing == null) {
+          _error = 'Ajanda kaydı için önce aktif proje seçin.';
+        }
       });
       await _loadLocations();
     } on Object {
@@ -177,33 +187,6 @@ class _LogFormPageState extends State<LogFormPage> {
         _loadingProjects = false;
         _error = 'Projeler okunamadı.';
       });
-    }
-  }
-
-  Future<void> _createProject() async {
-    final projectId = RecordId.randomUuid();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => const OwnedTextInputDialog(
-        title: 'Yeni proje',
-        label: 'Proje adı',
-        confirmLabel: 'Oluştur',
-        inputKey: Key('new-project-name'),
-        maxLength: 160,
-      ),
-    );
-    if (name == null || !mounted) return;
-    try {
-      final project = await widget.agenda.createProject(
-        CreateProjectCommand(id: projectId, name: name),
-      );
-      await _loadProjects();
-      if (mounted) {
-        setState(() => _projectId = project.id);
-        await _loadLocations();
-      }
-    } on AgendaValidationFailure catch (error) {
-      if (mounted) setState(() => _error = error.message);
     }
   }
 
@@ -249,18 +232,6 @@ class _LogFormPageState extends State<LogFormPage> {
         _locationError = 'Mahaller güvenli biçimde okunamadı.';
       });
     }
-  }
-
-  Future<void> _selectProject(String? projectId) async {
-    if (projectId == _projectId) return;
-    setState(() {
-      _projectId = projectId;
-      if (_locationId != null) {
-        _locationId = null;
-        _location.clear();
-      }
-    });
-    await _loadLocations();
   }
 
   void _selectLocation(String? locationId) {
@@ -333,21 +304,6 @@ class _LogFormPageState extends State<LogFormPage> {
     setState(() => _allowPop = true);
     await WidgetsBinding.instance.endOfFrame;
     if (mounted) Navigator.of(context).pop(result);
-  }
-
-  Future<void> _openLocationCatalog() async {
-    final application = widget.projectLocations;
-    final projectId = _projectId;
-    if (application == null || projectId == null) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => ProjectLocationCatalogPage(
-          application: application,
-          initialProjectId: projectId,
-        ),
-      ),
-    );
-    if (mounted) await _loadLocations();
   }
 
   Future<void> _submit() async {
@@ -491,8 +447,8 @@ class _LogFormPageState extends State<LogFormPage> {
       appBar: AppBar(
         title: Text(
           widget.existing == null
-              ? 'Yeni Ajanda logu'
-              : 'Ajanda logunu düzenle',
+              ? 'Yeni Ajanda kaydı'
+              : 'Ajanda kaydını düzenle',
         ),
       ),
       body: Form(
@@ -545,43 +501,13 @@ class _LogFormPageState extends State<LogFormPage> {
                                         ),
                                       ),
                                     if (_loadingProjects)
-                                      const LinearProgressIndicator()
-                                    else ...[
-                                      DropdownButtonFormField<String>(
-                                        key: const Key('log-project'),
-                                        initialValue: _projectId,
-                                        isExpanded: true,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Proje',
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        items: _projects
-                                            .map(
-                                              (project) => DropdownMenuItem(
-                                                value: project.id,
-                                                child: Text(
-                                                  project.name,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                        onChanged: _selectProject,
-                                        validator: (value) => value == null
-                                            ? 'Proje zorunludur.'
-                                            : null,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _formIconAction(
-                                        key: const Key('create-project'),
-                                        onPressed: _createProject,
-                                        icon: const Icon(
-                                          Icons.add_business_outlined,
-                                        ),
-                                        label: 'Yeni proje oluştur',
-                                      ),
+                                      const LinearProgressIndicator(),
+                                    if (!_loadingProjects) ...[
+                                      _buildProjectContext(),
+                                      const SizedBox(height: 12),
                                     ],
+                                    _buildDateTimeControls(),
+                                    const SizedBox(height: 12),
                                     TextFormField(
                                       key: const Key('log-description'),
                                       controller: _description,
@@ -597,46 +523,70 @@ class _LogFormPageState extends State<LogFormPage> {
                                           ? 'Kısa açıklama zorunludur.'
                                           : null,
                                     ),
+                                    if (widget.existing != null) ...[
+                                      const SizedBox(height: 8),
+                                      TextFormField(
+                                        key: const Key('log-notes'),
+                                        controller: _notes,
+                                        maxLength: 4000,
+                                        minLines: 3,
+                                        maxLines: 8,
+                                        decoration: const InputDecoration(
+                                          labelText:
+                                              'Ayrıntılı not (mevcut kayıt)',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 8),
+                                    if (widget.projectLocations == null)
+                                      TextFormField(
+                                        key: const Key('log-location'),
+                                        controller: _location,
+                                        maxLength: 200,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Mahal (opsiyonel)',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: _rebuildForUserEdit,
+                                      )
+                                    else
+                                      _buildStableLocationField(),
                                     if (widget.existing == null &&
                                         widget.attachments != null) ...[
-                                      const SizedBox(height: 8),
-                                      _formIconAction(
-                                        key: const Key('log-add-photo'),
-                                        onPressed: _submitting
-                                            ? null
-                                            : _pickPhoto,
-                                        icon: const Icon(
-                                          Icons.add_a_photo_outlined,
-                                        ),
-                                        label: 'Fotoğraf ekle',
-                                      ),
-                                      for (
-                                        var index = 0;
-                                        index < _pendingPhotos.length;
-                                        index += 1
-                                      )
-                                        ListTile(
-                                          key: Key('pending-log-photo-$index'),
-                                          leading: const Icon(
-                                            Icons.photo_outlined,
-                                          ),
-                                          title: Text(
-                                            _pendingPhotos[index].$1.name,
-                                          ),
-                                          subtitle: const Text(
-                                            'Log kaydıyla birlikte eklenecek',
-                                          ),
-                                          trailing: _formIconAction(
-                                            label: 'Seçimden kaldır',
-                                            onPressed: () => setState(
-                                              () => _pendingPhotos.removeAt(
-                                                index,
-                                              ),
-                                            ),
-                                            icon: const Icon(Icons.close),
-                                          ),
-                                        ),
+                                      const SizedBox(height: 12),
+                                      _buildPhotoPanel(),
                                     ],
+                                    const SizedBox(height: 12),
+                                    KeyedSubtree(
+                                      key: const Key('log-category'),
+                                      child:
+                                          DropdownButtonFormField<
+                                            AgendaCategory
+                                          >(
+                                            key: _categoryFieldKey,
+                                            initialValue: _category,
+                                            isExpanded: true,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Tür',
+                                              border: OutlineInputBorder(),
+                                            ),
+                                            items: AgendaCategory.values
+                                                .map(
+                                                  (category) =>
+                                                      DropdownMenuItem(
+                                                        value: category,
+                                                        child: Text(
+                                                          category.label,
+                                                        ),
+                                                      ),
+                                                )
+                                                .toList(),
+                                            onChanged: (value) => setState(
+                                              () => _category = value!,
+                                            ),
+                                          ),
+                                    ),
                                     if (widget.existing == null &&
                                         _hasConcreteSignal) ...[
                                       const SizedBox(height: 12),
@@ -665,114 +615,6 @@ class _LogFormPageState extends State<LogFormPage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 24),
-                            ExpansionTile(
-                              key: const Key('log-time-details'),
-                              title: const Text('Zaman ve tür'),
-                              tilePadding: EdgeInsets.zero,
-                              children: [
-                                const SizedBox(height: 12),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    OutlinedButton.icon(
-                                      key: const Key('log-date'),
-                                      onPressed: () async {
-                                        final value = await showDatePicker(
-                                          context: context,
-                                          initialDate: _date,
-                                          firstDate: DateTime(2000),
-                                          lastDate: DateTime(2100),
-                                        );
-                                        if (value != null) {
-                                          setState(() => _date = value);
-                                        }
-                                      },
-                                      icon: const Icon(
-                                        Icons.calendar_today_outlined,
-                                      ),
-                                      label: Text(
-                                        '${_date.day.toString().padLeft(2, '0')}.'
-                                        '${_date.month.toString().padLeft(2, '0')}.${_date.year}',
-                                      ),
-                                    ),
-                                    OutlinedButton.icon(
-                                      key: const Key('log-time'),
-                                      onPressed: () async {
-                                        final value = await showTimePicker(
-                                          context: context,
-                                          initialTime: _time,
-                                        );
-                                        if (value != null) {
-                                          setState(() => _time = value);
-                                        }
-                                      },
-                                      icon: const Icon(Icons.schedule),
-                                      label: Text(_time.format(context)),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                KeyedSubtree(
-                                  key: const Key('log-category'),
-                                  child:
-                                      DropdownButtonFormField<AgendaCategory>(
-                                        key: _categoryFieldKey,
-                                        initialValue: _category,
-                                        isExpanded: true,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Kayıt türü',
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        items: AgendaCategory.values
-                                            .map(
-                                              (category) => DropdownMenuItem(
-                                                value: category,
-                                                child: Text(category.label),
-                                              ),
-                                            )
-                                            .toList(),
-                                        onChanged: (value) =>
-                                            setState(() => _category = value!),
-                                      ),
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            ExpansionTile(
-                              key: const Key('log-optional-details'),
-                              title: const Text('İsteğe bağlı ayrıntılar'),
-                              tilePadding: EdgeInsets.zero,
-                              children: [
-                                if (widget.projectLocations == null)
-                                  TextFormField(
-                                    key: const Key('log-location'),
-                                    controller: _location,
-                                    maxLength: 200,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Mahal (opsiyonel)',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    onChanged: _rebuildForUserEdit,
-                                  )
-                                else
-                                  _buildStableLocationField(),
-                                const SizedBox(height: 8),
-                                TextFormField(
-                                  key: const Key('log-notes'),
-                                  controller: _notes,
-                                  maxLength: 4000,
-                                  minLines: 3,
-                                  maxLines: 8,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Ayrıntılı not (opsiyonel)',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                ),
-                              ],
-                            ),
                           ],
                         ),
                       ],
@@ -790,9 +632,11 @@ class _LogFormPageState extends State<LogFormPage> {
                       child: Semantics(
                         label: _submitting ? 'Kaydediliyor…' : 'Kaydet',
                         button: true,
-                        enabled: !_submitting,
+                        enabled: !_submitting && _projectId != null,
                         excludeSemantics: true,
-                        onTap: _submitting ? null : _submit,
+                        onTap: _submitting || _projectId == null
+                            ? null
+                            : _submit,
                         child: FilledButton.icon(
                           key: const Key('submit-log'),
                           style: FilledButton.styleFrom(
@@ -802,7 +646,9 @@ class _LogFormPageState extends State<LogFormPage> {
                               vertical: 12,
                             ),
                           ),
-                          onPressed: _submitting ? null : _submit,
+                          onPressed: _submitting || _projectId == null
+                              ? null
+                              : _submit,
                           icon: _submitting
                               ? const SizedBox.square(
                                   dimension: 20,
@@ -824,6 +670,143 @@ class _LogFormPageState extends State<LogFormPage> {
       ),
     );
   }
+
+  Widget _buildProjectContext() {
+    var projectName = widget.existing?.projectName ?? _projectId;
+    for (final project in _projects) {
+      if (project.id == _projectId) {
+        projectName = project.name;
+        break;
+      }
+    }
+    return Semantics(
+      label: projectName == null
+          ? 'Aktif proje seçilmedi'
+          : 'Aktif proje: $projectName',
+      readOnly: true,
+      child: InputDecorator(
+        key: const Key('log-project-context'),
+        decoration: const InputDecoration(
+          labelText: 'Aktif proje',
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.folder_outlined),
+        ),
+        child: Text(
+          projectName == null ? 'Proje seçilmedi' : 'Aktif proje: $projectName',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateTimeControls() => Wrap(
+    key: const Key('log-date-time-controls'),
+    spacing: 8,
+    runSpacing: 8,
+    children: [
+      OutlinedButton.icon(
+        key: const Key('log-date'),
+        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+        onPressed: () async {
+          final value = await showDatePicker(
+            context: context,
+            initialDate: _date,
+            firstDate: DateTime(2000),
+            lastDate: DateTime(2100),
+          );
+          if (value != null) setState(() => _date = value);
+        },
+        icon: const Icon(Icons.calendar_today_outlined),
+        label: Text(
+          '${_date.day.toString().padLeft(2, '0')}.'
+          '${_date.month.toString().padLeft(2, '0')}.${_date.year}',
+        ),
+      ),
+      OutlinedButton.icon(
+        key: const Key('log-time'),
+        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+        onPressed: () async {
+          final value = await showTimePicker(
+            context: context,
+            initialTime: _time,
+          );
+          if (value != null) setState(() => _time = value);
+        },
+        icon: const Icon(Icons.schedule),
+        label: Text(_time.format(context)),
+      ),
+    ],
+  );
+
+  Widget _buildPhotoPanel() => Column(
+    key: const Key('log-photo-panel'),
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      OutlinedButton(
+        key: const Key('log-add-photo'),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 96),
+          padding: const EdgeInsets.all(16),
+        ),
+        onPressed: _submitting ? null : _pickPhoto,
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add_a_photo_outlined, size: 32),
+            SizedBox(height: 8),
+            Text('Buradan fotoğraf ekle'),
+          ],
+        ),
+      ),
+      for (var index = 0; index < _pendingPhotos.length; index += 1) ...[
+        const SizedBox(height: 8),
+        Card(
+          key: Key('pending-log-photo-$index'),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(
+                    Uint8List.fromList(_pendingPhotos[index].$1.bytes),
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
+                    cacheWidth: 144,
+                    cacheHeight: 144,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox(
+                          width: 72,
+                          height: 72,
+                          child: Icon(Icons.broken_image_outlined),
+                        ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _pendingPhotos[index].$1.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                _formIconAction(
+                  key: Key('remove-pending-log-photo-$index'),
+                  label: 'Fotoğrafı seçimden kaldır',
+                  onPressed: () =>
+                      setState(() => _pendingPhotos.removeAt(index)),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ],
+  );
 
   Widget _buildStableLocationField() {
     final options = _buildLocationOptions(_locations);
@@ -886,7 +869,7 @@ class _LogFormPageState extends State<LogFormPage> {
           const Padding(
             padding: EdgeInsets.only(top: 6),
             child: Text(
-              'Bu projede aktif mahal yok. Mahal Kataloğu’ndan ekleyebilirsiniz.',
+              'Bu projede aktif mahal yok.',
               key: Key('log-location-empty'),
             ),
           ),
@@ -926,13 +909,6 @@ class _LogFormPageState extends State<LogFormPage> {
               key: Key('archived-location-context'),
             ),
           ),
-        const SizedBox(height: 8),
-        _formIconAction(
-          key: const Key('open-location-catalog-from-log'),
-          onPressed: _projectId == null ? null : _openLocationCatalog,
-          icon: const Icon(Icons.account_tree_outlined),
-          label: 'Mahal Kataloğu',
-        ),
       ],
     );
   }
