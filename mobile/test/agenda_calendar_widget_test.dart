@@ -69,9 +69,15 @@ void main() {
   });
 
   testWidgets(
-    '<336 usable width shows seven visual columns and separate 48x48 selector',
+    '<336 width supports direct day taps and primary 48x48 selector',
     (tester) async {
-      final agenda = _FilteringAgenda(projects: const [_projectA]);
+      final agenda = _FilteringAgenda(
+        projects: const [_projectA],
+        logs: [
+          _log('monday', '2026-09-07', _projectA),
+          _log('tuesday', '2026-09-08', _projectA),
+        ],
+      );
       await _pumpAgenda(
         tester,
         agenda,
@@ -108,8 +114,8 @@ void main() {
         final semantics = tester
             .getSemantics(semanticsFinder)
             .getSemanticsData();
-        expect(semantics.flagsCollection.isButton, isFalse);
-        expect(semantics.hasAction(SemanticsAction.tap), isFalse);
+        expect(semantics.flagsCollection.isButton, isTrue);
+        expect(semantics.hasAction(SemanticsAction.tap), isTrue);
         expect(tester.getRect(semanticsFinder), visualRects[index]);
         semanticsRects.add(tester.getRect(semanticsFinder));
       }
@@ -125,8 +131,18 @@ void main() {
       final callsBeforeVisualTap = agenda.listAgendaCalls;
       await tester.tap(monday);
       await tester.pumpAndSettle();
-      expect(agenda.listAgendaCalls, callsBeforeVisualTap);
-      expect(find.text('2026-09-09'), findsOneWidget);
+      expect(agenda.listAgendaCalls, greaterThan(callsBeforeVisualTap));
+      expect(agenda.lastAgendaQuery?.istanbulDay, '2026-09-07');
+      expect(find.text('2026-09-07'), findsOneWidget);
+      expect(_key('agenda-log-monday'), findsOneWidget);
+      expect(_key('agenda-log-tuesday'), findsNothing);
+
+      await tester.tap(visualDays[1]);
+      await tester.pumpAndSettle();
+      expect(agenda.lastAgendaQuery?.istanbulDay, '2026-09-08');
+      expect(find.text('2026-09-08'), findsOneWidget);
+      expect(_key('agenda-log-monday'), findsNothing);
+      expect(_key('agenda-log-tuesday'), findsOneWidget);
 
       for (final key in ['previous-day', 'selected-day', 'next-day']) {
         final control = _key(key);
@@ -152,10 +168,12 @@ void main() {
       );
       await tester.tap(_key('previous-day'));
       await tester.pumpAndSettle();
-      expect(find.text('2026-09-08'), findsOneWidget);
+      expect(find.text('2026-09-07'), findsOneWidget);
+      expect(agenda.lastAgendaQuery?.istanbulDay, '2026-09-07');
       await tester.tap(_key('next-day'));
       await tester.pumpAndSettle();
-      expect(find.text('2026-09-09'), findsOneWidget);
+      expect(find.text('2026-09-08'), findsOneWidget);
+      expect(agenda.lastAgendaQuery?.istanbulDay, '2026-09-08');
       await tester.tap(_key('selected-day'));
       await tester.pumpAndSettle();
       expect(find.byType(DatePickerDialog), findsOneWidget);

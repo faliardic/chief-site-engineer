@@ -747,19 +747,26 @@ class _AgendaPageState extends State<AgendaPage> {
       return Semantics(
         label: key,
         selected: selected,
-        hint: count == 0 ? 'Görsel gün' : '$count Ajanda kaydı, görsel gün',
+        button: true,
+        hint: count == 0 ? 'Günü seç' : '$count Ajanda kaydı, günü seç',
         excludeSemantics: true,
-        child: Container(
-          key: Key('agenda-calendar-day-$key'),
-          width: width,
-          height: 56,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? colors.primaryContainer : null,
-            border: key == today ? Border.all(color: colors.outline) : null,
-            borderRadius: BorderRadius.circular(12),
+        onTap: select,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          excludeFromSemantics: true,
+          onTap: select,
+          child: Container(
+            key: Key('agenda-calendar-day-$key'),
+            width: width,
+            height: 56,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? colors.primaryContainer : null,
+              border: key == today ? Border.all(color: colors.outline) : null,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: content,
           ),
-          child: content,
         ),
       );
     }
