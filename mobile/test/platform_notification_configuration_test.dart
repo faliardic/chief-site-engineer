@@ -1,8 +1,272 @@
 import 'dart:io';
 
+import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/platform/notification_gateway.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite/sqflite.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  group('REM06 foreground notification handoff', () {
+    const channel = MethodChannel('dexterous.com/flutter/local_notifications');
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    final calls = <MethodCall>[];
+    Map<String, Object?> launch = {};
+    late _IntentAndroidPlugin android;
+    setUp(() {
+      calls.clear();
+      launch = {'notificationLaunchedApp': false};
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      android = _IntentAndroidPlugin();
+      FlutterLocalNotificationsPlatform.instance = android;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            if (call.method == 'initialize') return true;
+            if (call.method == 'getNotificationAppLaunchDetails') return launch;
+            return null;
+          });
+    });
+    tearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+    for (final repeat in [null, 60]) {
+      test(
+        'one visible non-cancelling Ertele action, repeat=$repeat',
+        () async {
+          final gateway = FlutterReminderNotificationGateway();
+          await gateway.schedule(
+            ReminderNotificationRequest(
+              platformId: 123,
+              reminderId: id,
+              title: 'Başlık',
+              body: 'Aynı içerik',
+              scheduledAtUtc: '2026-09-09T06:00:00Z',
+              repeatIntervalMinutes: repeat,
+            ),
+          );
+          final call = calls.singleWhere(
+            (c) =>
+                c.method ==
+                (repeat == null
+                    ? 'zonedSchedule'
+                    : 'periodicallyShowWithDuration'),
+          );
+          final args = call.arguments as Map;
+          expect(args['payload'], 'reminder:$id');
+          expect(args['title'], 'Başlık');
+          expect(args['body'], 'Aynı içerik');
+          final platform = args['platformSpecifics'] as Map;
+          final actions = platform['actions'] as List;
+          expect(actions, hasLength(1));
+          final action = actions.single as Map;
+          expect(
+            action['id'],
+            FlutterReminderNotificationGateway.snoozeActionId,
+          );
+          expect(action['title'], 'Ertele');
+          expect(action['showsUserInterface'], isTrue);
+          expect(action['cancelNotification'], isFalse);
+          expect(action['invisible'], isFalse);
+          expect(android.backgroundCallback, isNull);
+          expect(calls.any((c) => c.method == 'cancel'), isFalse);
+        },
+      );
+    }
+    test(
+      'REM06 application forwards typed intents without opening persistence',
+      () async {
+        launch = {
+          'notificationLaunchedApp': true,
+          'notificationResponse': {
+            'notificationResponseType': 1,
+            'payload': 'reminder:$id',
+            'actionId': FlutterReminderNotificationGateway.snoozeActionId,
+          },
+        };
+        final gateway = FlutterReminderNotificationGateway();
+        await gateway.initialize();
+        final app = SqliteAgendaApplication(
+          databasePath: 'unused-notification-handoff',
+          databaseFactory: _NoNotificationDatabase(),
+          clock: () => DateTime.utc(2026, 9, 7),
+          notificationGateway: gateway,
+        );
+        final initial = app.takeInitialNotificationIntent()!;
+        expect(initial.reminderId, id);
+        expect(initial.action, ReminderNotificationAction.snooze);
+        expect(app.takeInitialNotificationIntent(), isNull);
+        final next = app.notificationIntents.first;
+        android.foregroundCallback!(
+          const NotificationResponse(
+            notificationResponseType:
+                NotificationResponseType.selectedNotificationAction,
+            payload: 'reminder:$id',
+            actionId: FlutterReminderNotificationGateway.snoozeActionId,
+          ),
+        );
+        expect((await next).action, ReminderNotificationAction.snooze);
+        expect(calls.map((c) => c.method), [
+          'initialize',
+          'getNotificationAppLaunchDetails',
+        ]);
+      },
+    );
+    test(
+      'REM06 application preserves legacy body intents with once-only launch',
+      () async {
+        final app = SqliteAgendaApplication(
+          databasePath: 'unused-notification-handoff',
+          databaseFactory: _NoNotificationDatabase(),
+          clock: () => DateTime.utc(2026, 9, 7),
+          notificationGateway: _LegacyBodyGateway(),
+        );
+        expect(
+          app.takeInitialNotificationIntent()?.action,
+          ReminderNotificationAction.openDetail,
+        );
+        expect(app.takeInitialNotificationIntent(), isNull);
+        final intent = await app.notificationIntents.first;
+        expect(intent.reminderId, id);
+        expect(intent.action, ReminderNotificationAction.openDetail);
+      },
+    );
+    for (final action in ReminderNotificationAction.values) {
+      test('cold launch preserves $action and is consumed once', () async {
+        launch = {
+          'notificationLaunchedApp': true,
+          'notificationResponse': {
+            'notificationId': 123,
+            'payload': 'reminder:$id',
+            'notificationResponseType':
+                action == ReminderNotificationAction.snooze ? 1 : 0,
+            'actionId': action == ReminderNotificationAction.snooze
+                ? FlutterReminderNotificationGateway.snoozeActionId
+                : null,
+          },
+        };
+        final gateway = FlutterReminderNotificationGateway();
+        await gateway.initialize();
+        if (action == ReminderNotificationAction.snooze) {
+          expect(gateway.initialTapReminderId, isNull);
+        }
+        final intent = gateway.takeInitialNotificationIntent()!;
+        expect(intent.reminderId, id);
+        expect(intent.action, action);
+        expect(gateway.takeInitialNotificationIntent(), isNull);
+        await gateway.initialize();
+        expect(gateway.takeInitialNotificationIntent(), isNull);
+      });
+    }
+    test(
+      'running responses distinguish body, Ertele and invalid actions',
+      () async {
+        final gateway = FlutterReminderNotificationGateway();
+        await gateway.initialize();
+        final intents = <ReminderNotificationIntent>[];
+        final legacy = <String>[];
+        final typedSubscription = gateway.notificationIntents.listen(
+          intents.add,
+        );
+        final legacySubscription = gateway.notificationTaps.listen(legacy.add);
+        android.foregroundCallback!(
+          const NotificationResponse(
+            notificationResponseType:
+                NotificationResponseType.selectedNotification,
+            payload: 'reminder:$id',
+          ),
+        );
+        android.foregroundCallback!(
+          const NotificationResponse(
+            notificationResponseType:
+                NotificationResponseType.selectedNotificationAction,
+            payload: 'reminder:$id',
+            actionId: FlutterReminderNotificationGateway.snoozeActionId,
+          ),
+        );
+        for (final payload in ['reminder:invalid', 'other:$id']) {
+          android.foregroundCallback!(
+            NotificationResponse(
+              notificationResponseType:
+                  NotificationResponseType.selectedNotificationAction,
+              payload: payload,
+              actionId: FlutterReminderNotificationGateway.snoozeActionId,
+            ),
+          );
+        }
+        android.foregroundCallback!(
+          const NotificationResponse(
+            notificationResponseType:
+                NotificationResponseType.selectedNotificationAction,
+            payload: 'reminder:$id',
+            actionId: 'unknown-action',
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(intents.map((i) => i.reminderId), [id, id]);
+        expect(intents.map((i) => i.action), ReminderNotificationAction.values);
+        expect(legacy, [id]);
+        expect(calls.map((c) => c.method), [
+          'initialize',
+          'getNotificationAppLaunchDetails',
+        ]);
+        await typedSubscription.cancel();
+        await legacySubscription.cancel();
+      },
+    );
+    test(
+      'response during bootstrap is retained without becoming a body tap',
+      () async {
+        final gateway = FlutterReminderNotificationGateway();
+        await gateway.initialize();
+        android.foregroundCallback!(
+          const NotificationResponse(
+            notificationResponseType:
+                NotificationResponseType.selectedNotificationAction,
+            payload: 'reminder:$id',
+            actionId: FlutterReminderNotificationGateway.snoozeActionId,
+          ),
+        );
+        expect(
+          gateway.takeInitialNotificationIntent()?.action,
+          ReminderNotificationAction.snooze,
+        );
+        expect(gateway.takeInitialNotificationIntent(), isNull);
+        expect(gateway.initialTapReminderId, isNull);
+      },
+    );
+    test('iOS does not acquire an Android Ertele intent', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      FlutterLocalNotificationsPlatform.instance =
+          IOSFlutterLocalNotificationsPlugin();
+      launch = {
+        'notificationLaunchedApp': true,
+        'notificationResponse': {
+          'notificationResponseType': 1,
+          'payload': 'reminder:$id',
+          'actionId': FlutterReminderNotificationGateway.snoozeActionId,
+        },
+      };
+      final gateway = FlutterReminderNotificationGateway();
+      await gateway.initialize();
+      expect(gateway.takeInitialNotificationIntent(), isNull);
+    });
+    test('gateway installs no background callback or mutation path', () {
+      final source = File(
+        'lib/platform/notification_gateway.dart',
+      ).readAsStringSync();
+      expect(
+        source,
+        isNot(contains('onDidReceiveBackgroundNotificationResponse')),
+      );
+      expect(source, isNot(contains('mutateReminder')));
+    });
+  });
   test(
     'Android uses audited reboot reschedule and scoped exact alarm access',
     () {
@@ -169,4 +433,39 @@ void main() {
       contains("path.join(staging.path, 'incoming_backups')"),
     );
   });
+}
+
+class _IntentAndroidPlugin extends AndroidFlutterLocalNotificationsPlugin {
+  DidReceiveNotificationResponseCallback? foregroundCallback;
+  DidReceiveBackgroundNotificationResponseCallback? backgroundCallback;
+
+  @override
+  Future<bool> initialize({
+    required AndroidInitializationSettings settings,
+    DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
+    DidReceiveBackgroundNotificationResponseCallback?
+    onDidReceiveBackgroundNotificationResponse,
+  }) {
+    foregroundCallback = onDidReceiveNotificationResponse;
+    backgroundCallback = onDidReceiveBackgroundNotificationResponse;
+    return super.initialize(
+      settings: settings,
+      onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse:
+          onDidReceiveBackgroundNotificationResponse,
+    );
+  }
+}
+
+class _NoNotificationDatabase implements DatabaseFactory {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Notification handoff must not access persistence');
+}
+
+class _LegacyBodyGateway extends UnavailableReminderNotificationGateway {
+  @override
+  String? get initialTapReminderId => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  @override
+  Stream<String> get notificationTaps => Stream.value(initialTapReminderId!);
 }
