@@ -144,7 +144,7 @@ Bu alt dilim background/reboot engine değişikliği gerektirirse aynı STANDARD
 ### Q03 — Ajanda aktif-proje takvimi + hızlı kayıt oluşturma
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimleri — `Ajanda — Takvim` ve `Ajanda Kaydı Oluşturma` başlıkları; #617 daily-core ilkeleri.  
-**Durum:** `NEXT` — Q01 ve Q02 tamamlandı; sıradaki uygulanabilir production maddesi.
+**Durum:** `COMPLETE` — Issue #732 closed, PR #734 merged; required review/focused validation PASS, exact head `3d5ccb375bf05e134e7be20371fc3e190c490c7a` Acceptance APK data-preserving olarak kuruldu ve Fatih manuel Acceptance PASS.
 
 Ajanda, proje yönetimi menüsü değil **aktif projenin takvim tabanlı saha zaman çizgisi ve hızlı kayıt yüzeyi** olarak çalışır. Bu Q mevcut Ajanda stable identity, `AgendaCategory`, history/event ve attachment sözleşmelerini yeniden yazmaz; takvim ile `+ Ajanda kaydı` akışını aynı günlük-core işi altında sadeleştirir.
 
@@ -163,7 +163,7 @@ Ajanda, proje yönetimi menüsü değil **aktif projenin takvim tabanlı saha za
 - `1–3` kayıt için aynı sayıda küçük nokta kullanılabilir.
 - `4+` kayıtta sınırsız nokta veya spiral çizilmez; bounded nokta + sayısal badge/count ile toplam yoğunluk görünür tutulur.
 - Örneğin 100 kayıtta 100 ayrı nokta üretilmez; tarih hücresi kayıt sayacı yüzünden okunamaz hale gelmez.
-- Gösterge yalnız kayıt yoğunluğunu anlatır; güne dokunulduğunda gerçek kayıt listesi açılır/görünür.
+- Gösterge yalnız kayıt yoğunluğunu anlatır. `>=336 dp` modunda doğrudan gün hücresine dokunmak kayıt gününü seçer ve gerçek kayıt listesini görünür kılar; `<336 dp` modunda görsel gün hücresi non-interactive kalır ve gün seçimi ayrı responsive selector üzerinden yapılır.
 
 #### CAL-03 — Yalnız aktif projenin Ajanda kayıtları
 
@@ -189,7 +189,9 @@ Ajanda, proje yönetimi menüsü değil **aktif projenin takvim tabanlı saha za
 
 #### CAL-06 — Seçili gün ve empty-state davranışı
 
-- Kullanıcı güne dokunduğunda o günün kayıtları aynı Ajanda bağlamında doğrudan görünür; sırf günlük listeyi görmek için gereksiz ayrı navigasyon dayatılmaz.
+- `>=336 dp` modunda kullanıcı doğrudan gün hücresine dokunduğunda o günün kayıtları aynı Ajanda bağlamında görünür; sırf günlük listeyi görmek için gereksiz ayrı navigasyon dayatılmaz.
+- `<336 dp` modunda görsel gün hücreleri non-interactive kalır; gün seçimi en az 48×48 dp önceki gün / seçili tarih / sonraki gün selector'ı ve seçili tarih kontrolünün açtığı standart DatePicker üzerinden yapılır.
+- Fatih'in Q03 Acceptance sırasında bildirdiği “Ajanda üzerinde tıklama yok” gözlemi compact modun bilinçli non-interactive görsel gün davranışıyla uyumludur; responsive selector/DatePicker yolu çalıştığı için non-blocking ve kabul edilmiş davranıştır.
 - `Bu ay için Ajanda kaydı bulunmuyor.` ile `Bugün için kayıt yok.` gibi ay ve seçili-gün empty state'leri ayrılır.
 - Boş seçili günde görünür `+ Ajanda kaydı` ana eylemi sunulabilir.
 
@@ -274,7 +276,7 @@ Hedef günlük create sırası:
 ### Q04 — İş Gücü / Sicil first-class alanı + Firma → Personel + Günlük Puantaj sadeleştirmesi
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimleri — `İş Gücü / Saha Rehberi / Sicil` ve `Puantaj` başlıkları; #617 daily-core ve progressive-disclosure ilkeleri; current `WorkforceDirectoryPage`, `WorkforcePage`, `AttendancePage`, `AttendanceDayPage` baseline'ı.  
-**Durum:** `QUEUED`
+**Durum:** `NEXT`
 
 Amaç; İş Gücü'nü yalnız Puantaj ön-koşulu veya gizli yardımcı akış olmaktan çıkarıp aktif projenin first-class günlük insan kaynağı alanı haline getirmek, mevcut güçlü Saha Rehberi/Sicil yeteneklerini korumak, ilk kayıt yolunu `Firma → Personel` seviyesine indirmek ve Günlük Puantaj'ı firma/ekip navigasyonu yerine doğrudan personel durum girişi yüzeyi haline getirmektir.
 
