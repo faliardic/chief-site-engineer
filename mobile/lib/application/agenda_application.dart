@@ -315,6 +315,7 @@ class SqliteAgendaApplication
         AttachmentCatalogHost,
         AgendaExistingAttachmentApplication,
         ReminderTodayApplication,
+        ReminderNotificationIntentSource,
         ReminderSourceAgendaMediaApplication,
         ReminderDeliveryApplication {
   SqliteAgendaApplication({
@@ -366,6 +367,31 @@ class SqliteAgendaApplication
 
   @override
   Stream<String> get notificationTaps => notificationGateway.notificationTaps;
+
+  bool _legacyInitialNotificationConsumed = false;
+
+  @override
+  ReminderNotificationIntent? takeInitialNotificationIntent() {
+    final gateway = notificationGateway;
+    if (gateway is ReminderNotificationIntentSource) {
+      return (gateway as ReminderNotificationIntentSource)
+          .takeInitialNotificationIntent();
+    }
+    if (_legacyInitialNotificationConsumed) return null;
+    _legacyInitialNotificationConsumed = true;
+    final id = gateway.initialTapReminderId;
+    return id == null ? null : ReminderNotificationIntent(reminderId: id);
+  }
+
+  @override
+  Stream<ReminderNotificationIntent> get notificationIntents {
+    final gateway = notificationGateway;
+    return gateway is ReminderNotificationIntentSource
+        ? (gateway as ReminderNotificationIntentSource).notificationIntents
+        : gateway.notificationTaps.map(
+            (id) => ReminderNotificationIntent(reminderId: id),
+          );
+  }
 
   @override
   Future<List<MobileProject>> listProjects() async {

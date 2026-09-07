@@ -369,6 +369,112 @@ void _expectPrimaryFormAction(
 }
 
 void main() {
+  for (final schedule in [
+    ReminderScheduleKind.in1Hour,
+    ReminderScheduleKind.in2Hours,
+    ReminderScheduleKind.in3Hours,
+  ]) {
+    testWidgets(
+      'REM06 handoff reuses existing ${schedule.name} mutation once',
+      (tester) async {
+        final item = reminder(
+          revision: 7,
+          nextAttentionAt: '2026-07-20T09:00:00Z',
+        );
+        final agenda = FakeAgendaApplication(reminders: [item]);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ReminderDetailPage(
+              agenda: agenda,
+              reminderId: item.id,
+              openScheduleOnLaunch: true,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final option = find.byKey(
+          Key('reminder-schedule-option-${schedule.name}'),
+        );
+        expect(option, findsOneWidget);
+        expect(agenda.mutateReminderCalls, 0);
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+        expect(agenda.mutateReminderCalls, 1);
+        expect(agenda.lastMutationCommand!.reminderId, item.id);
+        expect(agenda.lastMutationCommand!.expectedRevision, 7);
+        expect(
+          agenda.lastMutationCommand!.action,
+          ReminderMutationAction.schedule,
+        );
+        expect(agenda.lastMutationCommand!.schedule, schedule);
+        expect(
+          find.byKey(const Key('reminder-schedule-option-in1Hour')),
+          findsNothing,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ReminderDetailPage(
+              agenda: agenda,
+              reminderId: item.id,
+              openScheduleOnLaunch: true,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('reminder-schedule-option-in1Hour')),
+          findsNothing,
+        );
+        expect(agenda.mutateReminderCalls, 1);
+      },
+    );
+  }
+  for (final state in [
+    'completed',
+    'cancelled',
+    'trashed',
+    'missing',
+    'wrong-id',
+  ]) {
+    testWidgets('REM06 $state reminder cannot auto-open scheduling or mutate', (
+      tester,
+    ) async {
+      final item = reminder(
+        id: state == 'wrong-id' ? widgetReminderId(7000) : reminderId,
+        status: state == 'completed'
+            ? ReminderStatus.completed
+            : state == 'cancelled'
+            ? ReminderStatus.cancelled
+            : ReminderStatus.active,
+        trashedAt: state == 'trashed' ? '2026-07-20T09:00:00Z' : null,
+      );
+      final agenda = FakeAgendaApplication(
+        reminders: state == 'missing' ? [] : [item],
+        reminderDetail: state == 'wrong-id' ? item : null,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(
+            agenda: agenda,
+            reminderId: reminderId,
+            openScheduleOnLaunch: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('reminder-schedule-option-in1Hour')),
+        findsNothing,
+      );
+      expect(agenda.mutateReminderCalls, 0);
+      if (state == 'missing' || state == 'wrong-id') {
+        expect(
+          find.byKey(const Key('reminder-detail-read-error-retry')),
+          findsOneWidget,
+        );
+      }
+    });
+  }
   for (final width in [320.0, 390.0]) {
     testWidgets(
       'history uses Turkish labels and preserves order and time at ${width.toInt()} px with 2x text',

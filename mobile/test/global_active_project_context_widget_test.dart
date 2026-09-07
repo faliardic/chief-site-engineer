@@ -13,6 +13,8 @@ import 'package:chief_site_engineer/features/attachments/project_media_album_pag
 import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
+import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
+import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -40,6 +42,166 @@ const _albumOnlyProject = AttachmentCatalogProject(
 );
 
 void main() {
+  testWidgets(
+    'REM06 running body and Ertele keep exact B under shared active A',
+    (tester) async {
+      final item = _notificationReminder();
+      final agenda = _IntentAgenda(reminders: [item]);
+      addTearDown(agenda.intents.close);
+      await _pumpShell(tester, agenda);
+      await _chooseSharedProject(tester, _projectA.id);
+      agenda.intents.add(ReminderNotificationIntent(reminderId: item.id));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<ReminderDetailPage>(find.byType(ReminderDetailPage))
+            .reminderId,
+        item.id,
+      );
+      expect(
+        find.byKey(const Key('reminder-schedule-option-in1Hour')),
+        findsNothing,
+      );
+      final action = ReminderNotificationIntent(
+        reminderId: item.id,
+        action: ReminderNotificationAction.snooze,
+      );
+      agenda.intents.add(action);
+      agenda.intents.add(action);
+      await tester.pumpAndSettle();
+      expect(
+        find.byType(ReminderDetailPage, skipOffstage: false),
+        findsOneWidget,
+      );
+      final option = find.byKey(const Key('reminder-schedule-option-in1Hour'));
+      expect(option, findsOneWidget);
+      agenda.intents.add(action);
+      await tester.pumpAndSettle();
+      expect(option, findsOneWidget);
+      expect(
+        find.byType(ReminderDetailPage, skipOffstage: false),
+        findsOneWidget,
+      );
+      Navigator.of(tester.element(option)).pop();
+      await tester.pumpAndSettle();
+      expect(agenda.mutateReminderCalls, 0);
+      expect(agenda.reminders, [item]);
+      agenda.intents.add(action);
+      await tester.pumpAndSettle();
+      expect(option, findsOneWidget);
+      expect(
+        find.byType(ReminderDetailPage, skipOffstage: false),
+        findsOneWidget,
+      );
+      Navigator.of(tester.element(option)).pop();
+      await tester.pumpAndSettle();
+      _popRoute(tester, find.byType(ReminderDetailPage));
+      await tester.pumpAndSettle();
+      _expectIndicator(_projectA.name);
+    },
+  );
+  testWidgets('REM06 pending body read retains Ertele without a second route', (
+    tester,
+  ) async {
+    final item = _notificationReminder();
+    final agenda = _IntentAgenda(reminders: [item]);
+    addTearDown(agenda.intents.close);
+    await _pumpShell(tester, agenda);
+    final pending = Completer<MobileReminder>();
+    agenda.nextNotificationRead = pending;
+    agenda.intents.add(ReminderNotificationIntent(reminderId: item.id));
+    await tester.pump();
+    final action = ReminderNotificationIntent(
+      reminderId: item.id,
+      action: ReminderNotificationAction.snooze,
+    );
+    agenda.intents.add(action);
+    agenda.intents.add(action);
+    await tester.pump();
+    expect(find.byType(ReminderDetailPage), findsNothing);
+    pending.complete(item);
+    await tester.pumpAndSettle();
+    expect(
+      find.byType(ReminderDetailPage, skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('reminder-schedule-option-in1Hour')),
+      findsOneWidget,
+    );
+    expect(agenda.mutateReminderCalls, 0);
+    expect(agenda.reminders, [item]);
+  });
+  testWidgets(
+    'REM06 cold action consumed once across shell rebuild and remount',
+    (tester) async {
+      final item = _notificationReminder();
+      final agenda = _IntentAgenda(
+        reminders: [item],
+        initial: ReminderNotificationIntent(
+          reminderId: item.id,
+          action: ReminderNotificationAction.snooze,
+        ),
+      );
+      addTearDown(agenda.intents.close);
+      await _pumpShell(tester, agenda);
+      final option = find.byKey(const Key('reminder-schedule-option-in2Hours'));
+      expect(option, findsOneWidget);
+      expect(agenda.initialReads, 1);
+      Navigator.of(tester.element(option)).pop();
+      await tester.pumpAndSettle();
+      _popRoute(tester, find.byType(ReminderDetailPage));
+      await tester.pumpAndSettle();
+      await _chooseSharedProject(tester, _projectA.id);
+      expect(option, findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      await _pumpShell(tester, agenda);
+      expect(agenda.initialReads, 2);
+      expect(find.byType(ReminderDetailPage), findsNothing);
+      expect(option, findsNothing);
+      expect(agenda.mutateReminderCalls, 0);
+    },
+  );
+  testWidgets('REM06 invalid or stale intent cannot target another reminder', (
+    tester,
+  ) async {
+    final item = _notificationReminder();
+    final agenda = _IntentAgenda(reminders: [item]);
+    addTearDown(agenda.intents.close);
+    await _pumpShell(tester, agenda);
+    agenda.intents.add(
+      const ReminderNotificationIntent(
+        reminderId: 'invalid',
+        action: ReminderNotificationAction.snooze,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(ReminderDetailPage), findsNothing);
+    const staleId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    agenda.intents.add(
+      const ReminderNotificationIntent(
+        reminderId: staleId,
+        action: ReminderNotificationAction.snooze,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<ReminderDetailPage>(find.byType(ReminderDetailPage))
+          .reminderId,
+      staleId,
+    );
+    expect(
+      find.byKey(const Key('reminder-detail-read-error-retry')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('reminder-schedule-option-in1Hour')),
+      findsNothing,
+    );
+    expect(agenda.mutateReminderCalls, 0);
+    expect(agenda.reminders, [item]);
+  });
   testWidgets(
     'Dashboard B opens exact Inventory B and hidden external A is adopted on return',
     (tester) async {
@@ -716,3 +878,43 @@ class _OverlapTrackingAgenda extends FakeAgendaApplication {
     return super.listProjects();
   }
 }
+
+class _IntentAgenda extends FakeAgendaApplication
+    implements ReminderNotificationIntentSource {
+  _IntentAgenda({required super.reminders, this.initial})
+    : super(projects: const [_projectA, _projectB]);
+  ReminderNotificationIntent? initial;
+  final intents = StreamController<ReminderNotificationIntent>.broadcast();
+  Completer<MobileReminder>? nextNotificationRead;
+  int initialReads = 0;
+  @override
+  Future<MobileReminder> getReminderDetail(String reminderId) {
+    final pending = nextNotificationRead;
+    nextNotificationRead = null;
+    return pending?.future ?? super.getReminderDetail(reminderId);
+  }
+
+  @override
+  Stream<ReminderNotificationIntent> get notificationIntents => intents.stream;
+  @override
+  ReminderNotificationIntent? takeInitialNotificationIntent() {
+    initialReads += 1;
+    final result = initial;
+    initial = null;
+    return result;
+  }
+}
+
+MobileReminder _notificationReminder() => MobileReminder(
+  id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  projectId: _projectB.id,
+  projectName: _projectB.name,
+  sourceLogId: null,
+  title: 'B bildirim kaydı',
+  kind: ReminderKind.action,
+  status: ReminderStatus.active,
+  nextAttentionAt: '2026-09-09T06:00:00Z',
+  createdAt: '2026-09-07T03:00:00Z',
+  updatedAt: '2026-09-07T03:00:00Z',
+  revision: 1,
+);

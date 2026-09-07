@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
+import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
@@ -26,6 +27,7 @@ import 'package:chief_site_engineer/features/projects/project_create_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
+import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -273,6 +275,19 @@ class SafeDiagnosticPanel extends StatelessWidget {
   }
 }
 
+class _ReminderNotificationRoute {
+  _ReminderNotificationRoute({required this.openSchedule});
+  final detailKey = GlobalKey<ReminderDetailPageState>();
+  bool openSchedule;
+  bool sourceRoute = false;
+  Route<void>? page;
+
+  bool get isCurrent =>
+      page == null ||
+      page!.isCurrent ||
+      (detailKey.currentState?.notificationSurfaceIsCurrent ?? false);
+}
+
 class MobileShell extends StatefulWidget {
   const MobileShell({required this.bootstrap, super.key});
 
@@ -286,7 +301,8 @@ class _MobileShellState extends State<MobileShell> {
   int _selectedIndex = 0;
   final Set<int> _visitedPrimaryTabs = {0};
   final _inventoryKey = GlobalKey<InventoryPageState>();
-  StreamSubscription<String>? _notificationTapSubscription;
+  StreamSubscription<ReminderNotificationIntent>? _notificationTapSubscription;
+  final Map<String, _ReminderNotificationRoute> _notificationRoutes = {};
   StreamSubscription<void>? _projectContextSubscription;
   late final ActiveProjectSession _activeProjectSession;
   List<MobileProject> _activeProjectOptions = const [];
@@ -304,9 +320,24 @@ class _MobileShellState extends State<MobileShell> {
       (_) => unawaited(_refreshActiveProjectOptions()),
     );
     unawaited(_refreshActiveProjectOptions());
-    _notificationTapSubscription = widget.bootstrap.agenda.notificationTaps
-        .listen(_openReminderFromNotification);
-    final initial = widget.bootstrap.agenda.initialNotificationReminderId;
+    final agenda = widget.bootstrap.agenda;
+    final intents = agenda is ReminderNotificationIntentSource
+        ? agenda as ReminderNotificationIntentSource
+        : null;
+    _notificationTapSubscription =
+        (intents?.notificationIntents ??
+                agenda.notificationTaps.map(
+                  (id) => ReminderNotificationIntent(reminderId: id),
+                ))
+            .listen(_openReminderFromNotification);
+    final legacyInitial = intents == null
+        ? agenda.initialNotificationReminderId
+        : null;
+    final initial =
+        intents?.takeInitialNotificationIntent() ??
+        (legacyInitial == null
+            ? null
+            : ReminderNotificationIntent(reminderId: legacyInitial));
     if (initial != null) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _openReminderFromNotification(initial),
@@ -558,43 +589,79 @@ class _MobileShellState extends State<MobileShell> {
     );
   }
 
-  Future<void> _openReminderFromNotification(String reminderId) async {
+  Future<void> _openReminderFromNotification(
+    ReminderNotificationIntent intent,
+  ) async {
+    if (!mounted || !RecordId.isUuid(intent.reminderId)) return;
+    final reminderId = intent.reminderId;
+    final snooze = intent.action == ReminderNotificationAction.snooze;
+    final existing = _notificationRoutes[reminderId];
+    if (existing != null &&
+        existing.isCurrent &&
+        (!existing.sourceRoute || !snooze)) {
+      if (snooze) {
+        existing.openSchedule = true;
+        existing.detailKey.currentState?.requestNotificationSchedule();
+      }
+      return;
+    }
+    final route = _ReminderNotificationRoute(openSchedule: snooze);
+    _notificationRoutes[reminderId] = route;
+    try {
+      await _routeReminderFromNotification(reminderId, route);
+    } finally {
+      if (identical(_notificationRoutes[reminderId], route)) {
+        _notificationRoutes.remove(reminderId);
+      }
+    }
+  }
+
+  Future<void> _routeReminderFromNotification(
+    String reminderId,
+    _ReminderNotificationRoute route,
+  ) async {
     if (!mounted) return;
     try {
       final reminder = await widget.bootstrap.agenda.getReminderDetail(
         reminderId,
       );
+      if (reminder.id != reminderId) {
+        throw StateError('Notification reminder identity mismatch');
+      }
       final attendance = widget.bootstrap.attendance;
-      if (reminder.attendanceDayId != null && attendance != null) {
+      if (!route.openSchedule &&
+          reminder.attendanceDayId != null &&
+          attendance != null) {
         if (!mounted) return;
+        route.sourceRoute = true;
         _selectPrimaryTab(4);
-        await Navigator.of(context).push<void>(
-          MaterialPageRoute(
-            builder: (_) => AttendanceDayPage(
-              attendance: attendance,
-              agenda: widget.bootstrap.agenda,
-              dayId: reminder.attendanceDayId!,
-            ),
+        await _pushNotificationRoute(
+          route,
+          (_) => AttendanceDayPage(
+            attendance: attendance,
+            agenda: widget.bootstrap.agenda,
+            dayId: reminder.attendanceDayId!,
           ),
         );
         return;
       }
       final concrete = widget.bootstrap.concrete;
       final attachments = widget.bootstrap.concreteAttachments;
-      if (reminder.concretePourId != null &&
+      if (!route.openSchedule &&
+          reminder.concretePourId != null &&
           concrete != null &&
           attachments != null) {
         if (!mounted) return;
+        route.sourceRoute = true;
         _selectPrimaryTab(0);
-        await Navigator.of(context).push<void>(
-          MaterialPageRoute(
-            builder: (_) => ConcretePourDetailPage(
-              concrete: concrete,
-              agenda: widget.bootstrap.agenda,
-              attachments: attachments,
-              projectLocations: widget.bootstrap.projectLocations,
-              pourId: reminder.concretePourId!,
-            ),
+        await _pushNotificationRoute(
+          route,
+          (_) => ConcretePourDetailPage(
+            concrete: concrete,
+            agenda: widget.bootstrap.agenda,
+            attachments: attachments,
+            projectLocations: widget.bootstrap.projectLocations,
+            pourId: reminder.concretePourId!,
           ),
         );
         return;
@@ -604,18 +671,28 @@ class _MobileShellState extends State<MobileShell> {
     }
     if (!mounted) return;
     _selectPrimaryTab(1);
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => ReminderDetailPage(
-          agenda: widget.bootstrap.agenda,
-          projectLocations: widget.bootstrap.projectLocations,
-          attendance: widget.bootstrap.attendance,
-          concrete: widget.bootstrap.concrete,
-          concreteAttachments: widget.bootstrap.concreteAttachments,
-          reminderId: reminderId,
-        ),
+    await _pushNotificationRoute(
+      route,
+      (_) => ReminderDetailPage(
+        key: route.detailKey,
+        agenda: widget.bootstrap.agenda,
+        projectLocations: widget.bootstrap.projectLocations,
+        attendance: widget.bootstrap.attendance,
+        concrete: widget.bootstrap.concrete,
+        concreteAttachments: widget.bootstrap.concreteAttachments,
+        reminderId: reminderId,
+        openScheduleOnLaunch: route.openSchedule,
       ),
     );
+  }
+
+  Future<void> _pushNotificationRoute(
+    _ReminderNotificationRoute handoff,
+    WidgetBuilder builder,
+  ) async {
+    final page = MaterialPageRoute<void>(builder: builder);
+    handoff.page = page;
+    await Navigator.of(context).push<void>(page);
   }
 
   Future<void> _openPhoneCallResult(String initialProjectId) async {

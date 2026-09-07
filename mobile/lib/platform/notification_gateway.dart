@@ -168,6 +168,25 @@ class PendingReminderNotification {
   final bool scheduleComplete;
 }
 
+enum ReminderNotificationAction { openDetail, snooze }
+
+class ReminderNotificationIntent {
+  const ReminderNotificationIntent({
+    required this.reminderId,
+    this.action = ReminderNotificationAction.openDetail,
+  });
+
+  final String reminderId;
+  final ReminderNotificationAction action;
+}
+
+/// Optional foreground navigation capability; never performs a mutation.
+abstract interface class ReminderNotificationIntentSource {
+  ReminderNotificationIntent? takeInitialNotificationIntent();
+
+  Stream<ReminderNotificationIntent> get notificationIntents;
+}
+
 abstract interface class ReminderNotificationGateway {
   int get maximumPendingNotifications;
 
@@ -231,7 +250,10 @@ class UnavailableReminderNotificationGateway
 }
 
 class FlutterReminderNotificationGateway
-    implements ReminderNotificationGateway, ReminderDeliveryControl {
+    implements
+        ReminderNotificationGateway,
+        ReminderDeliveryControl,
+        ReminderNotificationIntentSource {
   FlutterReminderNotificationGateway({
     FlutterLocalNotificationsPlugin? plugin,
     MethodChannel? deliveryChannel,
@@ -248,10 +270,13 @@ class FlutterReminderNotificationGateway
   static const _channelDescription =
       'Chief Site Engineer tek seferlik hatırlatıcıları';
   static const rollingRepeatOccurrenceCount = 24;
+  static const snoozeActionId = 'cse_reminder_snooze';
 
   final FlutterLocalNotificationsPlugin _plugin;
   final MethodChannel _deliveryChannel;
   final StreamController<String> _taps = StreamController<String>.broadcast();
+  final _intents = StreamController<ReminderNotificationIntent>.broadcast();
+  ReminderNotificationIntent? _initialIntent;
   bool _initialized = false;
   String? _initialTapReminderId;
 
@@ -273,6 +298,35 @@ class FlutterReminderNotificationGateway
   Stream<String> get notificationTaps => _taps.stream;
 
   @override
+  Stream<ReminderNotificationIntent> get notificationIntents => _intents.stream;
+
+  @override
+  ReminderNotificationIntent? takeInitialNotificationIntent() {
+    final initial = _initialIntent;
+    _initialIntent = null;
+    _initialTapReminderId = null;
+    return initial;
+  }
+
+  ReminderNotificationIntent? _parseResponse(NotificationResponse? response) {
+    if (response == null) return null;
+    final reminderId = _parsePayload(response.payload);
+    if (reminderId == null) return null;
+    final action = switch (response.notificationResponseType) {
+      NotificationResponseType.selectedNotification =>
+        ReminderNotificationAction.openDetail,
+      NotificationResponseType.selectedNotificationAction
+          when defaultTargetPlatform == TargetPlatform.android &&
+              response.actionId == snoozeActionId =>
+        ReminderNotificationAction.snooze,
+      _ => null,
+    };
+    return action == null
+        ? null
+        : ReminderNotificationIntent(reminderId: reminderId, action: action);
+  }
+
+  @override
   Future<void> initialize() async {
     if (_initialized) return;
     timezone_data.initializeTimeZones();
@@ -287,8 +341,17 @@ class FlutterReminderNotificationGateway
         ),
       ),
       onDidReceiveNotificationResponse: (response) {
-        final reminderId = _parsePayload(response.payload);
-        if (reminderId != null) _taps.add(reminderId);
+        final intent = _parseResponse(response);
+        if (intent == null) return;
+        if (_intents.hasListener) {
+          _intents.add(intent);
+        } else {
+          // Retain a foreground response received during bootstrap.
+          _initialIntent = intent;
+        }
+        if (intent.action == ReminderNotificationAction.openDetail) {
+          _taps.add(intent.reminderId);
+        }
       },
     );
     if (initialized != true) {
@@ -296,9 +359,11 @@ class FlutterReminderNotificationGateway
     }
     final launch = await _plugin.getNotificationAppLaunchDetails();
     if (launch?.didNotificationLaunchApp ?? false) {
-      _initialTapReminderId = _parsePayload(
-        launch?.notificationResponse?.payload,
-      );
+      _initialIntent ??= _parseResponse(launch?.notificationResponse);
+      _initialTapReminderId =
+          _initialIntent?.action == ReminderNotificationAction.openDetail
+          ? _initialIntent?.reminderId
+          : null;
     }
     _initialized = true;
   }
@@ -441,6 +506,14 @@ class FlutterReminderNotificationGateway
         channelDescription: _channelDescription,
         importance: Importance.high,
         priority: Priority.high,
+        actions: [
+          AndroidNotificationAction(
+            snoozeActionId,
+            'Ertele',
+            showsUserInterface: true,
+            cancelNotification: false,
+          ),
+        ],
       ),
       iOS: DarwinNotificationDetails(),
     );

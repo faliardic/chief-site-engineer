@@ -22,6 +22,7 @@ class ReminderDetailPage extends StatefulWidget {
     this.concreteAttachments,
     this.projectLocations,
     this.istanbulToday,
+    this.openScheduleOnLaunch = false,
     super.key,
   });
 
@@ -32,12 +33,13 @@ class ReminderDetailPage extends StatefulWidget {
   final SafeAttachmentPicker? concreteAttachments;
   final ProjectLocationApplication? projectLocations;
   final String? istanbulToday;
+  final bool openScheduleOnLaunch;
 
   @override
-  State<ReminderDetailPage> createState() => _ReminderDetailPageState();
+  State<ReminderDetailPage> createState() => ReminderDetailPageState();
 }
 
-class _ReminderDetailPageState extends State<ReminderDetailPage> {
+class ReminderDetailPageState extends State<ReminderDetailPage> {
   ReminderDetail? _detail;
   AgendaLogDetail? _sourceAgendaDetail;
   ReminderDeliveryDiagnostic? _deliveryDiagnostic;
@@ -47,13 +49,47 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
   bool _mutating = false;
   bool _syncDialogOpen = false;
   bool _scheduleFlowOpen = false;
+  bool _notificationScheduleRequested = false;
+  bool _notificationScheduleQueued = false;
+  ModalRoute<dynamic>? _notificationScheduleRoute;
   String? _error;
   String? _readError;
 
   @override
   void initState() {
     super.initState();
+    _notificationScheduleRequested = widget.openScheduleOnLaunch;
     _reload();
+  }
+
+  /// A foreground notification may reuse this detail route, never its mutation.
+  void requestNotificationSchedule() {
+    if (!mounted || _scheduleFlowOpen || _notificationScheduleQueued) return;
+    _notificationScheduleRequested = true;
+    _consumeNotificationSchedule();
+  }
+
+  bool get notificationSurfaceIsCurrent =>
+      ModalRoute.of(context)?.isCurrent == true ||
+      _notificationScheduleRoute?.isCurrent == true;
+
+  void _consumeNotificationSchedule() {
+    final reminder = _detail?.reminder;
+    if (!_notificationScheduleRequested || _loading || reminder == null) return;
+    _notificationScheduleRequested = false;
+    if (reminder.trashedAt != null ||
+        reminder.status == ReminderStatus.completed ||
+        reminder.status == ReminderStatus.cancelled) {
+      return;
+    }
+    _notificationScheduleQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _notificationScheduleQueued = false;
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+        _showScheduleSheet();
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   Future<void> _reload({String? errorAfterReload}) async {
@@ -70,6 +106,9 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
       final detail = await widget.agenda.getReminderLifecycleDetail(
         widget.reminderId,
       );
+      if (detail.reminder.id != widget.reminderId) {
+        throw StateError('Reminder detail identity mismatch');
+      }
       AgendaLogDetail? sourceAgendaDetail;
       final sourceLogId = detail.reminder.sourceLogId;
       if (sourceLogId != null) {
@@ -104,6 +143,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           _error = errorAfterReload;
           _readError = null;
         });
+        _consumeNotificationSchedule();
       }
     } on Object {
       if (mounted) {
@@ -490,59 +530,63 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           context: context,
           isScrollControlled: true,
           showDragHandle: true,
-          builder: (sheetContext) => SafeArea(
-            child: FractionallySizedBox(
-              heightFactor: 0.90,
-              child: ListView(
-                primary: false,
-                children: [
-                  ...[
-                    ReminderScheduleKind.in15Minutes,
-                    ReminderScheduleKind.in1Hour,
-                    ReminderScheduleKind.in2Hours,
-                    ReminderScheduleKind.in3Hours,
-                    ReminderScheduleKind.tomorrowMorning,
-                    ReminderScheduleKind.nextWeekStart,
-                    ReminderScheduleKind.custom,
-                  ].map(
-                    (schedule) => ListTile(
-                      key: Key('reminder-schedule-option-${schedule.name}'),
-                      minVerticalPadding: 12,
-                      title: Text(schedule.label),
-                      subtitle: quickPreviews[schedule] == null
-                          ? null
-                          : Text(
-                              formatReminderExactSchedule(
-                                quickPreviews[schedule]!,
+          builder: (sheetContext) {
+            _notificationScheduleRoute = ModalRoute.of(sheetContext);
+            return SafeArea(
+              child: FractionallySizedBox(
+                heightFactor: 0.90,
+                child: ListView(
+                  primary: false,
+                  children: [
+                    ...[
+                      ReminderScheduleKind.in15Minutes,
+                      ReminderScheduleKind.in1Hour,
+                      ReminderScheduleKind.in2Hours,
+                      ReminderScheduleKind.in3Hours,
+                      ReminderScheduleKind.tomorrowMorning,
+                      ReminderScheduleKind.nextWeekStart,
+                      ReminderScheduleKind.custom,
+                    ].map(
+                      (schedule) => ListTile(
+                        key: Key('reminder-schedule-option-${schedule.name}'),
+                        minVerticalPadding: 12,
+                        title: Text(schedule.label),
+                        subtitle: quickPreviews[schedule] == null
+                            ? null
+                            : Text(
+                                formatReminderExactSchedule(
+                                  quickPreviews[schedule]!,
+                                ),
+                                key: Key(
+                                  'reminder-schedule-preview-${schedule.name}',
+                                ),
                               ),
-                              key: Key(
-                                'reminder-schedule-preview-${schedule.name}',
-                              ),
-                            ),
-                      onTap: () => Navigator.pop(sheetContext, (
-                        allDay: false,
-                        schedule: schedule,
-                      )),
-                    ),
-                  ),
-                  if (current.attendanceDayId == null)
-                    ListTile(
-                      key: const Key('reminder-schedule-option-allDay'),
-                      minVerticalPadding: 12,
-                      title: const Text('Tam gün'),
-                      subtitle: const Text(
-                        'Saat seçmeden bir takvim günü planla',
+                        onTap: () => Navigator.pop(sheetContext, (
+                          allDay: false,
+                          schedule: schedule,
+                        )),
                       ),
-                      onTap: () => Navigator.pop(sheetContext, (
-                        allDay: true,
-                        schedule: null,
-                      )),
                     ),
-                ],
+                    if (current.attendanceDayId == null)
+                      ListTile(
+                        key: const Key('reminder-schedule-option-allDay'),
+                        minVerticalPadding: 12,
+                        title: const Text('Tam gün'),
+                        subtitle: const Text(
+                          'Saat seçmeden bir takvim günü planla',
+                        ),
+                        onTap: () => Navigator.pop(sheetContext, (
+                          allDay: true,
+                          schedule: null,
+                        )),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
+    _notificationScheduleRoute = null;
     if (choice == null || !mounted) return;
     if (choice.allDay) {
       final initialDate = _allDayInitialDate(current);
