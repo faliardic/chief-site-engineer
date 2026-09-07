@@ -152,8 +152,10 @@ Ajanda, proje yönetimi menüsü değil **aktif projenin takvim tabanlı saha za
 
 - Ay takviminin yedi gün sütunu kullanılabilir ekran genişliği içinde tamamen görünür olur; normal kullanımda yatay kaydırma gerekmez.
 - Layout cihaz modeline değil kullanılabilir pencere genişliğine göre ölçeklenir.
-- Tarih okunabilirliği, 48×48 etkileşim/Semantics alanları, yüksek text scale ve safe inset korunur.
-- Görsel hücrenin küçülmesi gerçek dokunma alanını erişilemez hale getirmez.
+- `>=336 dp` kullanılabilir takvim genişliğinde her gün hücresi doğrudan en az 48×48 dp etkileşim/Semantics hedefi olur.
+- `<336 dp` kullanılabilir takvim genişliğinde yedi sütun görsel olarak yatay kaydırmasız sığar; aynı sayfada önceki gün, seçili tarih ve sonraki gün için ayrı ayrı en az 48×48 dp kontrol bulunur. Seçili tarih kontrolü standart tarih seçiciyi açar.
+- Dar görsel gün hücrelerinde komşu alanlarla örtüşen görünmez hit-area veya Semantics sınırları kullanılarak 48 dp hedefi taklit edilemez.
+- Her iki responsive modda tarih okunabilirliği, yüksek text scale ve safe inset korunur; erişilebilirlik takvimi sığdırmak için azaltılmaz, etkileşim modeli genişliğe uyarlanır.
 
 #### CAL-02 — Kayıt yoğunluğunu bounded göstergelerle göster
 
