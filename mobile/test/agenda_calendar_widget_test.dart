@@ -181,6 +181,74 @@ void main() {
     },
   );
 
+  testWidgets(
+    'date selection paths preserve offset and clamp shorter content',
+    (tester) async {
+      final agenda = _FilteringAgenda(
+        projects: const [_projectA],
+        logs: [
+          for (final day in ['2026-09-07', '2026-09-08', '2026-09-09'])
+            for (var index = 0; index < 24; index++)
+              _log('$day-$index', day, _projectA),
+          _log('short-day', '2026-09-10', _projectA),
+        ],
+      );
+      await _pumpAgenda(tester, agenda, size: const Size(320, 640));
+      await _selectDate(tester, DateTime(2026, 9, 9));
+      final list = _key('agenda-day-list');
+      final directTap = tester
+          .widget<GestureDetector>(
+            find.ancestor(
+              of: _key('agenda-calendar-day-2026-09-08'),
+              matching: find.byType(GestureDetector),
+            ),
+          )
+          .onTap!;
+      final previousDay = tester
+          .widget<IconButton>(_key('previous-day'))
+          .onPressed!;
+      final nextDay = tester.widget<IconButton>(_key('next-day')).onPressed!;
+      final selectDate = tester
+          .widget<OutlinedButton>(_key('selected-day'))
+          .onPressed!;
+      final position = tester
+          .state<ScrollableState>(
+            find.descendant(of: list, matching: find.byType(Scrollable)).first,
+          )
+          .position;
+      position.jumpTo(500);
+      await tester.pumpAndSettle();
+      final expectedOffset = position.pixels;
+      expect(expectedOffset, greaterThan(0));
+
+      directTap();
+      await tester.pumpAndSettle();
+      expect(agenda.lastAgendaQuery?.istanbulDay, '2026-09-08');
+      expect(position.pixels, closeTo(expectedOffset, 1));
+
+      previousDay();
+      await tester.pumpAndSettle();
+      expect(agenda.lastAgendaQuery?.istanbulDay, '2026-09-07');
+      expect(position.pixels, closeTo(expectedOffset, 1));
+
+      nextDay();
+      await tester.pumpAndSettle();
+      expect(agenda.lastAgendaQuery?.istanbulDay, '2026-09-08');
+      expect(position.pixels, closeTo(expectedOffset, 1));
+
+      selectDate();
+      await tester.pumpAndSettle();
+      Navigator.of(
+        tester.element(find.byType(DatePickerDialog)),
+      ).pop(DateTime(2026, 9, 10));
+      await tester.pumpAndSettle();
+      expect(agenda.lastAgendaQuery?.istanbulDay, '2026-09-10');
+      expect(position.pixels, closeTo(position.maxScrollExtent, 1));
+      expect(position.pixels, lessThan(expectedOffset));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('calendar density is bounded at 1-3 dots and count at 4+', (
     tester,
   ) async {

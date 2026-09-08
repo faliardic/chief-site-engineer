@@ -105,7 +105,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('agenda-literal-search')), findsOneWidget);
+    expect(find.byKey(const Key('agenda-literal-search')), findsNothing);
+    expect(find.byKey(const Key('agenda-search')), findsOneWidget);
     expect(find.byKey(const Key('agenda-filter-action')), findsOneWidget);
     expect(find.byKey(const Key('agenda-archive-filter')), findsNothing);
     expect(find.byKey(const Key('agenda-sort-order')), findsNothing);
@@ -121,125 +122,120 @@ void main() {
     expect(find.text('En yeni üstte'), findsOneWidget);
   });
 
-  testWidgets(
-    'Agenda filter drafts, summaries, and clears preserve search/day',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      final fake = FakeAgendaApplication(projects: [project()], logs: [log()]);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: AgendaPage(agenda: fake, activeProjectId: projectId),
-        ),
-      );
+  testWidgets('Agenda filter drafts, summaries, and clears preserve day', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final fake = FakeAgendaApplication(projects: [project()], logs: [log()]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AgendaPage(agenda: fake, activeProjectId: projectId),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final filterAction = find.byKey(const Key('agenda-filter-action'));
+    expect(tester.getSize(filterAction).height, greaterThanOrEqualTo(48));
+    final filterSemantics = find.bySemanticsLabel('Filtreler');
+    expect(filterSemantics, findsOneWidget);
+    expect(
+      tester
+          .getSemantics(filterSemantics)
+          .getSemanticsData()
+          .flagsCollection
+          .isButton,
+      isTrue,
+    );
+
+    final initialDay = fake.lastAgendaQuery!.istanbulDay;
+    await tester.tap(find.byKey(const Key('agenda-calendar-next-period')));
+    await tester.pumpAndSettle();
+    final selectedDay = CseTimeCodec.shiftIstanbulDay(initialDay, 7);
+    final callsBeforeDraft = fake.listAgendaCalls;
+
+    await _openAgendaFilters(tester);
+    await _setAgendaFilterDraft(
+      tester,
+      archiveLabel: 'Arşivlenenler',
+      sortLabel: 'En eski üstte',
+      categoryLabel: AgendaCategory.inspection.label,
+    );
+    await tester.tap(find.byKey(const Key('agenda-filter-cancel')));
+    await tester.pumpAndSettle();
+
+    expect(fake.listAgendaCalls, callsBeforeDraft);
+    expect(fake.lastAgendaQuery!.istanbulDay, selectedDay);
+    expect(fake.lastAgendaQuery!.literalSearch, '');
+    expect(fake.lastAgendaQuery!.archiveFilter, AgendaArchiveFilter.active);
+    expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.newestFirst);
+    expect(fake.lastAgendaQuery!.projectId, projectId);
+    expect(fake.lastAgendaQuery!.category, isNull);
+
+    await _openAgendaFilters(tester);
+    await _setAgendaFilterDraft(
+      tester,
+      archiveLabel: 'Arşivlenenler',
+      sortLabel: 'En eski üstte',
+      categoryLabel: AgendaCategory.inspection.label,
+    );
+    await _applyAgendaFilters(tester);
+
+    expect(fake.lastAgendaQuery!.archiveFilter, AgendaArchiveFilter.archived);
+    expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.oldestFirst);
+    expect(fake.lastAgendaQuery!.projectId, projectId);
+    expect(fake.lastAgendaQuery!.category, AgendaCategory.inspection);
+    expect(
+      find.byKey(const Key('agenda-filter-summary-archive')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('agenda-filter-summary-sort')), findsOneWidget);
+    expect(
+      find.byKey(const Key('agenda-filter-summary-project')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('agenda-filter-summary-category')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('agenda-clear-all-filters')), findsOneWidget);
+
+    for (final key in const [
+      Key('agenda-filter-summary-archive'),
+      Key('agenda-filter-summary-sort'),
+      Key('agenda-filter-summary-category'),
+    ]) {
+      tester.widget<InputChip>(find.byKey(key)).onDeleted!();
       await tester.pumpAndSettle();
+    }
+    expect(fake.lastAgendaQuery!.archiveFilter, AgendaArchiveFilter.active);
+    expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.newestFirst);
+    expect(fake.lastAgendaQuery!.projectId, projectId);
+    expect(fake.lastAgendaQuery!.category, isNull);
+    expect(fake.lastAgendaQuery!.literalSearch, '');
+    expect(fake.lastAgendaQuery!.istanbulDay, selectedDay);
+    expect(find.byKey(const Key('agenda-clear-all-filters')), findsNothing);
 
-      final filterAction = find.byKey(const Key('agenda-filter-action'));
-      expect(tester.getSize(filterAction).height, greaterThanOrEqualTo(48));
-      final filterSemantics = find.bySemanticsLabel('Filtreler');
-      expect(filterSemantics, findsOneWidget);
-      expect(
-        tester
-            .getSemantics(filterSemantics)
-            .getSemanticsData()
-            .flagsCollection
-            .isButton,
-        isTrue,
-      );
+    await _openAgendaFilters(tester);
+    await _setAgendaFilterDraft(
+      tester,
+      archiveLabel: 'Arşivlenenler',
+      sortLabel: 'En eski üstte',
+      categoryLabel: AgendaCategory.inspection.label,
+    );
+    await _applyAgendaFilters(tester);
+    await tester.tap(find.byKey(const Key('agenda-clear-all-filters')));
+    await tester.pumpAndSettle();
 
-      final initialDay = fake.lastAgendaQuery!.istanbulDay;
-      await tester.tap(find.byKey(const Key('agenda-calendar-next-period')));
-      await tester.pumpAndSettle();
-      final selectedDay = CseTimeCodec.shiftIstanbulDay(initialDay, 7);
-      await _enterAgendaSearch(tester, fake, 'korunacak arama');
-      final callsBeforeDraft = fake.listAgendaCalls;
-
-      await _openAgendaFilters(tester);
-      await _setAgendaFilterDraft(
-        tester,
-        archiveLabel: 'Arşivlenenler',
-        sortLabel: 'En eski üstte',
-        categoryLabel: AgendaCategory.inspection.label,
-      );
-      await tester.tap(find.byKey(const Key('agenda-filter-cancel')));
-      await tester.pumpAndSettle();
-
-      expect(fake.listAgendaCalls, callsBeforeDraft);
-      expect(fake.lastAgendaQuery!.istanbulDay, selectedDay);
-      expect(fake.lastAgendaQuery!.literalSearch, 'korunacak arama');
-      expect(fake.lastAgendaQuery!.archiveFilter, AgendaArchiveFilter.active);
-      expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.newestFirst);
-      expect(fake.lastAgendaQuery!.projectId, projectId);
-      expect(fake.lastAgendaQuery!.category, isNull);
-
-      await _openAgendaFilters(tester);
-      await _setAgendaFilterDraft(
-        tester,
-        archiveLabel: 'Arşivlenenler',
-        sortLabel: 'En eski üstte',
-        categoryLabel: AgendaCategory.inspection.label,
-      );
-      await _applyAgendaFilters(tester);
-
-      expect(fake.lastAgendaQuery!.archiveFilter, AgendaArchiveFilter.archived);
-      expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.oldestFirst);
-      expect(fake.lastAgendaQuery!.projectId, projectId);
-      expect(fake.lastAgendaQuery!.category, AgendaCategory.inspection);
-      expect(
-        find.byKey(const Key('agenda-filter-summary-archive')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('agenda-filter-summary-sort')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('agenda-filter-summary-project')),
-        findsNothing,
-      );
-      expect(
-        find.byKey(const Key('agenda-filter-summary-category')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const Key('agenda-clear-all-filters')), findsOneWidget);
-
-      for (final key in const [
-        Key('agenda-filter-summary-archive'),
-        Key('agenda-filter-summary-sort'),
-        Key('agenda-filter-summary-category'),
-      ]) {
-        tester.widget<InputChip>(find.byKey(key)).onDeleted!();
-        await tester.pumpAndSettle();
-      }
-      expect(fake.lastAgendaQuery!.archiveFilter, AgendaArchiveFilter.active);
-      expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.newestFirst);
-      expect(fake.lastAgendaQuery!.projectId, projectId);
-      expect(fake.lastAgendaQuery!.category, isNull);
-      expect(fake.lastAgendaQuery!.literalSearch, 'korunacak arama');
-      expect(fake.lastAgendaQuery!.istanbulDay, selectedDay);
-      expect(find.byKey(const Key('agenda-clear-all-filters')), findsNothing);
-
-      await _openAgendaFilters(tester);
-      await _setAgendaFilterDraft(
-        tester,
-        archiveLabel: 'Arşivlenenler',
-        sortLabel: 'En eski üstte',
-        categoryLabel: AgendaCategory.inspection.label,
-      );
-      await _applyAgendaFilters(tester);
-      await tester.tap(find.byKey(const Key('agenda-clear-all-filters')));
-      await tester.pumpAndSettle();
-
-      expect(fake.lastAgendaQuery!.archiveFilter, AgendaArchiveFilter.active);
-      expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.newestFirst);
-      expect(fake.lastAgendaQuery!.projectId, projectId);
-      expect(fake.lastAgendaQuery!.category, isNull);
-      expect(fake.lastAgendaQuery!.literalSearch, 'korunacak arama');
-      expect(fake.lastAgendaQuery!.istanbulDay, selectedDay);
-      expect(find.byKey(const Key('agenda-clear-all-filters')), findsNothing);
-      expect(tester.takeException(), isNull);
-      semantics.dispose();
-    },
-  );
+    expect(fake.lastAgendaQuery!.archiveFilter, AgendaArchiveFilter.active);
+    expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.newestFirst);
+    expect(fake.lastAgendaQuery!.projectId, projectId);
+    expect(fake.lastAgendaQuery!.category, isNull);
+    expect(fake.lastAgendaQuery!.literalSearch, '');
+    expect(fake.lastAgendaQuery!.istanbulDay, selectedDay);
+    expect(find.byKey(const Key('agenda-clear-all-filters')), findsNothing);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 
   testWidgets('Agenda technical failure stays distinct from empty results', (
     tester,
@@ -259,7 +255,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Bu günde Ajanda kaydı yok.'), findsNothing);
-    expect(find.byKey(const Key('agenda-literal-search')), findsOneWidget);
+    expect(find.byKey(const Key('agenda-literal-search')), findsNothing);
     expect(find.byKey(const Key('agenda-filter-action')), findsOneWidget);
   });
 
@@ -493,7 +489,7 @@ void main() {
       await tester.tap(agendaDestination);
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('agenda-literal-search')), findsOneWidget);
+      expect(find.byKey(const Key('agenda-literal-search')), findsNothing);
       expect(find.byKey(const Key('agenda-filter-action')), findsOneWidget);
       expect(find.byKey(const Key('agenda-project-filter')), findsNothing);
       expect(find.byKey(const Key('agenda-category-filter')), findsNothing);
@@ -1669,210 +1665,51 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Agenda search app bar detail return preserves text without focus',
-    (tester) async {
-      tester.view.physicalSize = const Size(430, 1200);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final logs = List.generate(18, _navigationLog);
-      final fake = FakeAgendaApplication(projects: [project()], logs: logs);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: AgendaPage(agenda: fake, activeProjectId: projectId),
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('Agenda drag fling and direction change do not churn queries', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final fake = FakeAgendaApplication(
+      projects: [project()],
+      logs: List.generate(34, _navigationLog),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AgendaPage(agenda: fake, activeProjectId: projectId),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final list = find.byKey(const Key('agenda-day-list'));
+    final callsBeforeScroll = fake.listAgendaCalls;
 
-      await _enterAgendaSearch(tester, fake, 'CSE275 app bar');
-      final searchEditable = tester.widget<EditableText>(
-        _agendaSearchEditable(),
-      );
-      final searchFocusNode = searchEditable.focusNode;
-      final searchController = searchEditable.controller;
-      expect(searchFocusNode.hasFocus, isTrue);
-      expect(tester.testTextInput.isVisible, isTrue);
-      expect(searchController.text, 'CSE275 app bar');
-      final target = find.byKey(Key('agenda-log-${logs.last.id}'));
-      await tester.ensureVisible(target);
-      await tester.pumpAndSettle();
-      expect(searchFocusNode.hasFocus, isTrue);
+    await tester.drag(list, const Offset(0, -360));
+    await tester.pumpAndSettle();
 
-      await tester.tap(target);
-      await tester.pumpAndSettle();
-      expect(find.byType(LogDetailPage), findsOneWidget);
-      await tester.tap(find.byType(BackButton));
-      await tester.pumpAndSettle();
+    await tester.fling(list, const Offset(0, -420), 1600);
+    await tester.pump(const Duration(milliseconds: 80));
+    await tester.pumpAndSettle();
 
-      final restoredOffset = _scrollOffset(
-        tester,
-        const Key('agenda-day-list'),
-      );
-      final restoredFocus = searchFocusNode.hasFocus;
-      final restoredKeyboard = tester.testTextInput.isVisible;
-      expect(searchController.text, 'CSE275 app bar');
-      expect(fake.lastAgendaQuery?.literalSearch, 'CSE275 app bar');
-      expect(restoredOffset, greaterThan(0));
-      expect(restoredKeyboard, isFalse);
-      expect(restoredFocus, isFalse);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    final gesture = await tester.startGesture(tester.getCenter(list));
+    await gesture.moveBy(const Offset(0, -180));
+    await gesture.moveBy(const Offset(0, 110));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    final offsetAfterGestures = _scrollOffset(
+      tester,
+      const Key('agenda-day-list'),
+    );
+    expect(offsetAfterGestures, greaterThan(0));
+    expect(fake.lastAgendaQuery?.literalSearch, '');
+    expect(fake.listAgendaCalls, callsBeforeScroll);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
-    'Agenda search system back preserves text without restoring focus',
-    (tester) async {
-      tester.view.physicalSize = const Size(430, 1200);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final logs = List.generate(18, _navigationLog);
-      final fake = FakeAgendaApplication(projects: [project()], logs: logs);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: AgendaPage(agenda: fake, activeProjectId: projectId),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await _enterAgendaSearch(tester, fake, 'CSE275 system back');
-      final target = find.byKey(Key('agenda-log-${logs.last.id}'));
-      await tester.ensureVisible(target);
-      await tester.pumpAndSettle();
-      await tester.tap(target);
-      await tester.pumpAndSettle();
-      expect(find.byType(LogDetailPage), findsOneWidget);
-
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-
-      final restoredOffset = _scrollOffset(
-        tester,
-        const Key('agenda-day-list'),
-      );
-      final restoredFocus = _agendaSearchHasFocus(tester);
-      final restoredKeyboard = tester.testTextInput.isVisible;
-      expect(fake.lastAgendaQuery?.literalSearch, 'CSE275 system back');
-      expect(restoredOffset, greaterThan(0));
-      expect(restoredKeyboard, isFalse);
-      await _expectAgendaSearchTextAfterReveal(tester, 'CSE275 system back');
-      expect(restoredFocus, isFalse);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'Agenda user scroll dismisses search focus without text or query churn',
-    (tester) async {
-      tester.view.physicalSize = const Size(390, 760);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final fake = FakeAgendaApplication(
-        projects: [project()],
-        logs: List.generate(30, _navigationLog),
-      );
-      await tester.pumpWidget(
-        MaterialApp(
-          home: AgendaPage(agenda: fake, activeProjectId: projectId),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await _enterAgendaSearch(tester, fake, 'CSE275 drag');
-      final searchEditable = tester.widget<EditableText>(
-        _agendaSearchEditable(),
-      );
-      final searchFocusNode = searchEditable.focusNode;
-      final searchController = searchEditable.controller;
-      expect(searchFocusNode.hasFocus, isTrue);
-      expect(tester.testTextInput.isVisible, isTrue);
-      expect(searchController.text, 'CSE275 drag');
-      final callsBeforeDrag = fake.listAgendaCalls;
-      await tester.drag(
-        find.byKey(const Key('agenda-literal-search')),
-        const Offset(0, -100),
-      );
-      await tester.pumpAndSettle();
-
-      final offsetAfterDrag = _scrollOffset(
-        tester,
-        const Key('agenda-day-list'),
-      );
-      final focusAfterDrag = searchFocusNode.hasFocus;
-      final keyboardAfterDrag = tester.testTextInput.isVisible;
-      expect(offsetAfterDrag, greaterThan(0));
-      expect(fake.lastAgendaQuery?.literalSearch, 'CSE275 drag');
-      expect(fake.listAgendaCalls, callsBeforeDrag);
-      expect(searchController.text, 'CSE275 drag');
-      expect(focusAfterDrag, isFalse);
-      expect(keyboardAfterDrag, isFalse);
-      expect(
-        tester
-            .widget<RefreshIndicator>(find.byType(RefreshIndicator))
-            .onRefresh,
-        isNotNull,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'Agenda drag fling and direction change never create search focus',
-    (tester) async {
-      tester.view.physicalSize = const Size(390, 760);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final fake = FakeAgendaApplication(
-        projects: [project()],
-        logs: List.generate(34, _navigationLog),
-      );
-      await tester.pumpWidget(
-        MaterialApp(
-          home: AgendaPage(agenda: fake, activeProjectId: projectId),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final list = find.byKey(const Key('agenda-day-list'));
-      final callsBeforeScroll = fake.listAgendaCalls;
-
-      await tester.drag(list, const Offset(0, -360));
-      await tester.pumpAndSettle();
-      expect(_agendaSearchHasFocus(tester), isFalse);
-      expect(tester.testTextInput.isVisible, isFalse);
-
-      await tester.fling(list, const Offset(0, -420), 1600);
-      await tester.pump(const Duration(milliseconds: 80));
-      await tester.pumpAndSettle();
-      expect(_agendaSearchHasFocus(tester), isFalse);
-
-      final gesture = await tester.startGesture(tester.getCenter(list));
-      await gesture.moveBy(const Offset(0, -180));
-      await gesture.moveBy(const Offset(0, 110));
-      await gesture.up();
-      await tester.pumpAndSettle();
-
-      final offsetAfterGestures = _scrollOffset(
-        tester,
-        const Key('agenda-day-list'),
-      );
-      _expectAgendaSearchFocusAndKeyboard(
-        tester,
-        hasFocus: false,
-        keyboardVisible: false,
-      );
-      expect(offsetAfterGestures, greaterThan(0));
-      expect(fake.lastAgendaQuery?.literalSearch, '');
-      expect(fake.listAgendaCalls, callsBeforeScroll);
-      await _expectAgendaSearchTextAfterReveal(tester, '');
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'Ajanda detail return keeps route-local filters search and scroll after reload',
+    'Ajanda detail return keeps route-local filters and scroll after reload',
     (tester) async {
       tester.view.physicalSize = const Size(390, 760);
       tester.view.devicePixelRatio = 1;
@@ -1904,17 +1741,6 @@ void main() {
       await _applyAgendaFilters(tester);
       expect(fake.lastAgendaQuery?.archiveFilter, AgendaArchiveFilter.archived);
       expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
-      final searchField = find.byKey(
-        const Key('agenda-literal-search'),
-        skipOffstage: false,
-      );
-      await tester.ensureVisible(searchField);
-      await tester.pumpAndSettle();
-      await tester.enterText(searchField, 'CSE264 arama');
-      tester.widget<TextField>(searchField).onSubmitted!('CSE264 arama');
-      await tester.pumpAndSettle();
-      expect(_agendaSearchHasFocus(tester), isTrue);
-      expect(tester.testTextInput.isVisible, isTrue);
 
       final target = logs[18];
       final list = find.byKey(const Key('agenda-day-list'));
@@ -1955,7 +1781,7 @@ void main() {
       expect(after, closeTo(before, 4));
       expect(fake.lastAgendaQuery?.projectId, projectId);
       expect(fake.lastAgendaQuery?.category, AgendaCategory.inspection);
-      expect(fake.lastAgendaQuery?.literalSearch, 'CSE264 arama');
+      expect(fake.lastAgendaQuery?.literalSearch, '');
       expect(fake.lastAgendaQuery?.archiveFilter, AgendaArchiveFilter.archived);
       expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
       expect(find.text('CSE264 güncel Ajanda açıklaması'), findsOneWidget);
@@ -1967,10 +1793,6 @@ void main() {
           .position
           .jumpTo(0);
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
-        'CSE264 arama',
-      );
       expect(fake.lastAgendaQuery!.istanbulDay, selectedCalendarDay);
       expect(
         tester
@@ -1980,8 +1802,6 @@ void main() {
             .selected,
         {true},
       );
-      expect(_agendaSearchHasFocus(tester), isFalse);
-      expect(tester.testTextInput.isVisible, isFalse);
       expect(tester.takeException(), isNull);
     },
   );
@@ -2058,7 +1878,6 @@ void main() {
         categoryLabel: AgendaCategory.inspection.label,
       );
       await _applyAgendaFilters(tester);
-      await _enterAgendaSearch(tester, fake, 'bağlı kaynak');
 
       final indicator = find.byKey(
         Key('agenda-log-linked-reminder-${linkedLog.id}'),
@@ -2137,10 +1956,8 @@ void main() {
       expect(indicator, findsOneWidget);
       expect(fake.lastAgendaQuery?.projectId, projectId);
       expect(fake.lastAgendaQuery?.category, AgendaCategory.inspection);
-      expect(fake.lastAgendaQuery?.literalSearch, 'bağlı kaynak');
+      expect(fake.lastAgendaQuery?.literalSearch, '');
       expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.oldestFirst);
-      expect(_agendaSearchHasFocus(tester), isFalse);
-      expect(tester.testTextInput.isVisible, isFalse);
       expect(tester.takeException(), isNull);
       semanticsHandle.dispose();
     },
@@ -2221,19 +2038,6 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final firstSearch = _agendaSearchEditable(
-      within: find.byKey(const Key('agenda-instance-one')),
-    );
-    final secondSearch = _agendaSearchEditable(
-      within: find.byKey(const Key('agenda-instance-two')),
-    );
-    expect(
-      identical(
-        tester.widget<EditableText>(firstSearch).focusNode,
-        tester.widget<EditableText>(secondSearch).focusNode,
-      ),
-      isFalse,
-    );
     final firstList = find.descendant(
       of: find.byKey(const Key('agenda-instance-one')),
       matching: find.byKey(const Key('agenda-day-list')),
@@ -2389,26 +2193,12 @@ void main() {
             fake.lastAgendaQuery!.archiveFilter,
             AgendaArchiveFilter.archived,
           );
-          await _revealIcon(
-            tester,
-            find.byKey(const Key('agenda-literal-search')),
-          );
-          await tester.enterText(
-            find.byKey(const Key('agenda-literal-search')),
-            'saha',
-          );
-          final callsBeforeFocus = fake.listAgendaCalls;
-          await tester.tap(find.byKey(const Key('agenda-search')));
-          await tester.pumpAndSettle();
-          expect(fake.listAgendaCalls, callsBeforeFocus);
-          expect(_agendaSearchHasFocus(tester), isTrue);
-          await tester.testTextInput.receiveAction(TextInputAction.search);
-          await tester.pumpAndSettle();
-          expect(fake.lastAgendaQuery!.literalSearch, 'saha');
+          expect(find.byKey(const Key('agenda-literal-search')), findsNothing);
+          expect(find.byKey(const Key('agenda-search')), findsOneWidget);
+          expect(fake.lastAgendaQuery!.literalSearch, '');
           expect(fake.lastAgendaQuery!.projectId, projectId);
           expect(fake.lastAgendaQuery!.category, AgendaCategory.inspection);
           expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.oldestFirst);
-          expect(find.text('saha'), findsOneWidget);
 
           expect(find.byKey(const Key('create-agenda-project')), findsNothing);
           expect(
@@ -3217,47 +3007,6 @@ class _FakeCatalog implements AttachmentCatalogApplication {
   ];
 }
 
-Finder _agendaSearchEditable({Finder? within}) {
-  final field = within == null
-      ? find.byKey(const Key('agenda-literal-search'))
-      : find.descendant(
-          of: within,
-          matching: find.byKey(const Key('agenda-literal-search')),
-        );
-  return find.descendant(of: field, matching: find.byType(EditableText));
-}
-
-bool _agendaSearchHasFocus(WidgetTester tester, {Finder? within}) {
-  final matches = _agendaSearchEditable(
-    within: within,
-  ).evaluate().toList(growable: false);
-  expect(
-    matches.length,
-    lessThanOrEqualTo(1),
-    reason: 'Expected at most one exact Agenda search EditableText.',
-  );
-  if (matches.isEmpty) return false;
-  final widget = matches.single.widget;
-  expect(widget, isA<EditableText>());
-  return (widget as EditableText).focusNode.hasFocus;
-}
-
-Future<void> _enterAgendaSearch(
-  WidgetTester tester,
-  FakeAgendaApplication fake,
-  String text,
-) async {
-  final field = find.byKey(const Key('agenda-literal-search'));
-  await tester.ensureVisible(field);
-  await tester.pumpAndSettle();
-  await tester.tap(field);
-  await tester.pump();
-  await tester.enterText(field, text);
-  tester.widget<TextField>(field).onSubmitted!(text);
-  await tester.pumpAndSettle();
-  expect(fake.lastAgendaQuery?.literalSearch, text);
-}
-
 Future<void> _openAgendaFilters(WidgetTester tester, {Finder? within}) async {
   final action = within == null
       ? find.byKey(const Key('agenda-filter-action'), skipOffstage: false)
@@ -3329,28 +3078,6 @@ Future<void> _applyAgendaFilters(WidgetTester tester) async {
   await tester.tap(apply);
   await tester.pumpAndSettle();
   expect(find.byKey(const Key('agenda-filter-sheet')), findsNothing);
-}
-
-void _expectAgendaSearchFocusAndKeyboard(
-  WidgetTester tester, {
-  required bool hasFocus,
-  required bool keyboardVisible,
-}) {
-  expect(_agendaSearchHasFocus(tester), hasFocus);
-  expect(tester.testTextInput.isVisible, keyboardVisible);
-}
-
-Future<void> _expectAgendaSearchTextAfterReveal(
-  WidgetTester tester,
-  String text,
-) async {
-  final list = find.byKey(const Key('agenda-day-list'));
-  final position = tester.state<ScrollableState>(_scrollableFor(list)).position;
-  position.jumpTo(position.minScrollExtent);
-  await tester.pumpAndSettle();
-  final editable = _agendaSearchEditable();
-  expect(editable, findsOneWidget);
-  expect(tester.widget<EditableText>(editable).controller.text, text);
 }
 
 double _scrollOffset(WidgetTester tester, Key listKey) {
