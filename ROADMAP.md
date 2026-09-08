@@ -289,25 +289,27 @@ Bitiş tanımı:
 - mevcut en az 48×48 dp önceki gün / seçili tarih / sonraki gün selector'ı ile standart DatePicker erişilebilir ana/primary yol olarak korunur; doğrudan compact hücre tap'i yalnız ek hızlı etkileşimdir;
 - source kayıt, active-project context veya persistence mutation semantiği değişmez.
 
-### Q03-R2 — Ajanda literal arama yüzeyini kaldır + tarih seçiminde scroll konumunu koru
+### Q03-R2 — Ajanda modal arama + tarih seçiminde scroll konumunu koru
 
-**Kaynak:** Issue #739 owner kararı — Q03-R1 sonrası dar Ajanda interaction refinement.
-**Durum:** `NEXT` — Q04'ten önce tamamlanacak owner-inserted refinement.
+**Kaynak:** Issue #739 owner kararı; merged PR #741 — Q03-R1 sonrası dar Ajanda interaction refinement.
+**Durum:** `COMPLETE`
+**Kanıt:** Bağımsız review ve focused validation `6/6 + 1/1 + 1/1` PASS; SHA-256 `da6030019fd77bc8fcb7842e9ff4995915e2124e5e2dc8b1b162a1fd9c67e8cd` olan exact `com.faliardic.sefim.acceptance` APK, Samsung `SM-S938B / R5CY21WKZFX` cihazına veri koruyan güncelleme olarak kuruldu; Fatih manuel Acceptance PASS verdi.
 
-Bu refinement yalnız Ajanda'nın görünür arama kontrolünü ve tarih seçimi sırasındaki sayfa konumunu değiştirir; tarihsel Q03 ile Q03-R1 `COMPLETE` kalır ve backend/query sözleşmeleri yeniden açılmaz.
+Bu refinement yalnız Ajanda'nın arama etkileşimini ve tarih seçimi sırasındaki sayfa konumunu değiştirir; tarihsel Q03 ile Q03-R1 `COMPLETE` kalır ve backend/query sözleşmeleri yeniden açılmaz.
 
 Bitiş tanımı:
 
-- görünür `Literal ara` UI'sı ve yalnız bu alanı açan `Ara` eylemi kaldırılır;
-- backend/query literal-search capability ve contract'ı silinmez, yeniden yazılmaz veya migration'a dönüştürülmez; mevcut literal-search yeteneği ileride güvenli biçimde yeniden kullanılmak üzere korunur;
+- Ajanda içinde inline veya `Literal ara` alanı gösterilmez; sağdaki tool rail'de `Ara`, `Filtreler` ile birlikte korunur;
+- `Ara` compact modal açar; yalnız modal içindeki açık `Ara` submit'i girilen metni mevcut literal-search capability üzerinden uygular ve modalı kapatır; boş submit aramayı temizler, iptal query'yi değiştirmez;
+- backend/query literal-search capability ve contract'ı silinmez, yeniden yazılmaz veya migration'a dönüştürülmez;
 - doğrudan takvim gününe dokunma, önceki/sonraki gün kontrolleri ve DatePicker ile tarih seçimi mevcut dikey scroll offset'ini korur;
-- tarih seçimi sonrası günlük liste yenilendiğinde mevcut güvenli restore/clamp davranışı kullanılır; içerik sınırı değişirse offset geçerli aralığa sıkıştırılır ve sayfa gereksiz yere en üste sıçramaz;
+- tarih seçimi sonrası günlük liste yenilendiğinde mevcut güvenli restore/clamp contract'ı değişmeden kullanılır; içerik sınırı değişirse offset geçerli aralığa sıkıştırılır ve sayfa gereksiz yere en üste sıçramaz;
 - active-project, kayıt, persistence, identity, event, attachment ve query semantiği değişmez.
 
 ### Q04 — İş Gücü / Sicil first-class alanı + Firma → Personel + Günlük Puantaj sadeleştirmesi
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimleri — `İş Gücü / Saha Rehberi / Sicil` ve `Puantaj` başlıkları; #617 daily-core ve progressive-disclosure ilkeleri; current `WorkforceDirectoryPage`, `WorkforcePage`, `AttendancePage`, `AttendanceDayPage` baseline'ı.  
-**Durum:** `QUEUED`
+**Durum:** `NEXT`
 
 Amaç; İş Gücü'nü yalnız Puantaj ön-koşulu veya gizli yardımcı akış olmaktan çıkarıp aktif projenin first-class günlük insan kaynağı alanı haline getirmek, mevcut güçlü Saha Rehberi/Sicil yeteneklerini korumak, ilk kayıt yolunu `Firma → Personel` seviyesine indirmek ve Günlük Puantaj'ı firma/ekip navigasyonu yerine doğrudan personel durum girişi yüzeyi haline getirmektir.
 
