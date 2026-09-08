@@ -35,9 +35,6 @@ class AgendaPage extends StatefulWidget {
 
 class _AgendaPageState extends State<AgendaPage> {
   final ScrollController _scrollController = ScrollController();
-  final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
-  final GlobalKey _searchFieldKey = GlobalKey();
   late String _selectedDay;
   bool _calendarMonth = false;
   List<AgendaLog> _logs = const [];
@@ -72,8 +69,6 @@ class _AgendaPageState extends State<AgendaPage> {
   void dispose() {
     _projectSubscription?.cancel();
     _scrollController.dispose();
-    _searchController.dispose();
-    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -191,11 +186,12 @@ class _AgendaPageState extends State<AgendaPage> {
       '${day.month.toString().padLeft(2, '0')}-'
       '${day.day.toString().padLeft(2, '0')}';
 
-  void _moveDay(int delta) {
+  void _moveDay(int delta, {bool preserveScroll = true}) {
+    final restoreOffset = preserveScroll ? _currentScrollOffset : null;
     setState(() {
       _selectedDay = CseTimeCodec.shiftIstanbulDay(_selectedDay, delta);
     });
-    _reload();
+    _reload(restoreOffset: restoreOffset);
   }
 
   Future<void> _selectDate() async {
@@ -207,13 +203,14 @@ class _AgendaPageState extends State<AgendaPage> {
       lastDate: DateTime(2100),
     );
     if (selected == null || !mounted) return;
+    final restoreOffset = _currentScrollOffset;
     setState(() {
       _selectedDay =
           '${selected.year.toString().padLeft(4, '0')}-'
           '${selected.month.toString().padLeft(2, '0')}-'
           '${selected.day.toString().padLeft(2, '0')}';
     });
-    _reload();
+    _reload(restoreOffset: restoreOffset);
   }
 
   Future<void> _openCreateLog() async {
@@ -247,7 +244,6 @@ class _AgendaPageState extends State<AgendaPage> {
   Future<void> _openDetail(AgendaLog log) async {
     if (_detailNavigationBusy) return;
     final restoreOffset = _currentScrollOffset;
-    _searchFocusNode.unfocus();
     _detailNavigationBusy = true;
     try {
       await Navigator.of(context).push<void>(
@@ -271,7 +267,6 @@ class _AgendaPageState extends State<AgendaPage> {
   Future<void> _openLinkedReminder(MobileReminder reminder) async {
     if (_detailNavigationBusy) return;
     final restoreOffset = _currentScrollOffset;
-    _searchFocusNode.unfocus();
     _detailNavigationBusy = true;
     try {
       await Navigator.of(context).push<void>(
@@ -483,32 +478,48 @@ class _AgendaPageState extends State<AgendaPage> {
     await _reload();
   }
 
-  Future<void> _revealSearch() async {
-    if (_searchFieldKey.currentContext == null &&
-        _scrollController.hasClients) {
-      await _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      );
-    }
-    if (!mounted) return;
-    _searchFocusNode.requestFocus();
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
-    final fieldContext = _searchFieldKey.currentContext;
-    if (fieldContext != null && fieldContext.mounted) {
-      await Scrollable.ensureVisible(
-        fieldContext,
-        duration: const Duration(milliseconds: 200),
-        alignment: 0,
-      );
-    }
+  Future<void> _showSearch() async {
+    var draft = _search;
+    final submitted = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('agenda-search-dialog'),
+        scrollable: true,
+        title: const Text('Ajanda ara'),
+        content: TextFormField(
+          key: const Key('agenda-search-input'),
+          initialValue: draft,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Arama',
+            hintText: 'Açıklama, mahal, not veya proje',
+            border: OutlineInputBorder(),
+          ),
+          textInputAction: TextInputAction.search,
+          onChanged: (value) => draft = value,
+        ),
+        actions: [
+          TextButton(
+            key: const Key('agenda-search-cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('İptal'),
+          ),
+          FilledButton(
+            key: const Key('agenda-search-submit'),
+            onPressed: () => Navigator.of(dialogContext).pop(draft),
+            child: const Text('Ara'),
+          ),
+        ],
+      ),
+    );
+    if (submitted == null || !mounted) return;
+    _search = submitted;
+    await _reload();
   }
 
   void _movePeriod(int delta) {
     if (!_calendarMonth) {
-      _moveDay(delta * 7);
+      _moveDay(delta * 7, preserveScroll: false);
       return;
     }
     final selected = DateTime.parse('${_selectedDay}T00:00:00Z');
@@ -519,7 +530,7 @@ class _AgendaPageState extends State<AgendaPage> {
       first.month,
       selected.day.clamp(1, lastDay),
     );
-    _moveDay(target.difference(selected).inDays);
+    _moveDay(target.difference(selected).inDays, preserveScroll: false);
   }
 
   Widget _buildCalendar() {
@@ -725,8 +736,9 @@ class _AgendaPageState extends State<AgendaPage> {
     final colors = Theme.of(context).colorScheme;
     final count = _calendarDensity[key] ?? 0;
     void select() {
+      final restoreOffset = _currentScrollOffset;
       setState(() => _selectedDay = key);
-      unawaited(_reload());
+      unawaited(_reload(restoreOffset: restoreOffset));
     }
 
     final content = Column(
@@ -873,30 +885,7 @@ class _AgendaPageState extends State<AgendaPage> {
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.fromLTRB(12, 8, 4, 16),
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildCalendar(),
-                        const SizedBox(height: 12),
-                        KeyedSubtree(
-                          key: _searchFieldKey,
-                          child: TextField(
-                            key: const Key('agenda-literal-search'),
-                            controller: _searchController,
-                            focusNode: _searchFocusNode,
-                            decoration: InputDecoration(
-                              labelText: 'Literal ara',
-                              hintText: 'Açıklama, mahal, not veya proje',
-                              border: const OutlineInputBorder(),
-                            ),
-                            textInputAction: TextInputAction.search,
-                            onChanged: (value) => _search = value,
-                            onSubmitted: (_) => _reload(),
-                            onTapOutside: (_) => _searchFocusNode.unfocus(),
-                          ),
-                        ),
-                      ],
-                    ),
+                    _buildCalendar(),
                     if (_hasActiveFilters) ...[
                       const SizedBox(height: 8),
                       Wrap(
@@ -1069,7 +1058,7 @@ class _AgendaPageState extends State<AgendaPage> {
                   key: const Key('agenda-search'),
                   label: 'Ara',
                   icon: Icons.search,
-                  onPressed: _revealSearch,
+                  onPressed: _showSearch,
                 ),
                 ScreenToolAction(
                   key: const Key('agenda-filter-action'),

@@ -41,6 +41,9 @@ void main() {
         );
         final actions = tester.widget<ScreenToolRail>(rail).actions;
         expect(actions.map((action) => action.label), ['Ara', 'Filtreler']);
+        expect(find.byKey(const Key('agenda-search')), findsOneWidget);
+        expect(find.byKey(const Key('agenda-literal-search')), findsNothing);
+        expect(find.byKey(const Key('agenda-search-input')), findsNothing);
         double? previousY;
         for (final action in actions) {
           final target = find.byKey(action.key);
@@ -105,63 +108,65 @@ void main() {
     });
   }
 
-  testWidgets(
-    'search rail reveals the same field and only submit runs the query',
-    (tester) async {
-      final fake = _ReadAgenda()
-        ..logs = List.generate(
-          20,
-          (index) => AgendaLog(
-            id: 'log-$index',
-            projectId: _project.id,
-            projectName: _project.name,
-            observedAt: '2026-09-05T06:00:00Z',
-            createdAt: '2026-09-05T06:00:00Z',
-            updatedAt: '2026-09-05T06:00:00Z',
-            revision: 1,
-            category: AgendaCategory.inspection,
-            description: 'Saha kaydı $index',
-            location: null,
-            notes: null,
-          ),
-        );
-      await _pump(tester, fake, size: const Size(320, 320));
-      final initialQuery = fake.lastAgendaQuery;
-      final search = find.byKey(const Key('agenda-search'));
-      await tester.tap(search);
-      await tester.pumpAndSettle();
-      final field = find.byKey(const Key('agenda-literal-search'));
-      final input = tester.widget<TextField>(field);
-      expect(input.focusNode!.hasFocus, isTrue);
-      expect(fake.lastAgendaQuery, same(initialQuery));
-      final initialAgendaCalls = fake.listAgendaCalls;
-      expect(initialAgendaCalls, greaterThanOrEqualTo(7));
-      expect(input.decoration!.suffixIcon, isNull);
-      await tester.enterText(field, '100% _ beton');
-      final before = fake.listAgendaCalls;
-      await tester.testTextInput.receiveAction(TextInputAction.search);
-      await tester.pumpAndSettle();
-      expect(fake.listAgendaCalls, greaterThan(before));
-      expect(fake.lastAgendaQuery!.literalSearch, '100% _ beton');
-      expect(fake.lastAgendaQuery!.istanbulDay, initialQuery!.istanbulDay);
-      input.focusNode!.unfocus();
-      final list = tester.widget<ListView>(
-        find.byKey(const Key('agenda-day-list')),
-      );
-      list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
-      await tester.pumpAndSettle();
-      final afterSubmit = fake.listAgendaCalls;
-      await tester.tap(search);
-      await tester.pumpAndSettle();
-      final revealed = tester.widget<TextField>(field);
-      expect(revealed.controller, same(input.controller));
-      expect(revealed.controller!.text, '100% _ beton');
-      expect(revealed.focusNode!.hasFocus, isTrue);
-      expect(field.hitTestable(), findsOneWidget);
-      expect(fake.listAgendaCalls, afterSubmit);
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('Agenda applies only explicit modal search submissions', (
+    tester,
+  ) async {
+    final fake = _ReadAgenda();
+    await _pump(tester, fake, size: const Size(320, 320));
+    final searchAction = find.byKey(const Key('agenda-search'));
+    expect(searchAction, findsOneWidget);
+    expect(find.byKey(const Key('agenda-literal-search')), findsNothing);
+    expect(find.byKey(const Key('agenda-search-input')), findsNothing);
+    expect(find.text('Literal ara'), findsNothing);
+    expect(fake.lastAgendaQuery?.literalSearch, '');
+    final callsBeforeOpen = fake.readAttempts;
+
+    await tester.tap(searchAction);
+    await tester.pumpAndSettle();
+
+    final dialog = find.byKey(const Key('agenda-search-dialog'));
+    final field = find.byKey(const Key('agenda-search-input'));
+    final editable = find.descendant(
+      of: field,
+      matching: find.byType(EditableText),
+    );
+    expect(dialog, findsOneWidget);
+    expect(field, findsOneWidget);
+    expect(find.byKey(const Key('agenda-literal-search')), findsNothing);
+    expect(find.text('Literal ara'), findsNothing);
+    expect(tester.widget<EditableText>(editable).focusNode.hasFocus, isTrue);
+    expect(fake.readAttempts, callsBeforeOpen);
+
+    await tester.enterText(field, 'saha');
+    await tester.tap(find.byKey(const Key('agenda-search-cancel')));
+    await tester.pumpAndSettle();
+    expect(dialog, findsNothing);
+    expect(fake.lastAgendaQuery?.literalSearch, '');
+    expect(fake.readAttempts, callsBeforeOpen);
+
+    await tester.tap(searchAction);
+    await tester.pumpAndSettle();
+    expect(tester.widget<EditableText>(editable).controller.text, '');
+    await tester.enterText(field, 'saha');
+    await tester.tap(find.byKey(const Key('agenda-search-submit')));
+    await tester.pumpAndSettle();
+    expect(dialog, findsNothing);
+    expect(fake.lastAgendaQuery?.literalSearch, 'saha');
+
+    final callsBeforeClear = fake.readAttempts;
+    await tester.tap(searchAction);
+    await tester.pumpAndSettle();
+    expect(tester.widget<EditableText>(editable).controller.text, 'saha');
+    expect(fake.readAttempts, callsBeforeClear);
+    await tester.enterText(field, '');
+    await tester.tap(find.byKey(const Key('agenda-search-submit')));
+    await tester.pumpAndSettle();
+    expect(dialog, findsNothing);
+    expect(fake.lastAgendaQuery?.literalSearch, '');
+    expect(fake.readAttempts, greaterThan(callsBeforeClear));
+    expect(find.byKey(const Key('agenda-literal-search')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'retry and empty state remain reachable and absent capability has no tool',

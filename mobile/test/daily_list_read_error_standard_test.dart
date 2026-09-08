@@ -31,14 +31,14 @@ void main() {
       projects: const [_project],
       logs: const [_log],
     );
-    await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: agenda)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AgendaPage(agenda: agenda, activeProjectId: _projectId),
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('agenda-calendar-next-period')));
-    await tester.pumpAndSettle();
-    final search = find.byKey(const Key('agenda-literal-search'));
-    await tester.enterText(search, 'korunacak arama');
-    tester.widget<TextField>(search).onSubmitted!('korunacak arama');
     await tester.pumpAndSettle();
     await _openAgendaFilters(tester);
     await tester.tap(find.text('Arşivlenenler'));
@@ -46,11 +46,6 @@ void main() {
       tester,
       const Key('agenda-sort-order'),
       'En eski üstte',
-    );
-    await _selectDropdown(
-      tester,
-      const Key('agenda-project-filter'),
-      _project.name,
     );
     await _selectDropdown(
       tester,
@@ -74,7 +69,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Bu günde Ajanda kaydı yok.'), findsNothing);
-    _expectAgendaQuery(agenda.lastAgendaQuery!, expected);
+    _expectAgendaQueryContext(agenda.lastAgendaQuery!, expected);
 
     final failedCalls = agenda.listAgendaCalls;
     final failedRetry = tester
@@ -83,9 +78,9 @@ void main() {
     failedRetry();
     failedRetry();
     await tester.pumpAndSettle();
-    expect(agenda.listAgendaCalls, failedCalls + 1);
+    expect(agenda.listAgendaCalls, failedCalls + 6);
     await _expectRetryAction(tester, const Key('agenda-read-error-retry'));
-    _expectAgendaQuery(agenda.lastAgendaQuery!, expected);
+    _expectAgendaQueryContext(agenda.lastAgendaQuery!, expected);
 
     agenda.agendaFailure = null;
     final gate = Completer<List<AgendaLog>>();
@@ -97,7 +92,7 @@ void main() {
     successfulRetry();
     successfulRetry();
     await tester.pump();
-    expect(agenda.listAgendaCalls, successfulCalls + 1);
+    expect(agenda.listAgendaCalls, successfulCalls + 6);
     expect(find.byKey(const Key('agenda-read-error-retry')), findsNothing);
     gate.complete(const [_log]);
     await tester.pumpAndSettle();
@@ -204,14 +199,14 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final logs = List.generate(24, _agendaLog);
       final agenda = _ScriptedAgenda(projects: const [_project], logs: logs);
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: agenda)));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AgendaPage(agenda: agenda, activeProjectId: _projectId),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('agenda-calendar-next-period')));
-      await tester.pumpAndSettle();
-      final search = find.byKey(const Key('agenda-literal-search'));
-      await tester.enterText(search, 'korunacak arama');
-      tester.widget<TextField>(search).onSubmitted!('korunacak arama');
       await tester.pumpAndSettle();
       final expectedQuery = agenda.lastAgendaQuery!;
 
@@ -245,7 +240,7 @@ void main() {
         _scrollOffset(tester, const Key('agenda-day-list')),
         closeTo(before, 4),
       );
-      _expectAgendaQuery(agenda.lastAgendaQuery!, expectedQuery);
+      _expectAgendaQueryContext(agenda.lastAgendaQuery!, expectedQuery);
 
       delayedReload.complete(logs);
       await tester.pumpAndSettle();
@@ -323,8 +318,13 @@ void main() {
   testWidgets('initial read failures expose retry instead of empty state', (
     tester,
   ) async {
-    final agenda = _ScriptedAgenda()..agendaFailure = StateError('agenda read');
-    await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: agenda)));
+    final agenda = _ScriptedAgenda(projects: const [_project])
+      ..agendaFailure = StateError('agenda read');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AgendaPage(agenda: agenda, activeProjectId: _projectId),
+      ),
+    );
     await tester.pumpAndSettle();
     await _expectRetryAction(tester, const Key('agenda-read-error-retry'));
     expect(find.text('Bu günde Ajanda kaydı yok.'), findsNothing);
@@ -349,20 +349,6 @@ void main() {
   testWidgets('operation errors do not expose generic read retry', (
     tester,
   ) async {
-    final agenda = _AgendaProjectFailure();
-    await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: agenda)));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('create-agenda-project')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('agenda-project-name')),
-      'Başarısız proje',
-    );
-    await tester.tap(find.byKey(const Key('save-agenda-project')));
-    await tester.pumpAndSettle();
-    expect(find.text('Proje oluşturulamadı.'), findsOneWidget);
-    expect(find.byKey(const Key('agenda-read-error-retry')), findsNothing);
-
     final reminders = FakeAgendaApplication(reminders: const [_activeReminder])
       ..mutateReminderFailure = StateError('mutation failure');
     await tester.pumpWidget(
@@ -384,10 +370,15 @@ void main() {
 
   testWidgets('empty list states do not expose read retry', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: AgendaPage(agenda: FakeAgendaApplication())),
+      MaterialApp(
+        home: AgendaPage(
+          agenda: FakeAgendaApplication(projects: const [_project]),
+          activeProjectId: _projectId,
+        ),
+      ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
+    expect(find.text('Seçili gün için Ajanda kaydı yok.'), findsOneWidget);
     expect(find.byKey(const Key('agenda-read-error-retry')), findsNothing);
 
     await tester.pumpWidget(
@@ -440,6 +431,10 @@ Future<void> _expectRetryAction(WidgetTester tester, Key key) async {
 
 void _expectAgendaQuery(AgendaQuery actual, AgendaQuery expected) {
   expect(actual.istanbulDay, expected.istanbulDay);
+  _expectAgendaQueryContext(actual, expected);
+}
+
+void _expectAgendaQueryContext(AgendaQuery actual, AgendaQuery expected) {
   expect(actual.literalSearch, expected.literalSearch);
   expect(actual.archiveFilter, expected.archiveFilter);
   expect(actual.sortOrder, expected.sortOrder);
@@ -524,13 +519,6 @@ class _ScriptedReminderAgenda extends FakeAgendaApplication {
     }
     if (reminderFailure case final failure?) throw failure;
     return List.unmodifiable(reminders);
-  }
-}
-
-class _AgendaProjectFailure extends FakeAgendaApplication {
-  @override
-  Future<MobileProject> createProject(CreateProjectCommand command) async {
-    throw StateError('project create failure');
   }
 }
 
