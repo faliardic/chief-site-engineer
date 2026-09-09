@@ -1,6 +1,6 @@
-# CSE Codex Instruction Comment Protocol — Risk-Based v2
+# CSE Codex Instruction Comment Protocol — Risk-Based v3
 
-**Geçerlilik tarihi:** 2026-09-02
+**Geçerlilik tarihi:** 2026-09-09
 
 GitHub comment bir amaç değil, kalıcı ve kritik handoff gerektiğinde kullanılan araçtır.
 
@@ -20,6 +20,7 @@ Commit/push boundary:
 ```
 
 Issue, comment ID, authority zinciri, routing YAML veya uzun evidence beklenmez.
+FAST/`SINGLE` için bu kısa chat handoff davranışı aynen korunur.
 
 ## 2. STANDARD
 
@@ -61,7 +62,24 @@ Comment gerektiği kadar şunları taşır:
 - commit/push/Ready/merge/release sınırı;
 - final provenance beklentisi.
 
-## 4. Kullanıcıya cevap
+## 4. PARALLEL_READ ortak handoff'u
+
+STANDARD/CRITICAL `PARALLEL_READ` işte tek ortak kanonik task/handoff kaydı;
+ortak base, goal, allowlist, protected contracts, gates, stop conditions,
+topology ve lane routing'lerini taşır. Aynı bilgi Builder, Scout ve Reviewer için
+üç uzun comment olarak tekrarlanmaz.
+
+Lane-specific prompt yalnız ortak kayda referans verir ve ilgili rolü
+(`Builder/WRITE`, `Scout/READ` veya `Reviewer/READ`), kullanılacak ADS skill'ini
+ve output contract'ını belirtir. CRITICAL kalıcı handoff/evidence gereklilikleri
+ve tüm CSE güvenlik bilgileri korunur; sadeleştirme bunları kaldırmaz.
+
+Scout ara bulguları seri comment akışına dönüştürmez ve tek `SCOUT_RESULT` üretir.
+Reviewer final exact revision için yalnız `REVIEW_PASS` veya `CHANGES_REQUIRED`
+üretir. ADS Reviewer, zorunlu ChatGPT/owner review veya manual/device gate'inin
+yerine geçmez.
+
+## 5. Kullanıcıya cevap
 
 Comment oluşturulduysa kullanıcıya:
 
@@ -71,12 +89,12 @@ Comment oluşturulduysa kullanıcıya:
 
 verilir. Uzun comment tekrar chat'e yapıştırılmaz; kullanıcı isterse gösterilir.
 
-## 5. GitHub yazma erişimi yoksa
+## 6. GitHub yazma erişimi yoksa
 
 Comment oluşturulduğu iddia edilmez. CRITICAL iş başlamaz; geçici chat taslağı canonical handoff sayılmaz.
 
 FAST/uygun STANDARD iş, owner'ın current chat talimatıyla ve diğer güvenlik sınırları uygunsa devam edebilir.
 
-## 6. Ana karar
+## 7. Ana karar
 
 > GitHub instruction comment FAST için yasak gereksiz törendir, STANDARD için koşullu araçtır, CRITICAL için kalıcı güvenlik sözleşmesidir.
