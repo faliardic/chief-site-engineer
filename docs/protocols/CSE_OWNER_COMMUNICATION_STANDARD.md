@@ -1,6 +1,6 @@
-# CSE Owner Communication Standard — Concise v4
+# CSE Owner Communication Standard — Concise v5
 
-**Geçerlilik tarihi:** 2026-09-03
+**Geçerlilik tarihi:** 2026-09-09
 
 CSE'de teknik gerçek saklanmaz; owner'a önce ürünün ve işlemin pratik anlamı anlatılır.
 
@@ -109,6 +109,12 @@ Bir aksiyon tamamlandıktan sonra sıradaki aksiyonun yalnız adı verilmez. Ayn
 
 sunulur.
 
+`PARALLEL_READ` seçildiğinde de owner-facing `Hazır Codex talimatı` **yalnız bir tanedir**. Bu tek talimat ana Codex'i `Builder/WRITE` olarak başlatır ve Builder'ın native Codex collaboration/subagent yeteneğiyle tam 1 `Scout/READ` ve 1 `Reviewer/READ` oluşturup yönetmesini ister. Fatih'e üç ayrı agent prompt'u verilmez; üç ayrı Codex sohbeti/süreci açması veya Scout/Reviewer sonuçlarını Builder'a taşıması istenmez.
+
+Scout sonucunu Builder kendi tüketir. Builder final exact revision/snapshot'ı Reviewer'a kendisi verir; `CHANGES_REQUIRED` varsa aynı task içinde düzeltir ve Reviewer'a yeniden inceletir. Owner'a ancak gerçek owner/authority veya manuel/device gate'i, native subagent capability için `ROUTING_ESCALATION_REQUIRED`, ya da tek kanonik final sonuç döner.
+
+Native subagent/collaboration yeteneği execution yüzeyinde gerçekten kullanılamıyorsa ChatGPT/Codex bunu üç manuel session'la sessizce telafi etmez ve topology'yi `SINGLE`'a düşürmez. Manuel üç-session çalışma ancak Fatih ayrıca açıkça fallback olarak seçerse kullanılabilir.
+
 Repository/local execution gerekiyorsa ChatGPT, owner'ın ayrıca `Codex ile çalış`, `devam` veya `talimat hazırla` demesini beklemez; Codex handoff'unu kendiliğinden verir. ChatGPT'ın yetkili olduğu mevcut owner-approved işlem için ayrıca `devam` istenmez.
 
 Fatih'e yalnız gerçekten owner kararı veya manuel/device kabul gerektiren aksiyon verilir. Non-CRITICAL işte manuel/device kabul gerekmiyorsa kısa gerekçeyle `GEREKMİYOR` yazılır; Codex automated PASS sonrası commit/push için manuel PASS istenmez. Gereken manuel/device kabulde Fatih PASS/FAIL kapısı korunur. Automated PASS, manuel PASS veya Ready/merge/release yetkisi gibi sunulmaz.
@@ -127,4 +133,4 @@ Owner `devam`, `son durum` veya `neden durdu` dediğinde:
 
 ## 8. Ana karar
 
-> Küçük iş küçük anlatılır. Büyük riskte gereken ayrıntı korunur. Owner her zaman projenin nerede olduğunu, merge ile hangi Issue'nun kapanacağını ve kendisinden ne beklendiğini teknik YAML okumadan anlayabilir.
+> Küçük iş küçük anlatılır. Büyük riskte gereken ayrıntı korunur. Owner her zaman projenin nerede olduğunu, merge ile hangi Issue'nun kapanacağını ve kendisinden ne beklendiğini teknik YAML okumadan anlayabilir. `PARALLEL_READ` owner'a tek ana Codex talimatı olarak görünür; Scout ve Reviewer orchestration'ı ana Builder'ın iç işidir.
