@@ -11,6 +11,20 @@ Bu dosya repository kökünde bütün CSE çalışmalarına uygulanır ve günl�
 - Kritik Git ve veri güvenliği: `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`.
 - Lane ve publication ayrıntıları: `docs/protocols/CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`.
 - Test/gate ayrıntıları: `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`.
+- AI-assisted execution çekirdeği: [pinned ADS CORE](.agents/ads/CORE.md);
+  kabul edilmiş kaynak revision kaydı: [ADS SOURCE](.agents/ads/SOURCE.md).
+
+CSE, repo içine source-pinned alınmış ADS sistemini kullanır. Önce bu `AGENTS.md`,
+ardından `.agents/ads/CORE.md` ve göreve uygun `.agents/skills/ads-*/SKILL.md`
+okunur. Çelişkide CSE kuralları üstündür: ADS; CSE ürün kararlarını,
+`FAST | STANDARD | CRITICAL` risk lane'ini, veri güvenliği sınırlarını,
+validation/manual-device acceptance, zorunlu ChatGPT/owner review veya
+publication/release kapılarını gevşetemez.
+
+CSE'ye source-pinned kopyalanmış ADS skill'lerindeki kaynak-repo bağlamlı
+`CORE.md` referansı bu repository'de `.agents/ads/CORE.md` olarak çözülür;
+repository root'unda `CORE.md` aranmaz. Bu yalnız bir path alias'ıdır; ADS
+authority veya içeriğini değiştirmez.
 
 Sabit master SHA, schema, app version, aktif Issue/PR veya roadmap ilerlemesi kalıcı protokollerde tutulmaz. Bunlar her görevde GitHub/repository üzerinden okunur.
 
@@ -21,9 +35,10 @@ README, eski Issue/PR, `.cse/state`, task/result, ZIP, handoff, podcast veya soh
 Yeni görevde zorunlu okuma:
 
 1. `AGENTS.md`
-2. current GitHub `master`, açık Issue/PR ve aktif görev
-3. `ROADMAP.md` içindeki ilk genel yayın öncesi Q01–Q26 kanonik yürütme kuyruğu
-4. yalnız değişen sözleşmenin gerektirdiği koşullu kaynak
+2. [pinned ADS CORE](.agents/ads/CORE.md) ve görevde ilgili ADS skill'i
+3. current GitHub `master`, açık Issue/PR ve aktif görev
+4. `ROADMAP.md` içindeki ilk genel yayın öncesi Q01–Q26 kanonik yürütme kuyruğu
+5. yalnız değişen sözleşmenin gerektirdiği koşullu kaynak
 
 Koşullu okuma:
 
@@ -70,6 +85,13 @@ ChatGPT/Work Mode her kullanıcı talebinde execution başlamadan önce sıradak
 
 Repository veya local execution gerekiyorsa ChatGPT, kullanıcının `Codex ile çalış` demesini beklemez. Açıkça `Sıradaki aktör: Codex` der ve current Issue/kuralları tekrar etmeyen, 10–15 satırı geçmeyen exact handoff verir. `CSE_PROJECT_INSTRUCTIONS.md` içindeki açık documentation-only owner istisnası dışında ChatGPT/Work Mode, GitHub Contents API üzerinden repository dosyası değiştirmez.
 
+ChatGPT/koordinatör task başında birbirinden ayrı olarak CSE risk lane'ini,
+ADS execution topology'sini ve lane routing'ini seçer. `SINGLE`, tek
+`Builder/WRITE` ile yürür. `PARALLEL_READ`, yalnız tam olarak 1 `Builder/WRITE` +
+1 `Scout/READ` + 1 `Reviewer/READ` kullanır; yalnız Builder production writer'dır.
+Scout ve Reviewer aynı task'ın read-only lane'leridir, ek production işi veya
+branch/PR değildir. Ayrıntılı davranış pinned ADS CORE ve ilgili skill'den okunur.
+
 Her Codex handoff'u ChatGPT'nin göreve özel belirlediği açık `Execution time budget: <süre>` alanını taşır. Bütçe; kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre seçilir.
 
 ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istemeden yürütülür. Kullanıcıya teslim edilen her sonuç şu satırla biter:
@@ -87,9 +109,12 @@ Kullanıcıdan sıradaki prompt'u yazması, `devam` demesi veya Codex talimatın
 
 Devam işi kalmadığında `Sıradaki aksiyon — Yok: İş tamamlandı.` yazılır; yapay yeni iş üretilmez.
 
-## 4. Zorunlu lane seçimi
+## 4. Zorunlu risk lane seçimi
 
-Her iş yalnız bir lane kullanır:
+Her iş yalnız bir CSE risk lane'i kullanır: `FAST | STANDARD | CRITICAL`.
+Execution topology ayrıca ve bağımsız olarak ADS'ye göre `SINGLE | PARALLEL_READ`
+seçilir; `Builder | Scout | Reviewer` ise agent rolüdür. Bu üç kavram birbirinin
+yerine kullanılamaz.
 
 FAST/STANDARD için varsayılan one-pass akışı:
 
@@ -179,6 +204,8 @@ Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro a
 - FAST: Codex automated PASS ve gerekiyorsa Fatih manuel/device PASS sonrası tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa tek minimal Draft PR, required review/gate PASS sonrası ChatGPT'nin otomatik Ready/squash merge'i ve `master` sync.
 - STANDARD: en fazla bir aktif production branch/PR; squash merge varsayılanı.
 - CRITICAL: Issue'ya özel branch/PR/review zinciri.
+- `PARALLEL_READ` lane'leri aynı task ve tek production branch/PR içinde kalır;
+  Scout/Reviewer yeni production branch, PR veya writer oluşturmaz.
 - Force-push yapılmaz.
 - Stacked PR oluşturulmaz.
 - Protokol kabul edildiğinde zaten açık olan legacy/stacked production PR'lar bir defalık geçiş kuyruğudur; yeni stack açma yetkisi vermez. Kuyruk çözülene kadar yeni production branch açılmaz; mevcut PR'lar current master'a birer birer uyarlanır ve her biri required review/validation/manual ve drift/mergeability kapılarından geçmeden Ready/merge edilmez.

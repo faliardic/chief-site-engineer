@@ -1,6 +1,6 @@
-# CSE Model ve Reasoning Routing Policy — v2
+# CSE Model ve Reasoning Routing Policy — v3
 
-**Geçerlilik tarihi:** 2026-09-02
+**Geçerlilik tarihi:** 2026-09-09
 
 Bu belge model ve reasoning seçimini yönlendirir; günlük işte metadata töreni üretmez. Güncel model adları ve availability kalıcı repository gerçeği değildir; execution yüzeyindeki mevcut seçeneklerden doğrulanır.
 
@@ -51,10 +51,21 @@ model_routing:
 
 Görünür mismatch varsa fail-closed durulur. Runtime metadata görünmüyorsa `unknown` yazılır; değer tahmin edilmez. Bu belirsizlik review'da dikkate alınır fakat tek başına geçmiş kanıtı geçersiz kılmaz.
 
-## 4. Execution mode ve orchestration
+## 4. Execution topology ve lane routing
 
-- Tek executor varsayılandır.
-- Multi-agent/Ultra yalnız owner açıkça isterse ve bağımsız alt işler gerçekten paralel yürüyebiliyorsa kullanılır.
+- `SINGLE` varsayılan topology olabilir; owner kararı kapsamındaki ChatGPT/koordinatör
+  `PARALLEL_READ` seçerse roster tam olarak 1 `Builder/WRITE` + 1 `Scout/READ` +
+  1 `Reviewer/READ` olur.
+- Task başında CSE risk lane'i ve topology'den ayrı olarak her izinli lane için
+  model, reasoning effort, speed mode ve READ/WRITE yetkisi kaydedilir. FAST ve
+  STANDARD'da bu kayıt kısa görev/handoff içinde kalabilir; routing YAML zorunlu değildir.
+- Lane kendi modelini, effort'unu, speed'ini, topology'yi, roster'ı veya
+  READ/WRITE yetkisini değiştiremez ve yeni lane açamaz.
+- Scout mekanik araştırmada daha hafif reasoning alabilir; contract, regression,
+  parser/formatter, persistence veya data-integrity riskinde mevcut sessiz
+  downgrade yasağı korunur.
+- CRITICAL için gereken ChatGPT/bağımsız derin-review tabanı ADS Reviewer lane'i
+  bulunmasıyla otomatik karşılanmış sayılmaz.
 - `pro`, model veya reasoning seviyesi değildir.
 - Reasoning seçimi, her Codex handoff'unda ChatGPT'nin kapsam/risk, beklenen validation/build/device işi ve blocker'a göre açıkça verdiği execution time budget'ı kaldırmaz; global sabit süre varsayılanı yoktur.
 

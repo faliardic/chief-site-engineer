@@ -1,7 +1,7 @@
-# CSE Workflow Acceleration Protocol — v7
+# CSE Workflow Acceleration Protocol — v8
 
 **Belge türü:** Bağlayıcı execution, correction ve publication protokolü
-**Geçerlilik tarihi:** 2026-09-04
+**Geçerlilik tarihi:** 2026-09-09
 
 Amaç maksimum kanıt üretmek değil, değişen sözleşmenin riskini karşılayan en hafif süreçle güvenli ürünü hızla master'a taşımaktır.
 
@@ -23,9 +23,11 @@ Codex gereken işte ChatGPT kullanıcının `Codex ile çalış` demesini beklem
 
 ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istenmez. Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla biter; kalan iş yoksa aktör `Yok` olur.
 
-## 1. Lane seçimi
+## 1. Risk lane seçimi
 
-Her iş yalnız bir lane seçer.
+Her iş yalnız bir CSE risk lane'i seçer: `FAST | STANDARD | CRITICAL`. Bu seçim
+validation, publication ve data-safety ağırlığını belirler; aşağıdaki execution
+topology veya agent rolü değildir.
 
 ### FAST
 
@@ -65,6 +67,28 @@ Aşağıdakilerden biri vardır:
 
 Dosya sayısı, widget test karmaşıklığı, navigation veya callback tek başına CRITICAL gerekçesi değildir.
 
+### Execution topology ve agent rolleri
+
+Risk lane'inden bağımsız olarak ADS'ye göre `SINGLE | PARALLEL_READ` topology'si
+seçilir. FAST çoğunlukla `SINGLE` yürür; STANDARD/CRITICAL işte paralel salt-okuma
+araştırması ve review anlamlı değer sağlıyorsa `PARALLEL_READ` seçilebilir.
+Bu seçim zorunlu üç-ajan töreni değildir.
+
+`SINGLE`, tek `Builder/WRITE` kullanır. `PARALLEL_READ`, yalnız tam olarak
+1 `Builder/WRITE` + 1 `Scout/READ` + 1 `Reviewer/READ` kullanır. Builder tek
+production writer'dır ve resmî local CSE worktree'sindeki source edit, test,
+commit ve push'u yürütür. Scout mümkünse exact task base SHA/current immutable
+source üzerinden araştırır; Builder'ın yarım worktree'sini production truth
+saymaz. Reviewer hazırlığını paralel yapabilir, fakat final verdict'i yalnız
+Builder'ın exact commit/head'i üzerinde verir.
+
+Scout ve Reviewer production dosyası, branch'i veya PR'si değiştirmez; commit ya
+da push yapmaz. Reviewer `CHANGES_REQUIRED` verirse düzeltmeyi aynı task ve
+production branch içinde Builder yapar ve güncel exact revision yeniden incelenir.
+Her iki topology'de de tek production branch, tek Draft PR ve stacked-PR yasağı
+korunur. ADS Reviewer, CSE'nin zorunlu ChatGPT/owner review veya manual/device
+gate'inin yerine geçmez. Ayrıntılı lane davranışı pinned ADS CORE/skill'lerdedir.
+
 ## 2. Göreve özel execution time budget
 
 Her Codex handoff'u ChatGPT'nin kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre seçtiği açık `Execution time budget: <süre>` alanını içerir. Global sabit süre varsayılanı yoktur. Codex bu bütçe içinde tek bounded outcome üretir; yetkili inceleme, edit/fix, focused validation ve commit/push mümkünse aynı adımda tamamlanır.
@@ -76,7 +100,7 @@ Süre dolduğunda:
 - kapsam genişletilmez;
 - Codex durur ve mevcut çalışmayı güvenle korur; tamamlanan iş, exact blocker ve kalan tek adım raporlanır.
 
-Görev ancak kapsam veya gerçek süre ihtiyacı gerektiriyorsa açık bütçeli alt adımlara bölünür. Codex bütçeyi kendiliğinden uzatmaz. Aynı anda yalnız bir production adımı yürür. Süre bütçesi CRITICAL veya publication kapılarını gevşetmez.
+Görev ancak kapsam veya gerçek süre ihtiyacı gerektiriyorsa açık bütçeli alt adımlara bölünür. Codex bütçeyi kendiliğinden uzatmaz. Aynı anda yalnız bir production writer yürür; `PARALLEL_READ` içindeki Scout/Reviewer salt-okuma lane'leri aynı task envelope'u içinde paralel olabilir. Süre bütçesi CRITICAL veya publication kapılarını gevşetmez.
 
 ## 3. Execution ve kabul sahipliği
 
