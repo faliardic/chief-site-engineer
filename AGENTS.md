@@ -21,6 +21,11 @@ okunur. Çelişkide CSE kuralları üstündür: ADS; CSE ürün kararlarını,
 validation/manual-device acceptance, zorunlu ChatGPT/owner review veya
 publication/release kapılarını gevşetemez.
 
+CSE'ye source-pinned kopyalanmış ADS skill'lerindeki kaynak-repo bağlamlı
+`CORE.md` referansı bu repository'de `.agents/ads/CORE.md` olarak çözülür;
+repository root'unda `CORE.md` aranmaz. Bu yalnız bir path alias'ıdır; ADS
+authority veya içeriğini değiştirmez.
+
 Sabit master SHA, schema, app version, aktif Issue/PR veya roadmap ilerlemesi kalıcı protokollerde tutulmaz. Bunlar her görevde GitHub/repository üzerinden okunur.
 
 README, eski Issue/PR, `.cse/state`, task/result, ZIP, handoff, podcast veya sohbet hafızası current GitHub gerçeğini override edemez.
