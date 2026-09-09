@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -502,6 +503,273 @@ void main() {
       member1,
     );
   });
+
+  test(
+    'Q04-A2 technical team is deterministic idempotent masked and explicit teams stay stable',
+    () async {
+      final subcontractor = await attendance.createSubcontractor(
+        const CreateSubcontractorCommand(
+          id: subcontractor1,
+          eventId: '33333333-3333-4333-8333-333333333311',
+          projectId: project1,
+          name: 'Atlas Yapı',
+        ),
+      );
+      final explicitTeam = await attendance.createTeam(
+        const CreateWorkforceTeamCommand(
+          id: team1,
+          eventId: '33333333-3333-4333-8333-333333333312',
+          projectId: project1,
+          subcontractorId: subcontractor1,
+          name: 'Kalıp Ekibi',
+        ),
+      );
+      final technical = await attendance.createMember(
+        const CreateWorkforceMemberCommand(
+          id: member1,
+          projectId: project1,
+          subcontractorId: subcontractor1,
+          fullName: 'Ekipsiz Ali',
+          roleName: 'Usta',
+        ),
+      );
+      final retry = await attendance.createMember(
+        const CreateWorkforceMemberCommand(
+          id: member1,
+          projectId: project1,
+          subcontractorId: subcontractor1,
+          fullName: 'Ekipsiz Ali',
+          roleName: 'Usta',
+        ),
+      );
+      final secondTechnical = await attendance.createMember(
+        const CreateWorkforceMemberCommand(
+          id: member2,
+          projectId: project1,
+          subcontractorId: subcontractor1,
+          fullName: 'Ekipsiz Ayşe',
+          roleName: 'Usta',
+        ),
+      );
+      final explicit = await attendance.createMember(
+        const CreateWorkforceMemberCommand(
+          id: member3,
+          projectId: project1,
+          subcontractorId: subcontractor1,
+          teamId: team1,
+          teamName: 'Kalıp Ekibi',
+          fullName: 'Ekipli Can',
+          roleName: 'Usta',
+        ),
+      );
+
+      final technicalId = workforceTechnicalTeamId(project1, subcontractor1);
+      expect(technical.teamId, technicalId);
+      expect(retry.teamId, technicalId);
+      expect(secondTechnical.teamId, technicalId);
+      expect(explicit.teamId, explicitTeam.id);
+      expect((await attendance.listTeams(project1)).map((team) => team.id), [
+        team1,
+      ]);
+      final firm = (await attendance.listSubcontractors(project1)).single;
+      expect(firm.activeTeamCount, 1);
+      expect(firm.activePersonCount, 3);
+
+      final preserved = await attendance.updateMember(
+        UpdateWorkforceMemberCommand(
+          id: explicit.id,
+          expectedRevision: explicit.revision,
+          fullName: 'Ekipli Can Güncel',
+          roleName: explicit.roleName,
+        ),
+      );
+      expect(preserved.teamId, team1);
+      expect(preserved.subcontractorId, subcontractor1);
+      final moved = await attendance.updateMember(
+        UpdateWorkforceMemberCommand(
+          id: preserved.id,
+          expectedRevision: preserved.revision,
+          fullName: preserved.fullName,
+          roleName: preserved.roleName,
+          subcontractorId: subcontractor1,
+          useTechnicalTeam: true,
+        ),
+      );
+      expect(moved.teamId, technicalId);
+      expect(
+        (await attendance.listMembers(
+          project1,
+        )).firstWhere((member) => member.id == member1).teamId,
+        technicalId,
+      );
+
+      final day = await _ensureDay(attendance);
+      final detail = await attendance.saveRoster(
+        SaveAttendanceRosterCommand(
+          dayId: day.id,
+          eventId: event2,
+          expectedRevision: day.revision,
+          values: const [
+            AttendanceRosterValue(
+              entryId: entry1,
+              memberId: member1,
+              result: AttendanceResult.fullDay,
+              overtimeMinutes: 0,
+            ),
+            AttendanceRosterValue(
+              entryId: entry2,
+              memberId: member2,
+              result: AttendanceResult.halfDay,
+              overtimeMinutes: 0,
+            ),
+          ],
+        ),
+      );
+      expect(detail.entries.map((entry) => entry.teamName).toSet(), {
+        subcontractor.name,
+      });
+      expect(detail.teamSummaries.map((summary) => summary.teamName).toSet(), {
+        subcontractor.name,
+      });
+      final exported = await attendance.exportDay(
+        ExportAttendanceDayCommand(
+          dayId: day.id,
+          eventId: event3,
+          expectedRevision: detail.day.revision,
+        ),
+        share: true,
+      );
+      final csv = utf8.decode(exports.bytes!.skip(3).toList());
+      expect(csv, contains(subcontractor.name));
+      expect(csv, isNot(contains(workforceTechnicalTeamStorageName)));
+      expect(exported.humanSummary, contains(subcontractor.name));
+      expect(
+        exported.humanSummary,
+        isNot(contains(workforceTechnicalTeamStorageName)),
+      );
+
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(
+        Sqflite.firstIntValue(
+          await raw.rawQuery(
+            'SELECT count(*) FROM workforce_teams WHERE id = ?',
+            [technicalId],
+          ),
+        ),
+        1,
+      );
+      expect(
+        Sqflite.firstIntValue(
+          await raw.rawQuery(
+            "SELECT count(*) FROM workforce_events WHERE aggregate_type = 'team' AND aggregate_id = ? AND event_type = 'team.created'",
+            [technicalId],
+          ),
+        ),
+        1,
+      );
+      expect(
+        (await raw.query(
+          'workforce_members',
+          columns: ['team_id'],
+          where: 'id = ?',
+          whereArgs: [member1],
+        )).single['team_id'],
+        technicalId,
+      );
+      await raw.close();
+    },
+  );
+
+  test(
+    'Q04-A2 technical team collisions mismatches and archived rows fail closed',
+    () async {
+      const targetFirm = '11111111-1111-4111-8111-111111111121';
+      const otherFirm = '11111111-1111-4111-8111-111111111122';
+      const nameFirm = '11111111-1111-4111-8111-111111111123';
+      const archivedFirm = '11111111-1111-4111-8111-111111111124';
+      for (final value in const [
+        (targetFirm, 'Hedef Firma', '33333333-3333-4333-8333-333333333321'),
+        (otherFirm, 'Diğer Firma', '33333333-3333-4333-8333-333333333322'),
+        (nameFirm, 'Ad Çakışması', '33333333-3333-4333-8333-333333333323'),
+        (archivedFirm, 'Pasif Teknik', '33333333-3333-4333-8333-333333333324'),
+      ]) {
+        await attendance.createSubcontractor(
+          CreateSubcontractorCommand(
+            id: value.$1,
+            eventId: value.$3,
+            projectId: project1,
+            name: value.$2,
+          ),
+        );
+      }
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      const timestamp = '2026-07-19T08:00:00.000Z';
+      Future<void> insertTeam({
+        required String id,
+        required String firmId,
+        required String name,
+        required String status,
+      }) => raw.insert('workforce_teams', {
+        'id': id,
+        'project_id': project1,
+        'subcontractor_id': firmId,
+        'name': name,
+        'name_normalized': name.toLowerCase(),
+        'status': status,
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+        'archived_at': status == 'archived' ? timestamp : null,
+      });
+      await insertTeam(
+        id: workforceTechnicalTeamId(project1, targetFirm),
+        firmId: otherFirm,
+        name: workforceTechnicalTeamStorageName,
+        status: 'active',
+      );
+      await insertTeam(
+        id: '22222222-2222-4222-8222-222222222231',
+        firmId: nameFirm,
+        name: workforceTechnicalTeamStorageName,
+        status: 'active',
+      );
+      await insertTeam(
+        id: workforceTechnicalTeamId(project1, archivedFirm),
+        firmId: archivedFirm,
+        name: workforceTechnicalTeamStorageName,
+        status: 'archived',
+      );
+      await raw.close();
+
+      Future<void> expectRejected(String id, String firmId) async {
+        await expectLater(
+          attendance.createMember(
+            CreateWorkforceMemberCommand(
+              id: id,
+              projectId: project1,
+              subcontractorId: firmId,
+              fullName: 'Fail closed',
+              roleName: 'Usta',
+            ),
+          ),
+          throwsA(isA<AgendaValidationFailure>()),
+        );
+      }
+
+      await expectRejected('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbc1', targetFirm);
+      await expectRejected('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbc2', nameFirm);
+      await expectRejected(
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbc3',
+        archivedFirm,
+      );
+    },
+  );
 
   test(
     'person attendance summary follows canonical id and keeps archived history',

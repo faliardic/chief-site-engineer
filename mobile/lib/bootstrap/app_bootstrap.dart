@@ -93,6 +93,10 @@ class AppBootstrap {
     required this.databaseFactory,
     required this.clock,
     ReminderNotificationGateway? notificationGateway,
+    this.diagnosticSink,
+    this.monotonicElapsed,
+    this.notificationPerAwaitLimit = const Duration(seconds: 2),
+    this.startupNotificationLimit = const Duration(seconds: 8),
   }) : notificationGateway =
            notificationGateway ??
            const UnavailableReminderNotificationGateway();
@@ -116,11 +120,66 @@ class AppBootstrap {
   final sqflite.DatabaseFactory databaseFactory;
   final UtcClock clock;
   final ReminderNotificationGateway notificationGateway;
+  final StartupPhaseSink? diagnosticSink;
+  final MonotonicElapsed? monotonicElapsed;
+  final Duration notificationPerAwaitLimit;
+  final Duration startupNotificationLimit;
+
+  Future<T> _phase<T>(
+    StartupPhaseDiagnostics diagnostics,
+    StartupPhase phase,
+    Future<T> Function() action, {
+    StartupDiagnosticOrigin origin = StartupDiagnosticOrigin.bootstrap,
+    StartupSafeErrorCode failureCode = StartupSafeErrorCode.startupFailure,
+  }) async {
+    diagnostics.record(phase, StartupPhaseOutcome.started, origin: origin);
+    try {
+      final result = await action();
+      diagnostics.record(phase, StartupPhaseOutcome.succeeded, origin: origin);
+      return result;
+    } on Object {
+      diagnostics.record(
+        phase,
+        StartupPhaseOutcome.failed,
+        origin: origin,
+        safeErrorCode: failureCode,
+      );
+      rethrow;
+    }
+  }
+
+  Future<T> _notificationAction<T>(
+    NotificationExecutionContext context,
+    StartupPhase phase,
+    String operationKey,
+    Future<T> Function() action,
+  ) {
+    return runWithNotificationExecution(context, () {
+      if (notificationGateway is DeadlineAwareReminderNotificationGateway) {
+        return action();
+      }
+      return context.budget.awaitPlatform<T>(
+        phase: phase,
+        origin: context.origin,
+        operationKey: operationKey,
+        operation: action,
+      );
+    });
+  }
 
   Future<BootstrapResult> start() async {
+    final diagnostics = StartupPhaseDiagnostics(
+      sink: diagnosticSink,
+      elapsed: monotonicElapsed,
+    );
+    diagnostics.record(StartupPhase.bootstrap, StartupPhaseOutcome.started);
     AppDatabase? database;
     try {
-      final directories = await directoriesProvider();
+      final directories = await _phase(
+        diagnostics,
+        StartupPhase.directories,
+        directoriesProvider,
+      );
       if (directories.environment != environment) {
         throw const PathContractViolation('environment directory mismatch');
       }
@@ -128,35 +187,62 @@ class AppBootstrap {
         directories: directories,
         clock: clock,
       );
-      await directories.ensureRecoveryRootsCreated();
+      await _phase(
+        diagnostics,
+        StartupPhase.recoveryRoots,
+        directories.ensureRecoveryRootsCreated,
+      );
       try {
-        await MobileRestoreRecoveryApplication(
-          directories: directories,
-          databaseFactory: databaseFactory,
-          clock: clock,
-        ).recoverBeforeBootstrap();
+        await _phase(
+          diagnostics,
+          StartupPhase.restoreRecovery,
+          () => MobileRestoreRecoveryApplication(
+            directories: directories,
+            databaseFactory: databaseFactory,
+            clock: clock,
+          ).recoverBeforeBootstrap(),
+          failureCode: StartupSafeErrorCode.recoveryFailure,
+        );
       } on RestoreRecoveryFailure {
+        diagnostics.record(
+          StartupPhase.bootstrap,
+          StartupPhaseOutcome.failed,
+          safeErrorCode: StartupSafeErrorCode.recoveryFailure,
+        );
         return const BootstrapFailure(code: 'restore_recovery_failed');
       }
       try {
-        await backupFileGateway.reconcileIncomingPackages();
+        await _phase(
+          diagnostics,
+          StartupPhase.incomingReconciliation,
+          backupFileGateway.reconcileIncomingPackages,
+        );
       } on Object {
         // Incoming cleanup never blocks access to the active SQLite truth.
       }
-      await directories.ensureCreated();
+      await _phase(
+        diagnostics,
+        StartupPhase.directories,
+        directories.ensureCreated,
+      );
       database = AppDatabase(
         path: directories.databaseFile,
         factory: databaseFactory,
         clock: clock,
       );
-      await database.open();
-      final smoke = await SmokeRecordRepository(
-        database: database,
-        clock: clock,
-      ).ensureFoundationRecord();
-      await database.close();
+      await _phase(diagnostics, StartupPhase.databaseOpen, database.open);
+      final smoke = await _phase(
+        diagnostics,
+        StartupPhase.foundationSmoke,
+        () => SmokeRecordRepository(
+          database: database!,
+          clock: clock,
+        ).ensureFoundationRecord(),
+      );
+      await _phase(diagnostics, StartupPhase.databaseClose, database.close);
       database = null;
       final coordinator = MobileOperationCoordinator();
+      final notificationAttempts = NotificationPlatformAttemptRegistry();
       final managedAttachmentStore = DeviceManagedAttachmentStore(
         directories: directories,
       );
@@ -183,6 +269,10 @@ class AppBootstrap {
         databaseFactory: databaseFactory,
         clock: clock,
         notificationGateway: notificationGateway,
+        notificationDiagnostics: diagnostics,
+        notificationAttempts: notificationAttempts,
+        notificationPerAwaitLimit: notificationPerAwaitLimit,
+        notificationTotalLimit: startupNotificationLimit,
         coordinator: coordinator,
         attachmentStore: DeviceAgendaAttachmentStore.shared(
           managedStore: managedAttachmentStore,
@@ -255,13 +345,54 @@ class AppBootstrap {
         coordinator: coordinator,
       );
       final concreteAttachments = safeAttachmentPicker;
+      final startupNotificationBudget = NotificationExecutionBudget(
+        diagnostics: diagnostics,
+        attempts: notificationAttempts,
+        perAwaitLimit: notificationPerAwaitLimit,
+        totalLimit: startupNotificationLimit,
+      );
       try {
-        await notificationGateway.initialize();
+        final context = NotificationExecutionContext(
+          budget: startupNotificationBudget,
+          origin: StartupDiagnosticOrigin.bootstrap,
+        );
+        await _phase(
+          diagnostics,
+          StartupPhase.notificationInitialize,
+          () => _notificationAction<void>(
+            context,
+            StartupPhase.notificationInitialize,
+            'bootstrap-initialize',
+            notificationGateway.initialize,
+          ),
+        );
       } on Object {
         // SQLite remains source-of-truth when the platform plugin is absent.
       }
-      await attendance.ensureRollingOccurrences();
-      await agenda.reconcileNotifications();
+      await _phase(
+        diagnostics,
+        StartupPhase.rollingOccurrences,
+        () => runWithNotificationExecution(
+          NotificationExecutionContext(
+            budget: startupNotificationBudget,
+            origin: StartupDiagnosticOrigin.rollingOccurrences,
+          ),
+          attendance.ensureRollingOccurrences,
+        ),
+        origin: StartupDiagnosticOrigin.rollingOccurrences,
+      );
+      await _phase(
+        diagnostics,
+        StartupPhase.finalNotificationReconciliation,
+        () => runWithNotificationExecution(
+          NotificationExecutionContext(
+            budget: startupNotificationBudget,
+            origin: StartupDiagnosticOrigin.finalReconciliation,
+          ),
+          agenda.reconcileNotifications,
+        ),
+        origin: StartupDiagnosticOrigin.finalReconciliation,
+      );
       final backup = SqliteMobileBackupApplication(
         directories: directories,
         databaseFactory: databaseFactory,
@@ -269,6 +400,7 @@ class AppBootstrap {
         coordinator: coordinator,
         fileGateway: backupFileGateway,
         notificationReconciler: () async {
+          notificationAttempts.invalidateSource();
           // The restore already owns the application-wide coordinator. A fresh
           // reader reconciles the newly activated SQLite truth without nesting
           // another operation on the same serial queue.
@@ -277,12 +409,28 @@ class AppBootstrap {
             databaseFactory: databaseFactory,
             clock: clock,
             notificationGateway: notificationGateway,
+            notificationDiagnostics: diagnostics,
+            notificationAttempts: notificationAttempts,
+            notificationPerAwaitLimit: notificationPerAwaitLimit,
+            notificationTotalLimit: startupNotificationLimit,
             coordinator: MobileOperationCoordinator(),
           );
-          await restoredAgenda.reconcileNotifications();
+          final restoreBudget = NotificationExecutionBudget(
+            diagnostics: diagnostics,
+            attempts: notificationAttempts,
+            perAwaitLimit: notificationPerAwaitLimit,
+            totalLimit: startupNotificationLimit,
+          );
+          await runWithNotificationExecution(
+            NotificationExecutionContext(
+              budget: restoreBudget,
+              origin: StartupDiagnosticOrigin.restoreReconciliation,
+            ),
+            restoredAgenda.reconcileNotifications,
+          );
         },
       );
-      return BootstrapSuccess(
+      final result = BootstrapSuccess(
         environmentLabel: environment.label,
         smokeRecordId: smoke.id,
         smokeRecordCreatedAt: smoke.createdAt,
@@ -302,10 +450,24 @@ class AppBootstrap {
         attachmentCatalog: attachmentCatalog,
         attachmentReconciliation: attachmentReconciliation,
       );
+      // This marker means a complete BootstrapResult, not a rendered frame.
+      diagnostics.record(StartupPhase.bootstrap, StartupPhaseOutcome.succeeded);
+      return result;
     } on Object {
+      diagnostics.record(
+        StartupPhase.bootstrap,
+        StartupPhaseOutcome.failed,
+        safeErrorCode: StartupSafeErrorCode.startupFailure,
+      );
       return const BootstrapFailure();
     } finally {
-      await database?.close();
+      if (database != null) {
+        try {
+          await _phase(diagnostics, StartupPhase.databaseClose, database.close);
+        } on Object {
+          // The returned bootstrap failure remains privacy-safe and stable.
+        }
+      }
     }
   }
 }

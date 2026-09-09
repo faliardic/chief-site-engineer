@@ -145,7 +145,18 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       ''',
         [projectId],
       );
-      return rows.map(_subcontractorFromRow).toList(growable: false);
+      final visibleTeamCounts = await _visibleActiveTeamCounts(
+        database,
+        projectId,
+      );
+      return rows
+          .map(
+            (row) => _subcontractorFromRow({
+              ...row,
+              'active_team_count': visibleTeamCounts[row['id']] ?? 0,
+            }),
+          )
+          .toList(growable: false);
     });
   }
 
@@ -416,7 +427,16 @@ class SqliteAttendanceApplication implements AttendanceApplication {
         WHERE ${where.join(' AND ')}
         ORDER BY s.name_normalized ASC, t.name_normalized ASC, t.id ASC
       ''', args);
-      return rows.map(_teamFromRow).toList(growable: false);
+      return rows
+          .where(
+            (row) => !isWorkforceTechnicalTeamLink(
+              projectId: row['project_id']! as String,
+              subcontractorId: row['subcontractor_id'] as String?,
+              teamId: row['id'] as String?,
+            ),
+          )
+          .map(_teamFromRow)
+          .toList(growable: false);
     });
   }
 
@@ -427,6 +447,18 @@ class SqliteAttendanceApplication implements AttendanceApplication {
     validateUuid(command.projectId, 'Proje kimliği');
     validateUuid(command.subcontractorId, 'Taşeron kimliği');
     final name = requiredTrimmed(command.name, 'Ekip adı', maxLength: 200);
+    final normalized = _normalizeRegistryName(name);
+    if (normalized ==
+            _normalizeRegistryName(workforceTechnicalTeamStorageName) ||
+        command.id ==
+            workforceTechnicalTeamId(
+              command.projectId,
+              command.subcontractorId,
+            )) {
+      throw const AgendaValidationFailure(
+        'Bu ekip kimliği uygulamaya ayrılmıştır.',
+      );
+    }
     final lead = optionalTrimmed(
       command.leadName,
       'Ekip sorumlusu',
@@ -472,7 +504,7 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           'project_id': command.projectId,
           'subcontractor_id': command.subcontractorId,
           'name': name,
-          'name_normalized': _normalizeRegistryName(name),
+          'name_normalized': normalized,
           'lead_name': lead,
           'note': note,
           'status': WorkforceRecordStatus.active.storageValue,
@@ -513,6 +545,19 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       now,
       (database) => database.transaction((tx) async {
         final current = await _loadTeam(tx, command.id);
+        if (isWorkforceTechnicalTeamLink(
+          projectId: current.projectId,
+          subcontractorId: current.subcontractorId,
+          teamId: current.id,
+        )) {
+          throw const AgendaValidationFailure('Teknik ekip değiştirilemez.');
+        }
+        if (_normalizeRegistryName(name) ==
+            _normalizeRegistryName(workforceTechnicalTeamStorageName)) {
+          throw const AgendaValidationFailure(
+            'Bu ekip adı uygulamaya ayrılmıştır.',
+          );
+        }
         _requireRevision(current.revision, command.expectedRevision);
         if (current.name == name &&
             current.leadName == lead &&
@@ -567,6 +612,15 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       now,
       (database) => database.transaction((tx) async {
         final current = await _loadTeam(tx, command.id);
+        if (isWorkforceTechnicalTeamLink(
+          projectId: current.projectId,
+          subcontractorId: current.subcontractorId,
+          teamId: current.id,
+        )) {
+          throw const AgendaValidationFailure(
+            'Teknik ekip durumu değiştirilemez.',
+          );
+        }
         _requireRevision(current.revision, command.expectedRevision);
         if (current.isActive != command.archive) return current;
         if (command.archive && current.activePersonCount > 0) {
@@ -1208,7 +1262,7 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       'Personel adı',
       maxLength: 200,
     );
-    final requestedTeamName = requiredTrimmed(
+    final requestedTeamName = optionalTrimmed(
       command.teamName,
       'Ekip',
       maxLength: 200,
@@ -1342,7 +1396,7 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       'Personel adı',
       maxLength: 200,
     );
-    final requestedTeamName = requiredTrimmed(
+    final requestedTeamName = optionalTrimmed(
       command.teamName,
       'Ekip',
       maxLength: 200,
@@ -1382,12 +1436,19 @@ class SqliteAttendanceApplication implements AttendanceApplication {
         final startedOn = command.replaceStartedOn
             ? requestedStartedOn
             : member.startedOn;
+        if (command.useTechnicalTeam && command.teamId != null) {
+          throw const AgendaValidationFailure(
+            'Teknik ekip seçimi gerçek ekip kimliğiyle birlikte kullanılamaz.',
+          );
+        }
         final registry = await _resolveRegistrySelection(
           transaction,
           projectId: member.projectId,
           requestedTeamName: requestedTeamName,
           subcontractorId: command.subcontractorId ?? member.subcontractorId,
-          teamId: command.teamId ?? member.teamId,
+          teamId: command.useTechnicalTeam
+              ? null
+              : command.teamId ?? member.teamId,
           timestamp: CseTimeCodec.encodeUtc(now),
         );
         if (member.fullName == fullName &&
@@ -2685,6 +2746,8 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       SELECT
         e.*, m.full_name AS member_name, m.team_name, m.role_name,
         m.personnel_code, m.is_active AS member_is_active, m.team_id,
+        m.project_id AS member_project_id,
+        m.subcontractor_id AS member_subcontractor_id,
         s.name AS subcontractor_name
       FROM attendance_entries e
       JOIN workforce_members m ON m.id = e.workforce_member_id
@@ -2763,7 +2826,40 @@ class SqliteAttendanceApplication implements AttendanceApplication {
     if (rows.isEmpty) {
       throw const AgendaValidationFailure('Taşeron bulunamadı.');
     }
-    return _subcontractorFromRow(rows.single);
+    final row = rows.single;
+    final visibleTeamCounts = await _visibleActiveTeamCounts(
+      database,
+      row['project_id']! as String,
+    );
+    return _subcontractorFromRow({
+      ...row,
+      'active_team_count': visibleTeamCounts[id] ?? 0,
+    });
+  }
+
+  Future<Map<String, int>> _visibleActiveTeamCounts(
+    DatabaseExecutor database,
+    String projectId,
+  ) async {
+    final rows = await database.query(
+      'workforce_teams',
+      columns: ['id', 'project_id', 'subcontractor_id'],
+      where: "project_id = ? AND status = 'active'",
+      whereArgs: [projectId],
+    );
+    final counts = <String, int>{};
+    for (final row in rows) {
+      final subcontractorId = row['subcontractor_id']! as String;
+      if (isWorkforceTechnicalTeamLink(
+        projectId: row['project_id']! as String,
+        subcontractorId: subcontractorId,
+        teamId: row['id'] as String?,
+      )) {
+        continue;
+      }
+      counts.update(subcontractorId, (value) => value + 1, ifAbsent: () => 1);
+    }
+    return counts;
   }
 
   Future<WorkforceTeam> _loadTeam(DatabaseExecutor database, String id) async {
@@ -2788,12 +2884,20 @@ class SqliteAttendanceApplication implements AttendanceApplication {
   Future<_RegistrySelection> _resolveRegistrySelection(
     DatabaseExecutor database, {
     required String projectId,
-    required String requestedTeamName,
+    required String? requestedTeamName,
     required String? subcontractorId,
     required String? teamId,
     required String timestamp,
   }) async {
-    if ((subcontractorId == null) != (teamId == null)) {
+    if (subcontractorId != null && teamId == null) {
+      return _resolveTechnicalTeam(
+        database,
+        projectId: projectId,
+        subcontractorId: subcontractorId,
+        timestamp: timestamp,
+      );
+    }
+    if (subcontractorId == null && teamId != null) {
       throw const AgendaValidationFailure(
         'Taşeron ve ekip birlikte seçilmelidir.',
       );
@@ -2817,7 +2921,12 @@ class SqliteAttendanceApplication implements AttendanceApplication {
 
     // Schema v4 callers remain source compatible. Mobile UI never exposes this
     // free-text compatibility path; it deterministically creates a legacy pair.
-    final normalized = _normalizeRegistryName(requestedTeamName);
+    final legacyTeamName = requiredTrimmed(
+      requestedTeamName ?? '',
+      'Ekip',
+      maxLength: 200,
+    );
+    final normalized = _normalizeRegistryName(legacyTeamName);
     final subcontractorStableId = _stableUuid(
       'legacy-subcontractor:$projectId:$normalized',
     );
@@ -2836,7 +2945,7 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       await database.insert('subcontractors', {
         'id': resolvedSubcontractorId,
         'project_id': projectId,
-        'name': requestedTeamName,
+        'name': legacyTeamName,
         'name_normalized': normalized,
         'status': 'active',
         'revision': 1,
@@ -2871,7 +2980,7 @@ class SqliteAttendanceApplication implements AttendanceApplication {
         'id': resolvedTeamId,
         'project_id': projectId,
         'subcontractor_id': resolvedSubcontractorId,
-        'name': requestedTeamName,
+        'name': legacyTeamName,
         'name_normalized': normalized,
         'status': 'active',
         'revision': 1,
@@ -2893,6 +3002,114 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       await _loadSubcontractor(database, resolvedSubcontractorId),
       await _loadTeam(database, resolvedTeamId),
     );
+  }
+
+  Future<_RegistrySelection> _resolveTechnicalTeam(
+    DatabaseExecutor database, {
+    required String projectId,
+    required String subcontractorId,
+    required String timestamp,
+  }) async {
+    validateUuid(subcontractorId, 'Taşeron kimliği');
+    final subcontractor = await _loadSubcontractor(database, subcontractorId);
+    if (subcontractor.projectId != projectId || !subcontractor.isActive) {
+      throw const AgendaValidationFailure(
+        'Personel yalnız aktif ve aynı projedeki taşerona bağlanabilir.',
+      );
+    }
+    final teamId = workforceTechnicalTeamId(projectId, subcontractorId);
+    final normalized = _normalizeRegistryName(
+      workforceTechnicalTeamStorageName,
+    );
+    final idRows = await database.query(
+      'workforce_teams',
+      where: 'id = ?',
+      whereArgs: [teamId],
+      limit: 1,
+    );
+    final nameRows = await database.query(
+      'workforce_teams',
+      columns: ['id'],
+      where: 'subcontractor_id = ? AND name_normalized = ?',
+      whereArgs: [subcontractorId, normalized],
+      limit: 1,
+    );
+    if (idRows.isNotEmpty) {
+      final row = idRows.single;
+      final expectedEventId = _stableUuid('technical-team-created:v1:$teamId');
+      final eventRows = await database.query(
+        'workforce_events',
+        where: 'aggregate_type = ? AND aggregate_id = ?',
+        whereArgs: ['team', teamId],
+      );
+      final event = eventRows.singleOrNull;
+      final payload = event == null
+          ? null
+          : jsonDecode(event['payload_json']! as String);
+      final exact =
+          row['project_id'] == projectId &&
+          row['subcontractor_id'] == subcontractorId &&
+          row['name'] == workforceTechnicalTeamStorageName &&
+          row['name_normalized'] == normalized &&
+          row['lead_name'] == null &&
+          row['note'] == null &&
+          row['status'] == WorkforceRecordStatus.active.storageValue &&
+          row['revision'] == 1 &&
+          row['archived_at'] == null &&
+          row['created_at'] == row['updated_at'] &&
+          nameRows.length == 1 &&
+          nameRows.single['id'] == teamId &&
+          eventRows.length == 1 &&
+          event?['id'] == expectedEventId &&
+          event?['project_id'] == projectId &&
+          event?['sequence'] == 1 &&
+          event?['event_type'] == 'team.created' &&
+          event?['occurred_at'] == row['created_at'] &&
+          payload is Map &&
+          payload['subcontractor_id'] == subcontractorId &&
+          payload['technical_default_version'] == 1;
+      if (!exact) {
+        throw const AgendaValidationFailure(
+          'Teknik ekip kimliği güvenli içerikle eşleşmiyor.',
+        );
+      }
+      return _RegistrySelection(
+        subcontractor,
+        await _loadTeam(database, teamId),
+      );
+    }
+    if (nameRows.isNotEmpty) {
+      throw const AgendaValidationFailure(
+        'Teknik ekip adı mevcut bir ekiple çakışıyor.',
+      );
+    }
+    await database.insert('workforce_teams', {
+      'id': teamId,
+      'project_id': projectId,
+      'subcontractor_id': subcontractorId,
+      'name': workforceTechnicalTeamStorageName,
+      'name_normalized': normalized,
+      'lead_name': null,
+      'note': null,
+      'status': WorkforceRecordStatus.active.storageValue,
+      'revision': 1,
+      'created_at': timestamp,
+      'updated_at': timestamp,
+    });
+    await _insertWorkforceEvent(
+      database,
+      id: _stableUuid('technical-team-created:v1:$teamId'),
+      type: 'team',
+      aggregateId: teamId,
+      projectId: projectId,
+      eventType: 'team.created',
+      occurredAt: timestamp,
+      payload: {
+        'subcontractor_id': subcontractorId,
+        'technical_default_version': 1,
+      },
+    );
+    return _RegistrySelection(subcontractor, await _loadTeam(database, teamId));
   }
 
   Future<void> _insertWorkforceEvent(
@@ -3351,6 +3568,12 @@ AttendanceDay _dayFromRow(Map<String, Object?> row) {
 AttendanceEntry _entryFromRow(Map<String, Object?> row) {
   final createdAt = row['created_at']! as String;
   final updatedAt = row['updated_at']! as String;
+  final storedTeamName = row['team_name']! as String;
+  final technicalTeam = isWorkforceTechnicalTeamLink(
+    projectId: row['member_project_id']! as String,
+    subcontractorId: row['member_subcontractor_id'] as String?,
+    teamId: row['team_id'] as String?,
+  );
   validateCanonicalTimestamp(createdAt, 'Puantaj entry oluşturma zamanı');
   validateCanonicalTimestamp(updatedAt, 'Puantaj entry güncelleme zamanı');
   return AttendanceEntry(
@@ -3358,7 +3581,9 @@ AttendanceEntry _entryFromRow(Map<String, Object?> row) {
     attendanceDayId: row['attendance_day_id']! as String,
     memberId: row['workforce_member_id']! as String,
     memberName: row['member_name']! as String,
-    teamName: row['team_name']! as String,
+    teamName: technicalTeam
+        ? (row['subcontractor_name'] as String? ?? 'Ekip belirtilmedi')
+        : storedTeamName,
     teamId: row['team_id'] as String?,
     subcontractorName: row['subcontractor_name'] as String?,
     roleName: row['role_name']! as String,

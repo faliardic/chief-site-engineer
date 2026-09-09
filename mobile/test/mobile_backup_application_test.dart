@@ -334,6 +334,104 @@ void main() {
   });
 
   test(
+    'Q04-A2 unchanged-schema backup round-trip preserves technical linkage and event',
+    () async {
+      const project = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+      const firm = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+      const firstMember = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+      const secondMember = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
+      final agenda = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      final attendance = SqliteAttendanceApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+        agenda: agenda,
+      );
+      await agenda.createProject(
+        const CreateProjectCommand(id: project, name: 'Teknik ekip yedeği'),
+      );
+      await attendance.createSubcontractor(
+        const CreateSubcontractorCommand(
+          id: firm,
+          eventId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1',
+          projectId: project,
+          name: 'Atlas Yapı',
+        ),
+      );
+      final member = await attendance.createMember(
+        const CreateWorkforceMemberCommand(
+          id: firstMember,
+          projectId: project,
+          subcontractorId: firm,
+          fullName: 'Ekipsiz Ali',
+          roleName: 'Usta',
+        ),
+      );
+      final technicalId = workforceTechnicalTeamId(project, firm);
+      expect(member.teamId, technicalId);
+
+      final backup = _application(directories, gateway: gateway);
+      final created = await backup.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      await attendance.createMember(
+        const CreateWorkforceMemberCommand(
+          id: secondMember,
+          projectId: project,
+          subcontractorId: firm,
+          fullName: 'Sonradan eklenen',
+          roleName: 'Usta',
+        ),
+      );
+      final preflight = await backup.preflightBackup(
+        created.package,
+        _password,
+      );
+      expect(preflight.migratedSchemaVersion, AppDatabase.schemaVersion);
+      await backup.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: created.package,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+
+      final restoredMembers = await attendance.listMembers(project);
+      expect(restoredMembers.map((item) => item.id), [firstMember]);
+      expect(restoredMembers.single.teamId, technicalId);
+      expect(await attendance.listTeams(project), isEmpty);
+      final raw = await _openRaw(directories);
+      expect(await raw.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      expect(
+        Sqflite.firstIntValue(
+          await raw.rawQuery(
+            'SELECT count(*) FROM workforce_teams WHERE id = ?',
+            [technicalId],
+          ),
+        ),
+        1,
+      );
+      expect(
+        Sqflite.firstIntValue(
+          await raw.rawQuery(
+            "SELECT count(*) FROM workforce_events WHERE aggregate_type = 'team' AND aggregate_id = ? AND event_type = 'team.created'",
+            [technicalId],
+          ),
+        ),
+        1,
+      );
+      await raw.close();
+    },
+  );
+
+  test(
     'format 1 backup round-trips Project Profile fields order archive and events',
     () async {
       const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';

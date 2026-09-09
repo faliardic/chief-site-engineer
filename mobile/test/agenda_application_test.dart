@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -7,6 +8,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/agenda_photo_export_gateway.dart';
+import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -2878,6 +2880,555 @@ void main() {
       expect(detail.log.observedAt, '2026-07-19T07:00:00Z');
     },
   );
+  test(
+    'NB-01 concurrent pending hang is single-flight and never infers empty',
+    () async {
+      await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(744001),
+          title: 'Bounded pending',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T09:00:00Z',
+        ),
+      );
+      final gateway = _BoundedNotificationGateway(hangPendingOnce: true);
+      final controlled = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: gateway,
+        notificationPerAwaitLimit: const Duration(milliseconds: 20),
+        notificationTotalLimit: const Duration(milliseconds: 100),
+        notificationDiagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+      );
+
+      final first = controlled.reconcileNotifications();
+      final concurrent = controlled.reconcileNotifications();
+      await Future.wait([first, concurrent]);
+
+      expect(gateway.pendingCalls, 1);
+      expect(gateway.cancelCalls, 0);
+      expect(gateway.scheduleCalls, 0);
+      var detail = await controlled.getReminderLifecycleDetail(reminder1);
+      expect(detail.notification.syncState, NotificationSyncState.failed);
+      expect(
+        detail.notification.safeErrorCode,
+        'native_result_unknown_timeout',
+      );
+
+      gateway.pendingCompleter.complete(const []);
+      await Future<void>.delayed(Duration.zero);
+      expect(gateway.cancelCalls, 0);
+      expect(gateway.scheduleCalls, 0);
+
+      await controlled.reconcileNotifications();
+      detail = await controlled.getReminderLifecycleDetail(reminder1);
+      expect(detail.notification.syncState, NotificationSyncState.scheduled);
+      expect(detail.notification.safeErrorCode, isNull);
+      expect(gateway.scheduleCalls, 1);
+    },
+  );
+
+  test(
+    'NB-01 mutation during native await rejects stale binding and event writes',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(744003),
+          title: 'Mutation wins',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T09:00:00Z',
+        ),
+      );
+      final gateway = _BoundedNotificationGateway(hangScheduleOnce: true);
+      final controlled = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: gateway,
+        notificationPerAwaitLimit: const Duration(seconds: 2),
+        notificationTotalLimit: const Duration(seconds: 8),
+        notificationDiagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+      );
+
+      final reconciliation = controlled.reconcileNotifications();
+      for (
+        var attempt = 0;
+        attempt < 100 && gateway.scheduleCalls == 0;
+        attempt += 1
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(gateway.scheduleCalls, 1);
+
+      final mutation = controlled.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder1,
+          eventId: eventId(744004),
+          expectedRevision: created.revision,
+          action: ReminderMutationAction.complete,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      gateway.scheduleCompleter.complete();
+      await Future.wait([reconciliation, mutation]);
+
+      final detail = await controlled.getReminderLifecycleDetail(reminder1);
+      expect(detail.reminder.status, ReminderStatus.completed);
+      expect(detail.notification.syncState, NotificationSyncState.cancelled);
+      expect(detail.notification.scheduledFor, isNull);
+      expect(gateway.scheduleCalls, 1);
+      expect(gateway.cancelCalls, 2);
+      final events = await controlled.listReminderEvents(reminder1);
+      expect(
+        events.where((event) => event.eventType == 'notification_scheduled'),
+        isEmpty,
+      );
+      expect(
+        events.where((event) => event.eventType == 'notification_cancelled'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'NB-01 duplicate reminder mutation preserves an active native run',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(744030),
+          title: 'Duplicate mutation',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T09:00:00Z',
+        ),
+      );
+      final command = MutateReminderCommand(
+        reminderId: reminder1,
+        eventId: eventId(744031),
+        expectedRevision: created.revision,
+        action: ReminderMutationAction.snoozeTomorrowMorning,
+      );
+      final snoozed = await agenda.mutateReminder(command);
+      expect(snoozed.revision, created.revision + 1);
+
+      final gateway = _BoundedNotificationGateway(hangScheduleOnce: true);
+      final controlled = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: gateway,
+        notificationPerAwaitLimit: const Duration(seconds: 2),
+        notificationTotalLimit: const Duration(seconds: 8),
+        notificationDiagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+      );
+
+      final activeRun = controlled.reconcileNotifications();
+      for (
+        var attempt = 0;
+        attempt < 100 && gateway.scheduleCalls == 0;
+        attempt += 1
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(gateway.scheduleCalls, 1);
+
+      final duplicate = await controlled.mutateReminder(command);
+      expect(duplicate.revision, snoozed.revision);
+      expect(gateway.scheduleCalls, 1);
+      var events = await controlled.listReminderEvents(reminder1);
+      expect(
+        events.where((event) => event.eventType == 'notification_scheduled'),
+        isEmpty,
+      );
+
+      gateway.scheduleCompleter.complete();
+      await activeRun;
+
+      expect(gateway.scheduleCalls, 1);
+      final detail = await controlled.getReminderLifecycleDetail(reminder1);
+      expect(detail.reminder.revision, snoozed.revision);
+      expect(detail.notification.syncState, NotificationSyncState.scheduled);
+      expect(detail.notification.safeErrorCode, isNull);
+      expect(
+        gateway.pending.single.requestFingerprint,
+        reminderNotificationRequestFingerprint(
+          gateway.scheduledRequests.single,
+          exact: true,
+        ),
+      );
+      events = await controlled.listReminderEvents(reminder1);
+      expect(
+        events.where((event) => event.eventType == 'notification_scheduled'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'NB-01 stale revision mutation preserves an active native run',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(744032),
+          title: 'Rejected mutation',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T09:00:00Z',
+        ),
+      );
+      final gateway = _BoundedNotificationGateway(hangScheduleOnce: true);
+      final controlled = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: gateway,
+        notificationPerAwaitLimit: const Duration(seconds: 2),
+        notificationTotalLimit: const Duration(seconds: 8),
+        notificationDiagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+      );
+
+      final activeRun = controlled.reconcileNotifications();
+      for (
+        var attempt = 0;
+        attempt < 100 && gateway.scheduleCalls == 0;
+        attempt += 1
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(gateway.scheduleCalls, 1);
+
+      await expectLater(
+        controlled.mutateReminder(
+          MutateReminderCommand(
+            reminderId: reminder1,
+            eventId: eventId(744033),
+            expectedRevision: created.revision + 1,
+            action: ReminderMutationAction.complete,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(gateway.scheduleCalls, 1);
+      var events = await controlled.listReminderEvents(reminder1);
+      expect(
+        events.where((event) => event.eventType == 'notification_scheduled'),
+        isEmpty,
+      );
+
+      gateway.scheduleCompleter.complete();
+      await activeRun;
+
+      expect(gateway.scheduleCalls, 1);
+      final detail = await controlled.getReminderLifecycleDetail(reminder1);
+      expect(detail.reminder.revision, created.revision);
+      expect(detail.reminder.status, ReminderStatus.active);
+      expect(detail.notification.syncState, NotificationSyncState.scheduled);
+      expect(detail.notification.safeErrorCode, isNull);
+      events = await controlled.listReminderEvents(reminder1);
+      expect(
+        events.where((event) => event.eventType == 'notification_scheduled'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'NB-01 rejected reminder creation preserves an active native run',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(744034),
+          title: 'Existing reminder',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T09:00:00Z',
+        ),
+      );
+      final gateway = _BoundedNotificationGateway(hangScheduleOnce: true);
+      final controlled = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: gateway,
+        notificationPerAwaitLimit: const Duration(seconds: 2),
+        notificationTotalLimit: const Duration(seconds: 8),
+        notificationDiagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+      );
+
+      final activeRun = controlled.reconcileNotifications();
+      for (
+        var attempt = 0;
+        attempt < 100 && gateway.scheduleCalls == 0;
+        attempt += 1
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(gateway.scheduleCalls, 1);
+
+      await expectLater(
+        controlled.createReminder(
+          CreateReminderCommand(
+            id: reminder2,
+            eventId: eventId(744035),
+            projectId: project2,
+            title: 'Rejected create',
+            kind: ReminderKind.action,
+            schedule: ReminderScheduleKind.custom,
+            customAttentionAt: '2026-07-20T10:00:00Z',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(gateway.scheduleCalls, 1);
+      var events = await controlled.listReminderEvents(reminder1);
+      expect(
+        events.where((event) => event.eventType == 'notification_scheduled'),
+        isEmpty,
+      );
+
+      gateway.scheduleCompleter.complete();
+      await activeRun;
+
+      expect(gateway.scheduleCalls, 1);
+      final detail = await controlled.getReminderLifecycleDetail(reminder1);
+      expect(detail.reminder.revision, created.revision);
+      expect(detail.notification.syncState, NotificationSyncState.scheduled);
+      expect(detail.notification.safeErrorCode, isNull);
+      events = await controlled.listReminderEvents(reminder1);
+      expect(
+        events.where((event) => event.eventType == 'notification_scheduled'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'NB-01 agenda sync replaces a stale native run with committed current truth',
+    () async {
+      await createLog(
+        id: log1,
+        event: 744010,
+        observedAt: '2026-07-20T07:00:00Z',
+        description: 'Yeni saha başlığı',
+        notes: 'Yeni saha açıklaması',
+      );
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(744011),
+          projectId: project1,
+          sourceLogId: log1,
+          title: 'Eski saha başlığı',
+          description: 'Eski saha açıklaması',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T09:00:00Z',
+        ),
+      );
+      final gateway = _BoundedNotificationGateway(hangScheduleOnce: true);
+      final controlled = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: gateway,
+        notificationPerAwaitLimit: const Duration(seconds: 2),
+        notificationTotalLimit: const Duration(seconds: 8),
+        notificationDiagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+      );
+
+      final staleRun = controlled.reconcileNotifications();
+      for (
+        var attempt = 0;
+        attempt < 100 && gateway.scheduleCalls == 0;
+        attempt += 1
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(gateway.scheduledRequests.single.title, 'Eski saha başlığı');
+
+      final sync = controlled.syncAgendaToReminder(
+        syncCommand(
+          operation: 744012,
+          sourceEvent: 744013,
+          targetEvent: 744014,
+          targetRevision: created.revision,
+          fields: const {
+            AgendaReminderSyncField.title,
+            AgendaReminderSyncField.description,
+          },
+        ),
+      );
+      ReminderDetail? committed;
+      for (var attempt = 0; attempt < 100; attempt += 1) {
+        committed = await controlled.getReminderLifecycleDetail(reminder1);
+        if (committed.reminder.revision == created.revision + 1) break;
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(committed?.reminder.title, 'Yeni saha başlığı');
+      expect(gateway.scheduleCalls, 1);
+
+      gateway.scheduleCompleter.complete();
+      final result = await sync;
+      await staleRun;
+
+      expect(result.changed, isTrue);
+      expect(result.idempotent, isFalse);
+      expect(gateway.scheduleCalls, 2);
+      expect(gateway.scheduledRequests.map((request) => request.title), [
+        'Eski saha başlığı',
+        'Yeni saha başlığı',
+      ]);
+      expect(gateway.scheduledRequests.last.body, 'Yeni saha açıklaması');
+      expect(
+        gateway.pending.single.requestFingerprint,
+        reminderNotificationRequestFingerprint(
+          gateway.scheduledRequests.last,
+          exact: true,
+        ),
+      );
+      final detail = await controlled.getReminderLifecycleDetail(reminder1);
+      expect(detail.notification.syncState, NotificationSyncState.scheduled);
+      expect(detail.notification.safeErrorCode, isNull);
+      final events = await controlled.listReminderEvents(reminder1);
+      expect(
+        events.where((event) => event.eventType == 'notification_scheduled'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'NB-01 no-op and rejected sync preserve an active notification run',
+    () async {
+      await createLog(
+        id: log1,
+        event: 744020,
+        observedAt: '2026-07-20T07:00:00Z',
+        description: 'Değişmeyen başlık',
+      );
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(744021),
+          projectId: project1,
+          sourceLogId: log1,
+          title: 'Değişmeyen başlık',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T09:00:00Z',
+        ),
+      );
+      final gateway = _BoundedNotificationGateway(hangScheduleOnce: true);
+      final controlled = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: gateway,
+        notificationPerAwaitLimit: const Duration(seconds: 2),
+        notificationTotalLimit: const Duration(seconds: 8),
+        notificationDiagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+      );
+
+      final activeRun = controlled.reconcileNotifications();
+      for (
+        var attempt = 0;
+        attempt < 100 && gateway.scheduleCalls == 0;
+        attempt += 1
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      final noOp = await controlled.syncAgendaToReminder(
+        syncCommand(
+          operation: 744022,
+          sourceEvent: 744023,
+          targetEvent: 744024,
+          targetRevision: created.revision,
+        ),
+      );
+      expect(noOp.changed, isFalse);
+      await expectLater(
+        controlled.syncAgendaToReminder(
+          syncCommand(
+            operation: 744025,
+            sourceEvent: 744026,
+            targetEvent: 744027,
+            targetRevision: created.revision + 1,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+
+      gateway.scheduleCompleter.complete();
+      await activeRun;
+
+      expect(gateway.scheduleCalls, 1);
+      final detail = await controlled.getReminderLifecycleDetail(reminder1);
+      expect(detail.notification.syncState, NotificationSyncState.scheduled);
+      expect(detail.notification.safeErrorCode, isNull);
+      final events = await controlled.listReminderEvents(reminder1);
+      expect(
+        events.where((event) => event.eventType == 'notification_scheduled'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'NB-01 late schedule cannot verify or write success until next safe pass',
+    () async {
+      await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(744002),
+          title: 'Late native schedule',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T09:00:00Z',
+        ),
+      );
+      final gateway = _BoundedNotificationGateway(hangScheduleOnce: true);
+      final controlled = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: gateway,
+        notificationPerAwaitLimit: const Duration(milliseconds: 20),
+        notificationTotalLimit: const Duration(milliseconds: 100),
+        notificationDiagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+      );
+
+      await controlled.reconcileNotifications();
+
+      expect(gateway.scheduleCalls, 1);
+      expect(gateway.pendingCalls, 1);
+      var detail = await controlled.getReminderLifecycleDetail(reminder1);
+      expect(detail.notification.syncState, NotificationSyncState.failed);
+      expect(
+        detail.notification.safeErrorCode,
+        'native_result_unknown_timeout',
+      );
+
+      gateway.scheduleCompleter.complete();
+      await Future<void>.delayed(Duration.zero);
+      expect(gateway.pendingCalls, 1);
+      detail = await controlled.getReminderLifecycleDetail(reminder1);
+      expect(detail.notification.syncState, NotificationSyncState.failed);
+
+      await controlled.reconcileNotifications();
+      detail = await controlled.getReminderLifecycleDetail(reminder1);
+      expect(detail.notification.syncState, NotificationSyncState.scheduled);
+      expect(detail.notification.safeErrorCode, isNull);
+      expect(gateway.scheduleCalls, 2);
+    },
+  );
 }
 
 Future<int> _countRows(String path, String table) async {
@@ -2943,5 +3494,71 @@ class _RecordingAgendaPhotoExportGateway implements AgendaPhotoExportGateway {
   @override
   Future<void> share(AgendaPhotoExportRequest request) async {
     sharedRequests.add(request);
+  }
+}
+
+class _BoundedNotificationGateway extends UnavailableReminderNotificationGateway
+    implements FingerprintedReminderNotificationGateway {
+  _BoundedNotificationGateway({
+    this.hangPendingOnce = false,
+    this.hangScheduleOnce = false,
+  });
+
+  final bool hangPendingOnce;
+  final bool hangScheduleOnce;
+  final Completer<List<PendingReminderNotification>> pendingCompleter =
+      Completer<List<PendingReminderNotification>>();
+  final Completer<void> scheduleCompleter = Completer<void>();
+  final List<PendingReminderNotification> pending = [];
+  final List<ReminderNotificationRequest> scheduledRequests = [];
+  var pendingCalls = 0;
+  var cancelCalls = 0;
+  var scheduleCalls = 0;
+  var _pendingHung = false;
+  var _scheduleHung = false;
+
+  @override
+  int get maximumPendingNotifications => 60;
+
+  @override
+  Future<NotificationPermissionState> permissionStatus() async =>
+      NotificationPermissionState.granted;
+
+  @override
+  Future<List<PendingReminderNotification>> pendingNotifications() {
+    pendingCalls += 1;
+    if (hangPendingOnce && !_pendingHung) {
+      _pendingHung = true;
+      return pendingCompleter.future;
+    }
+    return Future.value(List.unmodifiable(pending));
+  }
+
+  @override
+  Future<void> cancel(int platformId) async {
+    cancelCalls += 1;
+    pending.removeWhere((item) => item.platformId == platformId);
+  }
+
+  @override
+  Future<void> schedule(ReminderNotificationRequest request) async {
+    scheduleCalls += 1;
+    scheduledRequests.add(request);
+    if (hangScheduleOnce && !_scheduleHung) {
+      _scheduleHung = true;
+      await scheduleCompleter.future;
+    }
+    pending
+      ..removeWhere((item) => item.platformId == request.platformId)
+      ..add(
+        PendingReminderNotification(
+          platformId: request.platformId,
+          reminderId: request.reminderId,
+          requestFingerprint: reminderNotificationRequestFingerprint(
+            request,
+            exact: true,
+          ),
+        ),
+      );
   }
 }

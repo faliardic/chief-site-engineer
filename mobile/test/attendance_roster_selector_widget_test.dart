@@ -145,6 +145,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Arşivli Usta (pasif)'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('attendance-add-people')));
+      await tester.pumpAndSettle();
       await _selectSubcontractor(tester, 'Taşeron A');
 
       expect(
@@ -159,7 +161,7 @@ void main() {
     },
   );
 
-  testWidgets('zero active team is an explicit fail-closed state', (
+  testWidgets('Q04-A2 zero active team allows no-team inline person create', (
     tester,
   ) async {
     final attendance = FakeAttendanceApplication(detail: _detail())
@@ -167,15 +169,35 @@ void main() {
     await _pumpPage(tester, attendance);
     await _selectSubcontractor(tester, 'Taşeron A');
 
-    expect(find.byKey(const Key('attendance-no-active-team')), findsOneWidget);
+    expect(find.byKey(const Key('attendance-no-active-team')), findsNothing);
     final button = tester.widget<OutlinedButton>(
       find.byKey(const Key('attendance-new-member')),
     );
-    expect(button.onPressed, isNull);
-    expect(attendance.createMemberCalls, 0);
+    expect(button.onPressed, isNotNull);
+    await tester.tap(find.byKey(const Key('attendance-new-member')));
+    await tester.pumpAndSettle();
+    expect(find.text('Ekip belirtilmedi'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('attendance-inline-member-name')),
+      'Ekipsiz Usta',
+    );
+    await tester.enterText(
+      find.byKey(const Key('attendance-inline-member-role')),
+      'Usta',
+    );
+    await tester.tap(find.byKey(const Key('save-attendance-inline-member')));
+    await tester.pumpAndSettle();
+
+    expect(attendance.createMemberCalls, 1);
+    expect(
+      attendance.lastCreateMemberCommand!.subcontractorId,
+      subcontractorAId,
+    );
+    expect(attendance.lastCreateMemberCommand!.teamId, isNull);
+    expect(attendance.lastCreateMemberCommand!.teamName, isNull);
   });
 
-  testWidgets('multiple active teams require an explicit inline selection', (
+  testWidgets('Q04-A2 explicit inline team selection keeps existing behavior', (
     tester,
   ) async {
     final attendance = _attendance();
@@ -192,11 +214,6 @@ void main() {
       find.byKey(const Key('attendance-inline-member-role')),
       'Usta',
     );
-    await tester.tap(find.byKey(const Key('save-attendance-inline-member')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Aktif ekip seçilmelidir.'), findsOneWidget);
-    expect(attendance.createMemberCalls, 0);
     await _selectInlineTeam(tester, 'Ekip A2');
     await tester.tap(find.byKey(const Key('save-attendance-inline-member')));
     await tester.pumpAndSettle();
@@ -225,6 +242,7 @@ void main() {
       await _selectSubcontractor(tester, 'Taşeron A');
       await tester.tap(find.byKey(const Key('attendance-new-member')));
       await tester.pumpAndSettle();
+      await _selectInlineTeam(tester, 'Ekip A1');
 
       await tester.enterText(
         find.byKey(const Key('attendance-inline-member-name')),
@@ -477,7 +495,17 @@ Future<void> _selectSubcontractor(WidgetTester tester, String name) async {
     of: find.byKey(const Key('attendance-subcontractor-selector')),
     matching: find.byType(DropdownButtonFormField<String>),
   );
-  await tester.ensureVisible(dropdown);
+  await tester.scrollUntilVisible(
+    dropdown,
+    260,
+    scrollable: find
+        .descendant(
+          of: find.byKey(const Key('attendance-day-detail')),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+    maxScrolls: 12,
+  );
   await tester.tap(dropdown);
   await tester.pumpAndSettle();
   await tester.tap(find.text(name).last);

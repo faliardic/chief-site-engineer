@@ -217,6 +217,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
   Future<void> _pickTeam() async {
     final byId = <String, WorkforceMember>{};
     for (final member in _allMembers.where((item) => item.isActive)) {
+      if (_usesTechnicalTeam(member)) continue;
       byId.putIfAbsent(member.teamId ?? member.teamName, () => member);
     }
     final teams = byId.entries.toList()
@@ -271,9 +272,12 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
           (member) =>
               member.isActive &&
               member.subcontractorId == subcontractorId &&
-              member.teamId != null &&
-              activeTeamIds.contains(member.teamId) &&
-              (_selectedTeamId == null || member.teamId == _selectedTeamId) &&
+              (_usesTechnicalTeam(member)
+                  ? _selectedTeamId == null
+                  : member.teamId != null &&
+                        activeTeamIds.contains(member.teamId) &&
+                        (_selectedTeamId == null ||
+                            member.teamId == _selectedTeamId)) &&
               !selectedIds.contains(member.id),
         )
         .toList(growable: false);
@@ -341,13 +345,6 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
         .where((item) => item.id == subcontractorId)
         .firstOrNull;
     if (detail == null || subcontractor == null || _submitting) return;
-    if (_teams.isEmpty) {
-      setState(
-        () => _error =
-            'Bu taşeronun aktif ekibi yok. Önce Sicil’den aktif ekip oluşturun.',
-      );
-      return;
-    }
     final member = await showModalBottomSheet<WorkforceMember>(
       context: context,
       isScrollControlled: true,
@@ -586,7 +583,15 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
                                   style: OutlinedButton.styleFrom(
                                     minimumSize: const Size(48, 48),
                                   ),
-                                  onPressed: _submitting ? null : _pickTeam,
+                                  onPressed:
+                                      _submitting ||
+                                          !_allMembers.any(
+                                            (member) =>
+                                                member.isActive &&
+                                                !_usesTechnicalTeam(member),
+                                          )
+                                      ? null
+                                      : _pickTeam,
                                   icon: const Icon(Icons.groups_outlined),
                                   label: const Text('Ekibi tam gün'),
                                 ),
@@ -803,7 +808,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
             if (_subcontractors.isEmpty) ...[
               const SizedBox(height: 8),
               const Text(
-                'Aktif işveren yok. Önce Sicil’den işveren ve ekip oluşturun.',
+                'Aktif işveren yok. Önce Sicil’den işveren oluşturun.',
               ),
             ],
             if (subcontractorId != null) ...[
@@ -847,57 +852,47 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                if (_teams.isEmpty)
-                  const Text(
-                    'Bu işverenin aktif ekibi yok. Yeni personel için önce '
-                    'Sicil’den aktif ekip oluşturun.',
-                    key: Key('attendance-no-active-team'),
-                  ),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: OutlinedButton.icon(
                     key: const Key('attendance-new-member'),
-                    onPressed: _submitting || _teams.isEmpty
-                        ? null
-                        : _createInlineMember,
+                    onPressed: _submitting ? null : _createInlineMember,
                     icon: const Icon(Icons.person_add_alt_1_outlined),
                     label: const Text('+ Yeni eleman'),
                   ),
                 ),
-                if (_teams.isNotEmpty) ...[
-                  const Divider(),
-                  Text(
-                    'Aday personeller (${candidates.length})',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  if (candidates.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        'Bu filtrede rostere eklenebilecek aktif personel yok.',
+                const Divider(),
+                Text(
+                  'Aday personeller (${candidates.length})',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                if (candidates.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Bu filtrede rostere eklenebilecek aktif personel yok.',
+                    ),
+                  )
+                else
+                  ...candidates.map(
+                    (member) => ListTile(
+                      key: Key('attendance-candidate-${member.id}'),
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(member.fullName),
+                      subtitle: Text(
+                        '${_usesTechnicalTeam(member) ? '' : '${member.teamName} • '}${member.roleName}'
+                        '${member.phone == null ? '' : ' • ${member.phone}'}',
                       ),
-                    )
-                  else
-                    ...candidates.map(
-                      (member) => ListTile(
-                        key: Key('attendance-candidate-${member.id}'),
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(member.fullName),
-                        subtitle: Text(
-                          '${member.teamName} • ${member.roleName}'
-                          '${member.phone == null ? '' : ' • ${member.phone}'}',
-                        ),
-                        trailing: IconButton(
-                          key: Key('add-attendance-member-${member.id}'),
-                          tooltip: 'Rostere ekle',
-                          onPressed: _submitting
-                              ? null
-                              : () => _addDraftMember(member),
-                          icon: const Icon(Icons.add_circle_outline),
-                        ),
+                      trailing: IconButton(
+                        key: Key('add-attendance-member-${member.id}'),
+                        tooltip: 'Rostere ekle',
+                        onPressed: _submitting
+                            ? null
+                            : () => _addDraftMember(member),
+                        icon: const Icon(Icons.add_circle_outline),
                       ),
                     ),
-                ],
+                  ),
               ],
             ],
           ],
@@ -922,8 +917,10 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
               child: Text(
-                '${group.value.first.teamName} — '
-                '${group.value.first.subcontractorName ?? 'Tanımsız taşeron'}',
+                _usesTechnicalTeam(group.value.first)
+                    ? group.value.first.subcontractorName ?? 'Tanımsız taşeron'
+                    : '${group.value.first.teamName} — '
+                          '${group.value.first.subcontractorName ?? 'Tanımsız taşeron'}',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
@@ -977,13 +974,14 @@ class _InlineWorkforceMemberSheet extends StatefulWidget {
 
 class _InlineWorkforceMemberSheetState
     extends State<_InlineWorkforceMemberSheet> {
+  static const _noTeam = '__no_explicit_team__';
   late final String _memberId;
   late final String _eventId;
   final TextEditingController _name = TextEditingController();
   final TextEditingController _role = TextEditingController();
   final TextEditingController _phone = TextEditingController();
   final TextEditingController _personnelCode = TextEditingController();
-  String? _teamId;
+  String? _teamId = _noTeam;
   bool _submitting = false;
   String? _error;
 
@@ -992,7 +990,6 @@ class _InlineWorkforceMemberSheetState
     super.initState();
     _memberId = RecordId.randomUuid();
     _eventId = RecordId.randomUuid();
-    if (widget.teams.length == 1) _teamId = widget.teams.single.id;
   }
 
   @override
@@ -1007,10 +1004,6 @@ class _InlineWorkforceMemberSheetState
   Future<void> _submit() async {
     if (_submitting) return;
     final team = widget.teams.where((item) => item.id == _teamId).firstOrNull;
-    if (team == null) {
-      setState(() => _error = 'Aktif ekip seçilmelidir.');
-      return;
-    }
     setState(() {
       _submitting = true;
       _error = null;
@@ -1022,9 +1015,9 @@ class _InlineWorkforceMemberSheetState
           eventId: _eventId,
           projectId: widget.projectId,
           subcontractorId: widget.subcontractor.id,
-          teamId: team.id,
+          teamId: team?.id,
           fullName: _name.text,
-          teamName: team.name,
+          teamName: team?.name,
           roleName: _role.text,
           phone: _phone.text,
           personnelCode: _personnelCode.text,
@@ -1078,17 +1071,19 @@ class _InlineWorkforceMemberSheetState
               initialValue: _teamId,
               isExpanded: true,
               decoration: const InputDecoration(
-                labelText: 'Ekip *',
+                labelText: 'Ekip (opsiyonel)',
                 border: OutlineInputBorder(),
               ),
-              items: widget.teams
-                  .map(
-                    (item) => DropdownMenuItem(
-                      value: item.id,
-                      child: Text(item.name),
-                    ),
-                  )
-                  .toList(growable: false),
+              items: [
+                const DropdownMenuItem(
+                  value: _noTeam,
+                  child: Text('Ekip belirtilmedi'),
+                ),
+                ...widget.teams.map(
+                  (item) =>
+                      DropdownMenuItem(value: item.id, child: Text(item.name)),
+                ),
+              ],
               onChanged: _submitting
                   ? null
                   : (value) => setState(() => _teamId = value),
@@ -1251,8 +1246,10 @@ class _MemberAttendanceCard extends StatelessWidget {
               ],
             ),
             Text(
-              '${member.subcontractorName ?? 'Tanımsız taşeron'} • '
-              '${member.teamName}',
+              _usesTechnicalTeam(member)
+                  ? member.subcontractorName ?? 'Tanımsız taşeron'
+                  : '${member.subcontractorName ?? 'Tanımsız taşeron'} • '
+                        '${member.teamName}',
             ),
             Text(
               '${member.roleName}'
@@ -1404,3 +1401,9 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
+
+bool _usesTechnicalTeam(WorkforceMember member) => isWorkforceTechnicalTeamLink(
+  projectId: member.projectId,
+  subcontractorId: member.subcontractorId,
+  teamId: member.teamId,
+);
