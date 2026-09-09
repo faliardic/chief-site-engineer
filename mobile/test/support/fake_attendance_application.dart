@@ -46,7 +46,16 @@ class FakeAttendanceApplication implements AttendanceApplication {
           note: item.note,
           status: item.status,
           activeTeamCount: teams
-              .where((team) => team.subcontractorId == item.id && team.isActive)
+              .where(
+                (team) =>
+                    team.subcontractorId == item.id &&
+                    team.isActive &&
+                    !isWorkforceTechnicalTeamLink(
+                      projectId: team.projectId,
+                      subcontractorId: team.subcontractorId,
+                      teamId: team.id,
+                    ),
+              )
               .length,
           activePersonCount: members
               .where(
@@ -148,7 +157,12 @@ class FakeAttendanceApplication implements AttendanceApplication {
             item.projectId == projectId &&
             (subcontractorId == null ||
                 item.subcontractorId == subcontractorId) &&
-            (includeArchived || item.isActive),
+            (includeArchived || item.isActive) &&
+            !isWorkforceTechnicalTeamLink(
+              projectId: item.projectId,
+              subcontractorId: item.subcontractorId,
+              teamId: item.id,
+            ),
       )
       .map(
         (item) => WorkforceTeam(
@@ -248,7 +262,16 @@ class FakeAttendanceApplication implements AttendanceApplication {
   @override
   Future<List<ActiveTeamCount>> listActiveTeamCounts(String projectId) async =>
       teams
-          .where((item) => item.projectId == projectId && item.isActive)
+          .where(
+            (item) =>
+                item.projectId == projectId &&
+                item.isActive &&
+                !isWorkforceTechnicalTeamLink(
+                  projectId: item.projectId,
+                  subcontractorId: item.subcontractorId,
+                  teamId: item.id,
+                ),
+          )
           .map(
             (item) => ActiveTeamCount(
               teamId: item.id,
@@ -515,11 +538,15 @@ class FakeAttendanceApplication implements AttendanceApplication {
     createMemberCalls += 1;
     lastCreateMemberCommand = command;
     if (createMemberFailure case final failure?) throw failure;
+    final subcontractorId = command.subcontractorId;
+    final technicalTeam = subcontractorId != null && command.teamId == null;
     final member = WorkforceMember(
       id: command.id,
       projectId: command.projectId,
       fullName: command.fullName.trim(),
-      teamName: command.teamName.trim(),
+      teamName:
+          command.teamName?.trim() ??
+          (technicalTeam ? workforceTechnicalTeamStorageName : ''),
       roleName: command.roleName.trim(),
       personnelCode: command.personnelCode?.trim(),
       subcontractorId: command.subcontractorId,
@@ -527,7 +554,9 @@ class FakeAttendanceApplication implements AttendanceApplication {
           .where((item) => item.id == command.subcontractorId)
           .firstOrNull
           ?.name,
-      teamId: command.teamId,
+      teamId: technicalTeam
+          ? workforceTechnicalTeamId(command.projectId, subcontractorId)
+          : command.teamId,
       phone: command.phone?.trim(),
       note: command.note?.trim(),
       isActive: true,
@@ -622,7 +651,7 @@ class FakeAttendanceApplication implements AttendanceApplication {
             attendanceDayId: current.day.id,
             memberId: member.id,
             memberName: member.fullName,
-            teamName: member.teamName,
+            teamName: _presentedTeamName(member),
             teamId: member.teamId,
             subcontractorName: member.subcontractorName,
             roleName: member.roleName,
@@ -678,7 +707,7 @@ class FakeAttendanceApplication implements AttendanceApplication {
             attendanceDayId: current.day.id,
             memberId: member.id,
             memberName: member.fullName,
-            teamName: member.teamName,
+            teamName: _presentedTeamName(member),
             teamId: member.teamId,
             subcontractorName: member.subcontractorName,
             roleName: member.roleName,
@@ -769,14 +798,18 @@ class FakeAttendanceApplication implements AttendanceApplication {
   ) async {
     final index = members.indexWhere((item) => item.id == command.id);
     final current = members[index];
+    final subcontractorId = command.subcontractorId ?? current.subcontractorId;
+    final technicalTeam = command.useTechnicalTeam && subcontractorId != null;
     final updated = WorkforceMember(
       id: current.id,
       projectId: current.projectId,
       fullName: command.fullName.trim(),
-      teamName: command.teamName.trim(),
+      teamName: technicalTeam
+          ? workforceTechnicalTeamStorageName
+          : command.teamName?.trim() ?? current.teamName,
       roleName: command.roleName.trim(),
       personnelCode: command.personnelCode?.trim(),
-      subcontractorId: command.subcontractorId ?? current.subcontractorId,
+      subcontractorId: subcontractorId,
       subcontractorName:
           subcontractors
               .where(
@@ -787,7 +820,9 @@ class FakeAttendanceApplication implements AttendanceApplication {
               .firstOrNull
               ?.name ??
           current.subcontractorName,
-      teamId: command.teamId ?? current.teamId,
+      teamId: technicalTeam
+          ? workforceTechnicalTeamId(current.projectId, subcontractorId)
+          : command.teamId ?? current.teamId,
       phone: command.phone?.trim(),
       note: command.note?.trim(),
       isActive: current.isActive,
@@ -800,6 +835,15 @@ class FakeAttendanceApplication implements AttendanceApplication {
     return updated;
   }
 }
+
+String _presentedTeamName(WorkforceMember member) =>
+    isWorkforceTechnicalTeamLink(
+      projectId: member.projectId,
+      subcontractorId: member.subcontractorId,
+      teamId: member.teamId,
+    )
+    ? member.subcontractorName ?? 'Ekip belirtilmedi'
+    : member.teamName;
 
 AttendanceDayDetail _emptyDetail(AttendanceDay day) => AttendanceDayDetail(
   day: day,

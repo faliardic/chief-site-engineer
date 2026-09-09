@@ -326,6 +326,10 @@ class SqliteAgendaApplication
     ReminderNotificationGateway? notificationGateway,
     AgendaAttachmentStore? attachmentStore,
     AgendaPhotoExportGateway? photoExportGateway,
+    StartupPhaseDiagnostics? notificationDiagnostics,
+    NotificationPlatformAttemptRegistry? notificationAttempts,
+    this.notificationPerAwaitLimit = const Duration(seconds: 2),
+    this.notificationTotalLimit = const Duration(seconds: 8),
     this.attachmentCatalog,
     this.beforeReminderEventInsert,
     this.beforeProjectProfileEventInsert,
@@ -336,7 +340,11 @@ class SqliteAgendaApplication
        attachmentStore =
            attachmentStore ?? const UnavailableAgendaAttachmentStore(),
        photoExportGateway =
-           photoExportGateway ?? const UnavailableAgendaPhotoExportGateway();
+           photoExportGateway ?? const UnavailableAgendaPhotoExportGateway(),
+       notificationDiagnostics =
+           notificationDiagnostics ?? StartupPhaseDiagnostics(),
+       notificationAttempts =
+           notificationAttempts ?? NotificationPlatformAttemptRegistry();
 
   final String databasePath;
   final DatabaseFactory databaseFactory;
@@ -344,6 +352,13 @@ class SqliteAgendaApplication
   @override
   final MobileOperationCoordinator coordinator;
   final ReminderNotificationGateway notificationGateway;
+  final StartupPhaseDiagnostics notificationDiagnostics;
+  final NotificationPlatformAttemptRegistry notificationAttempts;
+  final Duration notificationPerAwaitLimit;
+  final Duration notificationTotalLimit;
+  Future<void>? _notificationReconciliationInFlight;
+  _NotificationReconciliationRequest? _pendingNotificationReconciliation;
+  var _notificationReconciliationGeneration = 0;
   final AgendaAttachmentStore attachmentStore;
   final AgendaPhotoExportGateway photoExportGateway;
   @override
@@ -1840,7 +1855,7 @@ class SqliteAgendaApplication
     }
     final now = _readClockOnce();
     final timestamp = CseTimeCodec.encodeUtc(now);
-    return _withDatabase(now, (database) {
+    final result = await _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         final priorTargetEvents = await transaction.query(
           'follow_up_events',
@@ -2086,6 +2101,11 @@ class SqliteAgendaApplication
         );
       });
     });
+    if (result.changed && !result.idempotent) {
+      _invalidateNotificationSource();
+      await _reconcileNotificationsAt(now, requestPermission: false);
+    }
+    return result;
   }
 
   @override
@@ -2831,6 +2851,7 @@ class SqliteAgendaApplication
         );
       });
     });
+    _invalidateNotificationSource();
     await _reconcileNotificationsAt(
       now,
       requestPermission: schedule.nextAttentionAt != null,
@@ -3038,7 +3059,12 @@ class SqliteAgendaApplication
         const ReminderPlatformDiagnostic.unavailable();
     var nativePresent = false;
     try {
-      final pending = await notificationGateway.pendingNotifications();
+      final pending =
+          await _notificationCall<List<PendingReminderNotification>>(
+            StartupPhase.pendingInitial,
+            'delivery-pending',
+            notificationGateway.pendingNotifications,
+          );
       nativePresent = pending.any(
         (item) =>
             item.platformId == detail.notification.platformNotificationId &&
@@ -3047,8 +3073,13 @@ class SqliteAgendaApplication
       );
       final gateway = notificationGateway;
       if (gateway is ReminderDeliveryControl) {
-        platform = await (gateway as ReminderDeliveryControl)
-            .deliveryDiagnostic(detail.notification.platformNotificationId);
+        platform = await _notificationCall<ReminderPlatformDiagnostic>(
+          StartupPhase.permissionStatus,
+          'delivery-diagnostic',
+          () => (gateway as ReminderDeliveryControl).deliveryDiagnostic(
+            detail.notification.platformNotificationId,
+          ),
+        );
       }
     } on Object {
       nativePresent = false;
@@ -3387,6 +3418,7 @@ class SqliteAgendaApplication
       });
     });
     if (result.changed) {
+      _invalidateNotificationSource();
       final shouldRequest = command.action == ReminderMutationAction.schedule
           ? result.reminder.nextAttentionAt != null &&
                 CseTimeCodec.decodeCanonicalUtc(
@@ -3907,7 +3939,166 @@ class SqliteAgendaApplication
   Future<void> _reconcileNotificationsAt(
     DateTime now, {
     required bool requestPermission,
-  }) async {
+  }) {
+    final inherited = currentNotificationExecutionContext;
+    final context =
+        inherited ??
+        NotificationExecutionContext(
+          budget: NotificationExecutionBudget(
+            diagnostics: notificationDiagnostics,
+            attempts: notificationAttempts,
+            perAwaitLimit: notificationPerAwaitLimit,
+            totalLimit: notificationTotalLimit,
+          ),
+          origin: StartupDiagnosticOrigin.backgroundReconciliation,
+        );
+    final request = _NotificationReconciliationRequest(
+      now: now,
+      requestPermission: requestPermission,
+      context: context,
+      generation: _notificationReconciliationGeneration,
+      sourceEpoch: notificationAttempts.sourceEpoch,
+    );
+    _pendingNotificationReconciliation =
+        _pendingNotificationReconciliation?.merge(request) ?? request;
+    final active = _notificationReconciliationInFlight;
+    if (active != null) return active;
+    final operation = _drainNotificationReconciliation();
+    _notificationReconciliationInFlight = operation;
+    return operation.whenComplete(() {
+      if (identical(_notificationReconciliationInFlight, operation)) {
+        _notificationReconciliationInFlight = null;
+      }
+    });
+  }
+
+  Future<void> _drainNotificationReconciliation() async {
+    while (true) {
+      final request = _pendingNotificationReconciliation;
+      if (request == null) return;
+      _pendingNotificationReconciliation = null;
+      try {
+        await runWithNotificationExecution(
+          request.context,
+          () => _performNotificationReconciliation(request),
+        );
+      } on _NotificationSourceChanged {
+        // A queued fresh request owns the next native decision and DB write.
+      }
+    }
+  }
+
+  bool _notificationRunIsCurrent(_NotificationReconciliationRequest run) =>
+      run.generation == _notificationReconciliationGeneration &&
+      run.sourceEpoch == notificationAttempts.sourceEpoch;
+
+  void _invalidateNotificationSource() {
+    notificationAttempts.invalidateSource();
+    _notificationReconciliationGeneration += 1;
+  }
+
+  Future<T> _notificationCall<T>(
+    StartupPhase phase,
+    String operationKey,
+    Future<T> Function() operation, {
+    _NotificationReconciliationRequest? run,
+    bool interactive = false,
+  }) {
+    if (run != null && !_notificationRunIsCurrent(run)) {
+      throw const _NotificationSourceChanged();
+    }
+    final inherited = currentNotificationExecutionContext;
+    final baseContext =
+        run?.context ??
+        inherited ??
+        NotificationExecutionContext(
+          budget: NotificationExecutionBudget(
+            diagnostics: notificationDiagnostics,
+            attempts: notificationAttempts,
+            perAwaitLimit: notificationPerAwaitLimit,
+            totalLimit: notificationTotalLimit,
+          ),
+          origin: StartupDiagnosticOrigin.backgroundReconciliation,
+        );
+    if (interactive) {
+      return runWithoutNotificationExecution(() async {
+        if (run != null && !_notificationRunIsCurrent(run)) {
+          throw const _NotificationSourceChanged();
+        }
+        final value = await operation();
+        if (run != null && !_notificationRunIsCurrent(run)) {
+          throw const _NotificationSourceChanged();
+        }
+        return value;
+      });
+    }
+    final context = baseContext.forPlatformCall(phase, operationKey);
+    return runWithNotificationExecution(context, () {
+      if (run != null && !_notificationRunIsCurrent(run)) {
+        throw const _NotificationSourceChanged();
+      }
+      if (notificationGateway is DeadlineAwareReminderNotificationGateway) {
+        return operation();
+      }
+      return context.budget.awaitPlatform<T>(
+        phase: phase,
+        origin: context.origin,
+        operationKey: operationKey,
+        operation: operation,
+      );
+    });
+  }
+
+  String _notificationFailureCode(Object error, String fallback) {
+    if (error is _NotificationSourceChanged) {
+      return 'notification_source_changed';
+    }
+    if (error is! NotificationPlatformBoundaryException) return fallback;
+    return switch (error.safeErrorCode) {
+      StartupSafeErrorCode.platformTimeout => 'native_result_unknown_timeout',
+      StartupSafeErrorCode.notificationDeadline =>
+        'notification_deadline_exhausted',
+      StartupSafeErrorCode.platformCallInFlight =>
+        'native_result_still_in_flight',
+      _ => fallback,
+    };
+  }
+
+  Future<void> _performNotificationReconciliation(
+    _NotificationReconciliationRequest run,
+  ) async {
+    NotificationPermissionState? promptedPermission;
+    Object? promptFailure;
+    if (run.requestPermission) {
+      try {
+        promptedPermission =
+            await _notificationCall<NotificationPermissionState>(
+              StartupPhase.permissionStatus,
+              'permission-request',
+              notificationGateway.requestPermission,
+              run: run,
+              interactive: true,
+            );
+      } on Object catch (error) {
+        promptFailure = error;
+      }
+      run.requestPermission = false;
+      _pendingNotificationReconciliation?.requestPermission = false;
+      run.now = clock().toUtc();
+      run.context = NotificationExecutionContext(
+        budget: NotificationExecutionBudget(
+          diagnostics: notificationDiagnostics,
+          attempts: notificationAttempts,
+          perAwaitLimit: notificationPerAwaitLimit,
+          totalLimit: notificationTotalLimit,
+        ),
+        origin: run.context.origin,
+      );
+      if (!_notificationRunIsCurrent(run)) {
+        throw const _NotificationSourceChanged();
+      }
+    }
+    final now = run.now;
     final work = await _withDatabase(now, (database) async {
       final rows = await database.rawQuery('''
         SELECT
@@ -3940,6 +4131,10 @@ class SqliteAgendaApplication
           )
           .toList(growable: false);
     });
+    run.sources = {for (final item in work) item.reminder.id: item};
+    if (!_notificationRunIsCurrent(run)) {
+      throw const _NotificationSourceChanged();
+    }
     if (work.isEmpty) return;
     final dispositions = {
       for (final item in work) item: _notificationDisposition(item, now),
@@ -3963,29 +4158,45 @@ class SqliteAgendaApplication
               _terminalNotificationNeedsCleanup(item),
         )
         .toList(growable: false);
-    NotificationPermissionState permission;
+    late final NotificationPermissionState permission;
     try {
-      await notificationGateway.initialize();
-      permission = requestPermission
-          ? await notificationGateway.requestPermission()
-          : await notificationGateway.permissionStatus();
-    } on Object {
+      if (promptFailure != null) throw promptFailure;
+      final known = promptedPermission;
+      if (known != null) {
+        permission = known;
+      } else {
+        await _notificationCall<void>(
+          StartupPhase.notificationInitialize,
+          'gateway-initialize',
+          notificationGateway.initialize,
+          run: run,
+        );
+        permission = await _notificationCall<NotificationPermissionState>(
+          StartupPhase.permissionStatus,
+          'permission-status',
+          notificationGateway.permissionStatus,
+          run: run,
+        );
+      }
+    } on Object catch (error) {
+      final safeCode = _notificationFailureCode(error, 'plugin_unavailable');
       await _writeBindingUpdates(now, [
         ...eligible.map(
           (item) => _BindingUpdate(
             reminderId: item.reminder.id,
             scheduledFor: item.reminder.nextAttentionAt,
             state: NotificationSyncState.unavailable,
-            safeErrorCode: 'plugin_unavailable',
+            safeErrorCode: safeCode,
           ),
         ),
         ...terminalToClean.map(
           (item) => _BindingUpdate(
             reminderId: item.reminder.id,
-            state: NotificationSyncState.cancelled,
+            state: NotificationSyncState.failed,
+            safeErrorCode: safeCode,
           ),
         ),
-      ]);
+      ], run);
       return;
     }
     if (permission != NotificationPermissionState.granted) {
@@ -3995,14 +4206,25 @@ class SqliteAgendaApplication
           eligible,
           preservedDeliveredOneTime,
           terminalToClean,
+          run,
         );
         return;
       }
+      final terminalCancelErrors = <String, String>{};
       for (final item in terminalToClean) {
         try {
-          await notificationGateway.cancel(item.binding.platformNotificationId);
-        } on Object {
-          // A terminal reminder remains visible and a later retry cleans up.
+          await _notificationCall<void>(
+            StartupPhase.cancel,
+            'cancel:${item.binding.platformNotificationId}',
+            () =>
+                notificationGateway.cancel(item.binding.platformNotificationId),
+            run: run,
+          );
+        } on Object catch (error) {
+          terminalCancelErrors[item.reminder.id] = _notificationFailureCode(
+            error,
+            'cancel_failed',
+          );
         }
       }
       final safeCode = switch (permission) {
@@ -4030,32 +4252,42 @@ class SqliteAgendaApplication
         ...terminalToClean.map(
           (item) => _BindingUpdate(
             reminderId: item.reminder.id,
-            state: NotificationSyncState.cancelled,
+            state: terminalCancelErrors.containsKey(item.reminder.id)
+                ? NotificationSyncState.failed
+                : NotificationSyncState.cancelled,
+            safeErrorCode: terminalCancelErrors[item.reminder.id],
           ),
         ),
-      ]);
+      ], run);
       return;
     }
     List<PendingReminderNotification> pending;
     try {
-      pending = await notificationGateway.pendingNotifications();
-    } on Object {
+      pending = await _notificationCall<List<PendingReminderNotification>>(
+        StartupPhase.pendingInitial,
+        'pending-initial',
+        notificationGateway.pendingNotifications,
+        run: run,
+      );
+    } on Object catch (error) {
+      final safeCode = _notificationFailureCode(error, 'pending_query_failed');
       await _writeBindingUpdates(now, [
         ...eligible.map(
           (item) => _BindingUpdate(
             reminderId: item.reminder.id,
             scheduledFor: item.reminder.nextAttentionAt,
             state: NotificationSyncState.failed,
-            safeErrorCode: 'pending_query_failed',
+            safeErrorCode: safeCode,
           ),
         ),
         ...terminalToClean.map(
           (item) => _BindingUpdate(
             reminderId: item.reminder.id,
-            state: NotificationSyncState.cancelled,
+            state: NotificationSyncState.failed,
+            safeErrorCode: safeCode,
           ),
         ),
-      ]);
+      ], run);
       return;
     }
     final capacity = notificationGateway.maximumPendingNotifications;
@@ -4081,23 +4313,40 @@ class SqliteAgendaApplication
         item.binding.platformNotificationId: item,
     };
     final validPendingIds = <int>{};
+    final resumablePendingIds = <int>{};
     final cancelledPendingIds = <int>{};
     for (final item in pending) {
       final expected = desiredByPlatformId[item.platformId];
       if (expected != null &&
           expected.reminder.id == item.reminderId &&
+          _pendingMatchesRequest(item, expected, exact: true) &&
           item.scheduleComplete &&
           validPendingIds.add(item.platformId)) {
+        continue;
+      }
+      if (expected != null &&
+          expected.reminder.id == item.reminderId &&
+          _pendingMatchesRequest(item, expected, exact: true) &&
+          !item.scheduleComplete &&
+          item.resumeSupported &&
+          expected.binding.scheduledFor == expected.reminder.nextAttentionAt &&
+          resumablePendingIds.add(item.platformId)) {
         continue;
       }
       final preserved = preservedByPlatformId[item.platformId];
       if (preserved != null &&
           preserved.reminder.id == item.reminderId &&
+          _pendingMatchesRequest(item, preserved, exact: true) &&
           item.scheduleComplete) {
         continue;
       }
       try {
-        await notificationGateway.cancel(item.platformId);
+        await _notificationCall<void>(
+          StartupPhase.cancel,
+          'cancel:${item.platformId}',
+          () => notificationGateway.cancel(item.platformId),
+          run: run,
+        );
         cancelledPendingIds.add(item.platformId);
       } on Object {
         // A later bootstrap retries orphan cleanup.
@@ -4108,6 +4357,7 @@ class SqliteAgendaApplication
       final reminder = item.reminder;
       final binding = item.binding;
       final scheduledFor = reminder.nextAttentionAt!;
+      final request = _notificationRequest(item);
       final pendingIsCurrent =
           validPendingIds.contains(binding.platformNotificationId) &&
           binding.scheduledFor == scheduledFor &&
@@ -4123,22 +4373,32 @@ class SqliteAgendaApplication
         continue;
       }
       try {
-        await notificationGateway.cancel(binding.platformNotificationId);
-        await notificationGateway.schedule(
-          ReminderNotificationRequest(
-            platformId: binding.platformNotificationId,
-            reminderId: reminder.id,
-            title: reminder.title,
-            body: reminder.description ?? reminder.captureText,
-            scheduledAtUtc: scheduledFor,
-            repeatIntervalMinutes: binding.repeatIntervalMinutes,
-          ),
+        if (!resumablePendingIds.contains(binding.platformNotificationId)) {
+          await _notificationCall<void>(
+            StartupPhase.cancel,
+            'cancel:${binding.platformNotificationId}',
+            () => notificationGateway.cancel(binding.platformNotificationId),
+            run: run,
+          );
+        }
+        await _notificationCall<void>(
+          StartupPhase.schedule,
+          'schedule:${binding.platformNotificationId}',
+          () => notificationGateway.schedule(request),
+          run: run,
         );
-        final verified = await notificationGateway.pendingNotifications();
+        final verified =
+            await _notificationCall<List<PendingReminderNotification>>(
+              StartupPhase.pendingVerification,
+              'pending-verification',
+              notificationGateway.pendingNotifications,
+              run: run,
+            );
         final nativeSchedulePresent = verified.any(
           (pending) =>
               pending.platformId == binding.platformNotificationId &&
               pending.reminderId == reminder.id &&
+              _pendingMatchesRequest(pending, item, exact: true) &&
               pending.scheduleComplete,
         );
         if (!nativeSchedulePresent) {
@@ -4151,20 +4411,28 @@ class SqliteAgendaApplication
             state: NotificationSyncState.scheduled,
           ),
         );
-      } on Object {
+      } on Object catch (error) {
         updates.add(
           _BindingUpdate(
             reminderId: reminder.id,
             scheduledFor: scheduledFor,
             state: NotificationSyncState.failed,
-            safeErrorCode: 'native_schedule_failed',
+            safeErrorCode: _notificationFailureCode(
+              error,
+              'native_schedule_failed',
+            ),
           ),
         );
       }
     }
     for (final item in capacityLimited) {
       try {
-        await notificationGateway.cancel(item.binding.platformNotificationId);
+        await _notificationCall<void>(
+          StartupPhase.cancel,
+          'cancel:${item.binding.platformNotificationId}',
+          () => notificationGateway.cancel(item.binding.platformNotificationId),
+          run: run,
+        );
       } on Object {
         // Capacity state remains visible and next bootstrap retries cleanup.
       }
@@ -4182,7 +4450,13 @@ class SqliteAgendaApplication
         if (!cancelledPendingIds.contains(
           item.binding.platformNotificationId,
         )) {
-          await notificationGateway.cancel(item.binding.platformNotificationId);
+          await _notificationCall<void>(
+            StartupPhase.cancel,
+            'cancel:${item.binding.platformNotificationId}',
+            () =>
+                notificationGateway.cancel(item.binding.platformNotificationId),
+            run: run,
+          );
         }
         updates.add(
           _BindingUpdate(
@@ -4190,17 +4464,17 @@ class SqliteAgendaApplication
             state: NotificationSyncState.cancelled,
           ),
         );
-      } on Object {
+      } on Object catch (error) {
         updates.add(
           _BindingUpdate(
             reminderId: item.reminder.id,
             state: NotificationSyncState.failed,
-            safeErrorCode: 'cancel_failed',
+            safeErrorCode: _notificationFailureCode(error, 'cancel_failed'),
           ),
         );
       }
     }
-    await _writeBindingUpdates(now, updates);
+    await _writeBindingUpdates(now, updates, run);
   }
 
   _NotificationDisposition _notificationDisposition(
@@ -4239,12 +4513,36 @@ class SqliteAgendaApplication
     List<_NotificationWorkItem> eligible,
     List<_NotificationWorkItem> preservedDeliveredOneTime,
     List<_NotificationWorkItem> terminalToClean,
+    _NotificationReconciliationRequest run,
   ) async {
     List<PendingReminderNotification> pending;
     try {
-      pending = await notificationGateway.pendingNotifications();
-    } on Object {
-      pending = const [];
+      pending = await _notificationCall<List<PendingReminderNotification>>(
+        StartupPhase.pendingInitial,
+        'pending-initial',
+        notificationGateway.pendingNotifications,
+        run: run,
+      );
+    } on Object catch (error) {
+      final safeCode = _notificationFailureCode(error, 'pending_query_failed');
+      await _writeBindingUpdates(now, [
+        ...eligible.map(
+          (item) => _BindingUpdate(
+            reminderId: item.reminder.id,
+            scheduledFor: item.reminder.nextAttentionAt,
+            state: NotificationSyncState.unavailable,
+            safeErrorCode: safeCode,
+          ),
+        ),
+        ...terminalToClean.map(
+          (item) => _BindingUpdate(
+            reminderId: item.reminder.id,
+            state: NotificationSyncState.failed,
+            safeErrorCode: safeCode,
+          ),
+        ),
+      ], run);
+      return;
     }
     final eligibleByPlatformId = {
       for (final item in eligible) item.binding.platformNotificationId: item,
@@ -4259,6 +4557,7 @@ class SqliteAgendaApplication
       final expected = eligibleByPlatformId[item.platformId];
       if (expected != null &&
           expected.reminder.id == item.reminderId &&
+          _pendingMatchesRequest(item, expected, exact: false) &&
           item.scheduleComplete &&
           expected.binding.scheduledFor == expected.reminder.nextAttentionAt &&
           valid.add(item.platformId)) {
@@ -4267,11 +4566,17 @@ class SqliteAgendaApplication
       final preserved = preservedByPlatformId[item.platformId];
       if (preserved != null &&
           preserved.reminder.id == item.reminderId &&
+          _pendingMatchesRequest(item, preserved, exact: false) &&
           item.scheduleComplete) {
         continue;
       }
       try {
-        await notificationGateway.cancel(item.platformId);
+        await _notificationCall<void>(
+          StartupPhase.cancel,
+          'cancel:${item.platformId}',
+          () => notificationGateway.cancel(item.platformId),
+          run: run,
+        );
         cancelledPendingIds.add(item.platformId);
       } on Object {
         // A later reconciliation retries privacy-safe orphan cleanup.
@@ -4283,31 +4588,45 @@ class SqliteAgendaApplication
       if (!valid.contains(item.binding.platformNotificationId)) {
         final gateway = notificationGateway;
         try {
-          await notificationGateway.cancel(item.binding.platformNotificationId);
+          await _notificationCall<void>(
+            StartupPhase.cancel,
+            'cancel:${item.binding.platformNotificationId}',
+            () =>
+                notificationGateway.cancel(item.binding.platformNotificationId),
+            run: run,
+          );
           if (gateway is! ReminderDeliveryControl) {
             throw StateError('fallback unavailable');
           }
-          await (gateway as ReminderDeliveryControl).scheduleInexactFallback(
-            ReminderNotificationRequest(
-              platformId: item.binding.platformNotificationId,
-              reminderId: item.reminder.id,
-              title: item.reminder.title,
-              body: item.reminder.description ?? item.reminder.captureText,
-              scheduledAtUtc: item.reminder.nextAttentionAt!,
-              repeatIntervalMinutes: item.binding.repeatIntervalMinutes,
+          await _notificationCall<void>(
+            StartupPhase.inexactFallback,
+            'fallback:${item.binding.platformNotificationId}',
+            () => (gateway as ReminderDeliveryControl).scheduleInexactFallback(
+              _notificationRequest(item),
             ),
+            run: run,
           );
-          final verified = await notificationGateway.pendingNotifications();
+          final verified =
+              await _notificationCall<List<PendingReminderNotification>>(
+                StartupPhase.pendingVerification,
+                'fallback-verification',
+                notificationGateway.pendingNotifications,
+                run: run,
+              );
           if (!verified.any(
             (pending) =>
                 pending.platformId == item.binding.platformNotificationId &&
                 pending.reminderId == item.reminder.id &&
+                _pendingMatchesRequest(pending, item, exact: false) &&
                 pending.scheduleComplete,
           )) {
             throw StateError('fallback schedule missing');
           }
-        } on Object {
-          safeCode = 'exact_alarm_and_fallback_unavailable';
+        } on Object catch (error) {
+          safeCode = _notificationFailureCode(
+            error,
+            'exact_alarm_and_fallback_unavailable',
+          );
         }
       }
       updates.add(
@@ -4320,29 +4639,67 @@ class SqliteAgendaApplication
       );
     }
     for (final item in terminalToClean) {
+      String? cancelError;
       try {
         if (!cancelledPendingIds.contains(
           item.binding.platformNotificationId,
         )) {
-          await notificationGateway.cancel(item.binding.platformNotificationId);
+          await _notificationCall<void>(
+            StartupPhase.cancel,
+            'cancel:${item.binding.platformNotificationId}',
+            () =>
+                notificationGateway.cancel(item.binding.platformNotificationId),
+            run: run,
+          );
         }
-      } on Object {
-        // A later reconciliation retries terminal cleanup.
+      } on Object catch (error) {
+        cancelError = _notificationFailureCode(error, 'cancel_failed');
       }
       updates.add(
         _BindingUpdate(
           reminderId: item.reminder.id,
-          state: NotificationSyncState.cancelled,
+          state: cancelError == null
+              ? NotificationSyncState.cancelled
+              : NotificationSyncState.failed,
+          safeErrorCode: cancelError,
         ),
       );
     }
-    await _writeBindingUpdates(now, updates);
+    await _writeBindingUpdates(now, updates, run);
+  }
+
+  ReminderNotificationRequest _notificationRequest(
+    _NotificationWorkItem item,
+  ) => ReminderNotificationRequest(
+    platformId: item.binding.platformNotificationId,
+    reminderId: item.reminder.id,
+    title: item.reminder.title,
+    body: item.reminder.description ?? item.reminder.captureText,
+    scheduledAtUtc: item.reminder.nextAttentionAt!,
+    repeatIntervalMinutes: item.binding.repeatIntervalMinutes,
+  );
+
+  bool _pendingMatchesRequest(
+    PendingReminderNotification pending,
+    _NotificationWorkItem expected, {
+    required bool exact,
+  }) {
+    if (notificationGateway is! FingerprintedReminderNotificationGateway) {
+      return true;
+    }
+    return pending.requestFingerprint ==
+        reminderNotificationRequestFingerprint(
+          _notificationRequest(expected),
+          exact: exact,
+        );
   }
 
   Future<void> _writeBindingUpdates(
     DateTime now,
     Iterable<_BindingUpdate> updates,
+    _NotificationReconciliationRequest run,
   ) async {
+    if (!_notificationRunIsCurrent(run)) return;
     final values = updates.toList(growable: false);
     if (values.isEmpty) return;
     final syncedAt = CseTimeCodec.encodeUtc(now);
@@ -4352,9 +4709,12 @@ class SqliteAgendaApplication
           final previousRows = await transaction.rawQuery(
             '''
             SELECT
-              b.sync_state, b.scheduled_for,
+              b.sync_state, b.scheduled_for, b.last_synced_at,
+              b.safe_error_code, b.platform_notification_id,
+              b.repeat_interval_minutes,
               f.project_id, f.observation_id, f.attendance_day_id,
-              f.concrete_pour_id
+              f.concrete_pour_id, f.revision, f.status,
+              f.next_attention_at, f.trashed_at
             FROM reminder_notification_bindings b
             JOIN follow_up_items f ON f.id = b.reminder_id
             WHERE b.reminder_id = ?
@@ -4364,6 +4724,24 @@ class SqliteAgendaApplication
           );
           if (previousRows.isEmpty) continue;
           final previous = previousRows.single;
+          final source = run.sources[update.reminderId];
+          if (source == null ||
+              !_notificationRunIsCurrent(run) ||
+              previous['revision'] != source.reminder.revision ||
+              previous['status'] != source.reminder.status.storageValue ||
+              previous['next_attention_at'] !=
+                  source.reminder.nextAttentionAt ||
+              previous['trashed_at'] != source.reminder.trashedAt ||
+              previous['platform_notification_id'] !=
+                  source.binding.platformNotificationId ||
+              previous['repeat_interval_minutes'] !=
+                  source.binding.repeatIntervalMinutes ||
+              previous['sync_state'] != source.binding.syncState.storageValue ||
+              previous['scheduled_for'] != source.binding.scheduledFor ||
+              previous['last_synced_at'] != source.binding.lastSyncedAt ||
+              previous['safe_error_code'] != source.binding.safeErrorCode) {
+            continue;
+          }
           await transaction.update(
             'reminder_notification_bindings',
             {
@@ -6397,6 +6775,37 @@ enum _NotificationDisposition {
   schedulable,
   preserveDeliveredOneTime,
   terminal,
+}
+
+class _NotificationSourceChanged implements Exception {
+  const _NotificationSourceChanged();
+}
+
+class _NotificationReconciliationRequest {
+  _NotificationReconciliationRequest({
+    required this.now,
+    required this.requestPermission,
+    required this.context,
+    required this.generation,
+    required this.sourceEpoch,
+  });
+
+  DateTime now;
+  bool requestPermission;
+  NotificationExecutionContext context;
+  final int generation;
+  final int sourceEpoch;
+  Map<String, _NotificationWorkItem> sources = const {};
+
+  _NotificationReconciliationRequest merge(
+    _NotificationReconciliationRequest newer,
+  ) => _NotificationReconciliationRequest(
+    now: newer.now,
+    requestPermission: requestPermission || newer.requestPermission,
+    context: requestPermission ? context : newer.context,
+    generation: newer.generation,
+    sourceEpoch: newer.sourceEpoch,
+  );
 }
 
 class _NotificationWorkItem {

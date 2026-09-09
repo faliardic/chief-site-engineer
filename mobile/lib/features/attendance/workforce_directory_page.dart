@@ -229,7 +229,7 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
             member.phone,
             member.roleName,
             member.subcontractorName,
-            member.teamName,
+            if (!_usesTechnicalTeam(member)) member.teamName,
           ].whereType<String>().any(
             (value) => _normalized(value).contains(query),
           );
@@ -653,7 +653,7 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
                   ),
                   subtitle: Text(
                     '${member.phone ?? 'Telefon yok'}\n'
-                    '${member.subcontractorName ?? 'Tanımsız taşeron'} • ${member.teamName}\n'
+                    '${_memberRegistryLabel(member)}\n'
                     '${member.isActive ? 'Aktif' : 'Arşiv'}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -667,6 +667,19 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
       ],
     );
   }
+}
+
+bool _usesTechnicalTeam(WorkforceMember member) => isWorkforceTechnicalTeamLink(
+  projectId: member.projectId,
+  subcontractorId: member.subcontractorId,
+  teamId: member.teamId,
+);
+
+String _memberRegistryLabel(WorkforceMember member) {
+  final subcontractor = member.subcontractorName ?? 'Tanımsız taşeron';
+  return _usesTechnicalTeam(member)
+      ? subcontractor
+      : '$subcontractor • ${member.teamName}';
 }
 
 enum _DirectoryStatus { active, archived }

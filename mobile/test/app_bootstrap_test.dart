@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
@@ -9,11 +10,14 @@ import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
+import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/agenda_photo_export_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/notification_gateway.dart';
+import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
@@ -322,4 +326,164 @@ void main() {
       reason: 'Attachment reconciliation is never automatic at bootstrap.',
     );
   });
+
+  test(
+    'NB-01 bootstrap returns after init hang and keeps database usable',
+    () async {
+      final directories = AppDirectories.fromSupportRoot(
+        temporaryRoot,
+        AppEnvironment.debug,
+      );
+      final gateway = _HangingInitializationGateway();
+      final evidence = <StartupPhaseEvent>[];
+
+      final result = await AppBootstrap(
+        environment: AppEnvironment.debug,
+        directoriesProvider: () async => directories,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 9, 8, 8),
+        notificationGateway: gateway,
+        notificationPerAwaitLimit: const Duration(milliseconds: 20),
+        startupNotificationLimit: const Duration(milliseconds: 80),
+        diagnosticSink: evidence.add,
+      ).start();
+
+      expect(result, isA<BootstrapSuccess>());
+      expect(gateway.initializeCalls, 1);
+      expect(
+        evidence.any(
+          (event) =>
+              event.phase == StartupPhase.notificationInitialize &&
+              event.outcome == StartupPhaseOutcome.timedOut,
+        ),
+        isTrue,
+      );
+      expect(
+        evidence
+            .lastWhere((event) => event.phase == StartupPhase.bootstrap)
+            .outcome,
+        StartupPhaseOutcome.succeeded,
+      );
+      final success = result as BootstrapSuccess;
+      expect(
+        await success.agenda.listAgenda(
+          const AgendaQuery(istanbulDay: '2026-09-08'),
+        ),
+        isEmpty,
+      );
+
+      gateway.initializeCompleter.complete();
+      await Future<void>.delayed(Duration.zero);
+      expect(gateway.initializeCalls, 1);
+    },
+  );
+
+  test(
+    'NB-01 rolling and final reconciliation share one bounded pending attempt',
+    () async {
+      final now = DateTime.utc(2026, 9, 8, 8);
+      final directories = AppDirectories.fromSupportRoot(
+        temporaryRoot,
+        AppEnvironment.debug,
+      );
+      await directories.ensureCreated();
+      final database = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      await database.open();
+      await database.close();
+      final seed = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      await seed.createReminder(
+        CreateReminderCommand(
+          id: '74400000-0000-4000-8000-000000000001',
+          eventId: '74400000-0000-4000-8000-000000000002',
+          title: 'NB-01 rolling pending',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-09-08T09:00:00Z',
+        ),
+      );
+      final gateway = _HangingPendingGateway();
+
+      final result = await AppBootstrap(
+        environment: AppEnvironment.debug,
+        directoriesProvider: () async => directories,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: gateway,
+        notificationPerAwaitLimit: const Duration(milliseconds: 20),
+        startupNotificationLimit: const Duration(milliseconds: 80),
+        diagnosticSink: (_) {},
+      ).start();
+
+      expect(result, isA<BootstrapSuccess>());
+      expect(gateway.pendingCalls, 1);
+      expect(gateway.scheduleCalls, 0);
+      expect(gateway.cancelCalls, 0);
+      final detail = await (result as BootstrapSuccess).agenda
+          .getReminderLifecycleDetail('74400000-0000-4000-8000-000000000001');
+      expect(detail.notification.syncState, NotificationSyncState.unavailable);
+      expect(
+        detail.notification.safeErrorCode,
+        anyOf(
+          'native_result_unknown_timeout',
+          'notification_deadline_exhausted',
+        ),
+      );
+
+      gateway.pendingCompleter.complete(const []);
+      await Future<void>.delayed(Duration.zero);
+      expect(gateway.scheduleCalls, 0);
+      expect(gateway.cancelCalls, 0);
+    },
+  );
+}
+
+class _HangingInitializationGateway
+    extends UnavailableReminderNotificationGateway {
+  final Completer<void> initializeCompleter = Completer<void>();
+  var initializeCalls = 0;
+
+  @override
+  Future<void> initialize() {
+    initializeCalls += 1;
+    return initializeCompleter.future;
+  }
+}
+
+class _HangingPendingGateway extends UnavailableReminderNotificationGateway {
+  final Completer<List<PendingReminderNotification>> pendingCompleter =
+      Completer<List<PendingReminderNotification>>();
+  var pendingCalls = 0;
+  var scheduleCalls = 0;
+  var cancelCalls = 0;
+
+  @override
+  int get maximumPendingNotifications => 60;
+
+  @override
+  Future<NotificationPermissionState> permissionStatus() async =>
+      NotificationPermissionState.granted;
+
+  @override
+  Future<List<PendingReminderNotification>> pendingNotifications() {
+    pendingCalls += 1;
+    return pendingCompleter.future;
+  }
+
+  @override
+  Future<void> schedule(ReminderNotificationRequest request) async {
+    scheduleCalls += 1;
+  }
+
+  @override
+  Future<void> cancel(int platformId) async {
+    cancelCalls += 1;
+  }
 }

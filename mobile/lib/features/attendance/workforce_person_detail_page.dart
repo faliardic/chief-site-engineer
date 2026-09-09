@@ -528,7 +528,8 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
             const SizedBox(height: 16),
             _row(
               'Ekip',
-              detail.member.teamName.trim().isEmpty
+              _usesTechnicalTeam(detail.member) ||
+                      detail.member.teamName.trim().isEmpty
                   ? 'Belirtilmedi'
                   : detail.member.teamName,
             ),
@@ -836,6 +837,12 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
     child: ListTile(title: Text(label), subtitle: Text(value)),
   );
 }
+
+bool _usesTechnicalTeam(WorkforceMember member) => isWorkforceTechnicalTeamLink(
+  projectId: member.projectId,
+  subcontractorId: member.subcontractorId,
+  teamId: member.teamId,
+);
 
 class _ComplianceHistoryPage extends StatelessWidget {
   const _ComplianceHistoryPage({required this.detail, required this.onRestore});

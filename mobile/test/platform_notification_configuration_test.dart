@@ -1,32 +1,44 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
+import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(sqfliteFfiInit);
   group('REM06 foreground notification handoff', () {
     const channel = MethodChannel('dexterous.com/flutter/local_notifications');
     const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
     final calls = <MethodCall>[];
     Map<String, Object?> launch = {};
+    Completer<Object?>? initializeGate;
+    Completer<Object?>? launchGate;
     late _IntentAndroidPlugin android;
     setUp(() {
       calls.clear();
       launch = {'notificationLaunchedApp': false};
+      initializeGate = null;
+      launchGate = null;
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       android = _IntentAndroidPlugin();
       FlutterLocalNotificationsPlatform.instance = android;
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (call) async {
             calls.add(call);
-            if (call.method == 'initialize') return true;
-            if (call.method == 'getNotificationAppLaunchDetails') return launch;
+            if (call.method == 'initialize') {
+              return initializeGate?.future ?? true;
+            }
+            if (call.method == 'getNotificationAppLaunchDetails') {
+              return launchGate?.future ?? launch;
+            }
             return null;
           });
     });
@@ -46,7 +58,7 @@ void main() {
               reminderId: id,
               title: 'Başlık',
               body: 'Aynı içerik',
-              scheduledAtUtc: '2026-09-09T06:00:00Z',
+              scheduledAtUtc: '2036-09-09T06:00:00Z',
               repeatIntervalMinutes: repeat,
             ),
           );
@@ -58,7 +70,11 @@ void main() {
                     : 'periodicallyShowWithDuration'),
           );
           final args = call.arguments as Map;
-          expect(args['payload'], 'reminder:$id');
+          expect(args['payload'], startsWith('reminder:$id|request:'));
+          expect(
+            (args['payload'] as String).split('|request:').last,
+            matches(RegExp(r'^[0-9a-f]{64}$')),
+          );
           expect(args['title'], 'Başlık');
           expect(args['body'], 'Aynı içerik');
           final platform = args['platformSpecifics'] as Map;
@@ -256,6 +272,127 @@ void main() {
       await gateway.initialize();
       expect(gateway.takeInitialNotificationIntent(), isNull);
     });
+    test(
+      'NB-01 late launch reaches the subscribed shell after one initial take',
+      () async {
+        initializeGate = Completer<Object?>();
+        final evidence = <StartupPhaseEvent>[];
+        final diagnostics = StartupPhaseDiagnostics(sink: evidence.add);
+        final attempts = NotificationPlatformAttemptRegistry();
+        final gateway = FlutterReminderNotificationGateway();
+
+        Future<void> initializeWithFreshBudget() {
+          final context = NotificationExecutionContext(
+            budget: NotificationExecutionBudget(
+              diagnostics: diagnostics,
+              attempts: attempts,
+              perAwaitLimit: const Duration(milliseconds: 20),
+              totalLimit: const Duration(milliseconds: 60),
+            ),
+            origin: StartupDiagnosticOrigin.bootstrap,
+          );
+          return runWithNotificationExecution(context, gateway.initialize);
+        }
+
+        await expectLater(
+          initializeWithFreshBudget(),
+          throwsA(isA<NotificationPlatformBoundaryException>()),
+        );
+        expect(
+          calls.where((call) => call.method == 'initialize'),
+          hasLength(1),
+        );
+        expect(
+          calls.where(
+            (call) => call.method == 'getNotificationAppLaunchDetails',
+          ),
+          isEmpty,
+        );
+
+        initializeGate!.complete(true);
+        await Future<void>.delayed(Duration.zero);
+        launchGate = Completer<Object?>();
+        await expectLater(
+          initializeWithFreshBudget(),
+          throwsA(isA<NotificationPlatformBoundaryException>()),
+        );
+        expect(
+          calls.where((call) => call.method == 'initialize'),
+          hasLength(1),
+        );
+        expect(
+          calls.where(
+            (call) => call.method == 'getNotificationAppLaunchDetails',
+          ),
+          hasLength(1),
+        );
+
+        final streamed = gateway.notificationIntents.first;
+        expect(gateway.takeInitialNotificationIntent(), isNull);
+
+        launchGate!.complete({
+          'notificationLaunchedApp': true,
+          'notificationResponse': {
+            'notificationResponseType': 0,
+            'payload': 'reminder:$id',
+          },
+        });
+        final intent = await streamed;
+        expect(intent.reminderId, id);
+        expect(intent.action, ReminderNotificationAction.openDetail);
+        expect(gateway.takeInitialNotificationIntent(), isNull);
+        await initializeWithFreshBudget();
+        expect(gateway.takeInitialNotificationIntent(), isNull);
+        expect(
+          evidence.where(
+            (event) => event.outcome == StartupPhaseOutcome.timedOut,
+          ),
+          hasLength(2),
+        );
+      },
+    );
+    test(
+      'NB-01 newer foreground intent suppresses late launch replay',
+      () async {
+        launchGate = Completer<Object?>();
+        final gateway = FlutterReminderNotificationGateway();
+        final context = NotificationExecutionContext(
+          budget: NotificationExecutionBudget(
+            diagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+            perAwaitLimit: const Duration(milliseconds: 20),
+            totalLimit: const Duration(milliseconds: 60),
+          ),
+          origin: StartupDiagnosticOrigin.bootstrap,
+        );
+        await expectLater(
+          runWithNotificationExecution(context, gateway.initialize),
+          throwsA(isA<NotificationPlatformBoundaryException>()),
+        );
+        final received = <ReminderNotificationIntent>[];
+        final subscription = gateway.notificationIntents.listen(received.add);
+        android.foregroundCallback!(
+          const NotificationResponse(
+            notificationResponseType:
+                NotificationResponseType.selectedNotificationAction,
+            payload: 'reminder:$id',
+            actionId: FlutterReminderNotificationGateway.snoozeActionId,
+          ),
+        );
+        launchGate!.complete({
+          'notificationLaunchedApp': true,
+          'notificationResponse': {
+            'notificationResponseType': 0,
+            'payload': 'reminder:$id',
+          },
+        });
+        await Future<void>.delayed(Duration.zero);
+        expect(received, hasLength(1));
+        expect(received.single.action, ReminderNotificationAction.snooze);
+        expect(gateway.takeInitialNotificationIntent(), isNull);
+        await subscription.cancel();
+      },
+    );
+
     test('gateway installs no background callback or mutation path', () {
       final source = File(
         'lib/platform/notification_gateway.dart',
@@ -433,6 +570,623 @@ void main() {
       contains("path.join(staging.path, 'incoming_backups')"),
     );
   });
+
+  test(
+    'NB-01 every non-interactive phase is bounded and fault-visible',
+    () async {
+      const phases = [
+        StartupPhase.pluginInitialize,
+        StartupPhase.launchDetails,
+        StartupPhase.permissionStatus,
+        StartupPhase.pendingInitial,
+        StartupPhase.pendingVerification,
+        StartupPhase.cancel,
+        StartupPhase.schedule,
+        StartupPhase.inexactFallback,
+      ];
+      for (final phase in phases) {
+        final events = <StartupPhaseEvent>[];
+        final hanging = Completer<Object?>();
+        final budget = NotificationExecutionBudget(
+          diagnostics: StartupPhaseDiagnostics(sink: events.add),
+          perAwaitLimit: const Duration(milliseconds: 1),
+          totalLimit: const Duration(milliseconds: 4),
+        );
+        await expectLater(
+          budget.awaitPlatform<Object?>(
+            phase: phase,
+            origin: StartupDiagnosticOrigin.backgroundReconciliation,
+            operationKey: 'hang-${phase.name}',
+            operation: () => hanging.future,
+          ),
+          throwsA(isA<NotificationPlatformBoundaryException>()),
+        );
+        expect(events.last.outcome, StartupPhaseOutcome.timedOut);
+
+        final faultEvents = <StartupPhaseEvent>[];
+        final faultBudget = NotificationExecutionBudget(
+          diagnostics: StartupPhaseDiagnostics(sink: faultEvents.add),
+        );
+        await expectLater(
+          faultBudget.awaitPlatform<void>(
+            phase: phase,
+            origin: StartupDiagnosticOrigin.backgroundReconciliation,
+            operationKey: 'fault-${phase.name}',
+            operation: () => Future<void>.error(StateError('private detail')),
+          ),
+          throwsA(isA<StateError>()),
+        );
+        expect(faultEvents.last.outcome, StartupPhaseOutcome.failed);
+      }
+    },
+  );
+
+  test(
+    'NB-01 shared budget is hard-capped and starts no work after deadline',
+    () async {
+      var elapsed = Duration.zero;
+      var calls = 0;
+      final events = <StartupPhaseEvent>[];
+      final budget = NotificationExecutionBudget(
+        diagnostics: StartupPhaseDiagnostics(
+          sink: events.add,
+          elapsed: () => elapsed,
+        ),
+        perAwaitLimit: const Duration(seconds: 20),
+        totalLimit: const Duration(seconds: 20),
+      );
+      expect(budget.perAwaitLimit, const Duration(seconds: 2));
+      expect(budget.totalLimit, const Duration(seconds: 8));
+
+      for (var index = 0; index < 4; index += 1) {
+        await budget.awaitPlatform<void>(
+          phase: StartupPhase.schedule,
+          origin: StartupDiagnosticOrigin.rollingOccurrences,
+          operationKey: 'aggregate-$index',
+          operation: () {
+            calls += 1;
+            elapsed += const Duration(milliseconds: 1900);
+            return Future.value();
+          },
+        );
+      }
+      await expectLater(
+        budget.awaitPlatform<void>(
+          phase: StartupPhase.schedule,
+          origin: StartupDiagnosticOrigin.finalReconciliation,
+          operationKey: 'aggregate-overrun',
+          operation: () {
+            calls += 1;
+            elapsed += const Duration(milliseconds: 500);
+            return Future.value();
+          },
+        ),
+        throwsA(isA<NotificationPlatformBoundaryException>()),
+      );
+      await expectLater(
+        budget.awaitPlatform<void>(
+          phase: StartupPhase.schedule,
+          origin: StartupDiagnosticOrigin.finalReconciliation,
+          operationKey: 'must-not-start',
+          operation: () {
+            calls += 1;
+            return Future.value();
+          },
+        ),
+        throwsA(isA<NotificationPlatformBoundaryException>()),
+      );
+      expect(calls, 5);
+      expect(events.last.outcome, StartupPhaseOutcome.deadlineExhausted);
+
+      var gapElapsed = Duration.zero;
+      var gapCalls = 0;
+      final gapBudget = NotificationExecutionBudget(
+        diagnostics: StartupPhaseDiagnostics(elapsed: () => gapElapsed),
+      );
+      await gapBudget.awaitPlatform<void>(
+        phase: StartupPhase.pendingInitial,
+        origin: StartupDiagnosticOrigin.backgroundReconciliation,
+        operationKey: 'before-gap',
+        operation: () async {
+          gapCalls += 1;
+        },
+      );
+      gapElapsed = const Duration(seconds: 8);
+      await expectLater(
+        gapBudget.awaitPlatform<void>(
+          phase: StartupPhase.pendingVerification,
+          origin: StartupDiagnosticOrigin.backgroundReconciliation,
+          operationKey: 'after-gap',
+          operation: () async {
+            gapCalls += 1;
+          },
+        ),
+        throwsA(isA<NotificationPlatformBoundaryException>()),
+      );
+      expect(gapCalls, 1);
+
+      final terminalBudget = NotificationExecutionBudget(
+        diagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+        perAwaitLimit: const Duration(milliseconds: 1),
+      );
+      await expectLater(
+        terminalBudget.awaitPlatform<void>(
+          phase: StartupPhase.schedule,
+          origin: StartupDiagnosticOrigin.backgroundReconciliation,
+          operationKey: 'first-timeout',
+          operation: () => Completer<void>().future,
+        ),
+        throwsA(isA<NotificationPlatformBoundaryException>()),
+      );
+      var afterTimeoutCalls = 0;
+      await expectLater(
+        terminalBudget.awaitPlatform<void>(
+          phase: StartupPhase.schedule,
+          origin: StartupDiagnosticOrigin.backgroundReconciliation,
+          operationKey: 'after-timeout',
+          operation: () async {
+            afterTimeoutCalls += 1;
+          },
+        ),
+        throwsA(isA<NotificationPlatformBoundaryException>()),
+      );
+      expect(afterTimeoutCalls, 0);
+    },
+  );
+
+  test(
+    'NB-01 unresolved platform calls are single-flight and late-safe',
+    () async {
+      final registry = NotificationPlatformAttemptRegistry();
+      final pending = Completer<int>();
+      var calls = 0;
+
+      NotificationExecutionBudget budget() => NotificationExecutionBudget(
+        diagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+        attempts: registry,
+        perAwaitLimit: const Duration(milliseconds: 1),
+        totalLimit: const Duration(milliseconds: 3),
+      );
+
+      Future<int> wait() => budget().awaitPlatform<int>(
+        phase: StartupPhase.pendingInitial,
+        origin: StartupDiagnosticOrigin.backgroundReconciliation,
+        operationKey: 'same-native-call',
+        operation: () {
+          calls += 1;
+          return pending.future;
+        },
+      );
+
+      await expectLater(
+        wait(),
+        throwsA(isA<NotificationPlatformBoundaryException>()),
+      );
+      await expectLater(
+        wait(),
+        throwsA(isA<NotificationPlatformBoundaryException>()),
+      );
+      expect(calls, 1);
+
+      var changedRequestCalls = 0;
+      NotificationPlatformBoundaryException? conflict;
+      try {
+        await budget().awaitPlatform<int>(
+          phase: StartupPhase.cancel,
+          origin: StartupDiagnosticOrigin.backgroundReconciliation,
+          operationKey: 'cancel-same-target',
+          targetKey: 'same-native-call',
+          requestKey: 'changed-semantic-request',
+          operation: () async {
+            changedRequestCalls += 1;
+            return 99;
+          },
+        );
+      } on NotificationPlatformBoundaryException catch (error) {
+        conflict = error;
+      }
+      expect(
+        conflict?.safeErrorCode,
+        StartupSafeErrorCode.platformCallInFlight,
+      );
+      expect(changedRequestCalls, 0);
+
+      pending.complete(7);
+      await Future<void>.delayed(Duration.zero);
+      final value = await budget().awaitPlatform<int>(
+        phase: StartupPhase.pendingInitial,
+        origin: StartupDiagnosticOrigin.backgroundReconciliation,
+        operationKey: 'same-native-call',
+        operation: () {
+          calls += 1;
+          return Future.value(8);
+        },
+      );
+      expect(value, 8);
+      expect(calls, 2);
+
+      final sinkFailureBudget = NotificationExecutionBudget(
+        diagnostics: StartupPhaseDiagnostics(
+          sink: (_) => throw StateError('diagnostic sink failed'),
+        ),
+      );
+      expect(
+        await sinkFailureBudget.awaitPlatform<int>(
+          phase: StartupPhase.pendingInitial,
+          origin: StartupDiagnosticOrigin.backgroundReconciliation,
+          operationKey: 'sink-failure',
+          operation: () async => 9,
+        ),
+        9,
+      );
+    },
+  );
+
+  test(
+    'NB-01 iOS rolling resumes a verified prefix and invalidates reschedule',
+    () async {
+      const channel = MethodChannel(
+        'dexterous.com/flutter/local_notifications',
+      );
+      final pending = <int, Map<String, Object?>>{};
+      final cancelled = <int>[];
+      var elapsed = Duration.zero;
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      FlutterLocalNotificationsPlatform.instance =
+          IOSFlutterLocalNotificationsPlugin();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            final arguments = call.arguments is Map
+                ? Map<Object?, Object?>.from(call.arguments as Map)
+                : const <Object?, Object?>{};
+            switch (call.method) {
+              case 'initialize':
+                return true;
+              case 'getNotificationAppLaunchDetails':
+                return {'notificationLaunchedApp': false};
+              case 'pendingNotificationRequests':
+                return pending.values.toList(growable: false);
+              case 'zonedSchedule':
+                final id = arguments['id']! as int;
+                pending[id] = {
+                  'id': id,
+                  'title': arguments['title'],
+                  'body': arguments['body'],
+                  'payload': arguments['payload'],
+                };
+                elapsed += const Duration(milliseconds: 600);
+                return null;
+              case 'cancel':
+                final id = call.arguments! as int;
+                cancelled.add(id);
+                pending.remove(id);
+                return null;
+            }
+            return null;
+          });
+      try {
+        final gateway = FlutterReminderNotificationGateway();
+        const reminderId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        final request = ReminderNotificationRequest(
+          platformId: 74401,
+          reminderId: reminderId,
+          title: 'Saatlik zincir',
+          body: 'Doğrulanmış prefix',
+          scheduledAtUtc: '2036-09-09T06:00:00Z',
+          repeatIntervalMinutes: 60,
+        );
+        Future<void> scheduleTurn(ReminderNotificationRequest value) {
+          final context = NotificationExecutionContext(
+            budget: NotificationExecutionBudget(
+              diagnostics: StartupPhaseDiagnostics(elapsed: () => elapsed),
+            ),
+            origin: StartupDiagnosticOrigin.rollingOccurrences,
+          );
+          return runWithNotificationExecution(
+            context,
+            () => gateway.schedule(value),
+          );
+        }
+
+        await expectLater(
+          scheduleTurn(request),
+          throwsA(isA<NotificationPlatformBoundaryException>()),
+        );
+        expect(pending.length, inInclusiveRange(1, 23));
+        expect(cancelled.where((id) => id < 0), isEmpty);
+
+        await scheduleTurn(request);
+        expect(
+          pending.length,
+          FlutterReminderNotificationGateway.rollingRepeatOccurrenceCount,
+        );
+        final oldFingerprints = pending.values
+            .map((item) => (item['payload']! as String).split('|request:').last)
+            .toSet();
+        expect(oldFingerprints, hasLength(1));
+
+        final changed = ReminderNotificationRequest(
+          platformId: 74401,
+          reminderId: reminderId,
+          title: 'Saatlik zincir güncellendi',
+          body: 'Doğrulanmış prefix',
+          scheduledAtUtc: '2036-09-09T06:00:00Z',
+          repeatIntervalMinutes: 60,
+        );
+        await expectLater(
+          scheduleTurn(changed),
+          throwsA(isA<NotificationPlatformBoundaryException>()),
+        );
+        expect(
+          cancelled.where((id) => id < 0),
+          hasLength(
+            FlutterReminderNotificationGateway.rollingRepeatOccurrenceCount,
+          ),
+        );
+        expect(
+          pending.values.every(
+            (item) => !oldFingerprints.contains(
+              (item['payload']! as String).split('|request:').last,
+            ),
+          ),
+          isTrue,
+        );
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      }
+    },
+  );
+
+  test(
+    'NB-01 application semantic phase reaches the Flutter MethodChannel await',
+    () async {
+      const channel = MethodChannel(
+        'dexterous.com/flutter/local_notifications',
+      );
+      final calls = <MethodCall>[];
+      final verificationGate = Completer<Object?>();
+      var pendingCalls = 0;
+      final temporaryRoot = await Directory.systemTemp.createTemp(
+        'cse_notification_seam_',
+      );
+      final databasePath =
+          '${temporaryRoot.path}${Platform.pathSeparator}cse.sqlite';
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      FlutterLocalNotificationsPlatform.instance = _IntentAndroidPlugin();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            if (call.method == 'initialize') return true;
+            if (call.method == 'getNotificationAppLaunchDetails') {
+              return {'notificationLaunchedApp': false};
+            }
+            if (call.method == 'pendingNotificationRequests') {
+              pendingCalls += 1;
+              return pendingCalls == 1 ? <Object?>[] : verificationGate.future;
+            }
+            if (call.method == 'zonedSchedule') return null;
+            return null;
+          });
+      try {
+        final now = DateTime.utc(2026, 9, 9, 8);
+        final database = AppDatabase(
+          path: databasePath,
+          factory: databaseFactoryFfi,
+          clock: () => now,
+        );
+        await database.open();
+        await database.close();
+        final events = <StartupPhaseEvent>[];
+        final application = SqliteAgendaApplication(
+          databasePath: databasePath,
+          databaseFactory: databaseFactoryFfi,
+          clock: () => now,
+          notificationGateway: _GrantedFlutterReminderNotificationGateway(),
+          notificationPerAwaitLimit: const Duration(milliseconds: 100),
+          notificationTotalLimit: const Duration(seconds: 1),
+          notificationDiagnostics: StartupPhaseDiagnostics(sink: events.add),
+        );
+        await application.createProject(
+          const CreateProjectCommand(
+            id: '11111111-1111-4111-8111-111111111111',
+            name: 'MethodChannel şantiyesi',
+          ),
+        );
+
+        await application.createReminder(
+          CreateReminderCommand(
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+            eventId: 'eeeeeeee-eeee-4eee-8eee-000000744031',
+            title: 'Gerçek seam',
+            kind: ReminderKind.action,
+            schedule: ReminderScheduleKind.custom,
+            customAttentionAt: '2036-09-09T09:00:00Z',
+          ),
+        );
+
+        expect(
+          pendingCalls,
+          2,
+          reason:
+              'calls=${calls.map((call) => call.method).join(',')} '
+              'events=${events.map((event) => '${event.phase.name}:${event.outcome.name}').join(',')}',
+        );
+        expect(
+          calls.where((call) => call.method == 'zonedSchedule'),
+          hasLength(1),
+        );
+        final timeout = events.lastWhere(
+          (event) =>
+              event.phase == StartupPhase.pendingVerification &&
+              event.outcome == StartupPhaseOutcome.timedOut,
+        );
+        expect(
+          timeout.origin,
+          StartupDiagnosticOrigin.backgroundReconciliation,
+        );
+        final detail = await application.getReminderLifecycleDetail(
+          'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+        );
+        expect(detail.notification.syncState, NotificationSyncState.failed);
+        expect(
+          detail.notification.safeErrorCode,
+          'native_result_unknown_timeout',
+        );
+      } finally {
+        if (!verificationGate.isCompleted) {
+          verificationGate.complete(<Object?>[]);
+        }
+        await Future<void>.delayed(Duration.zero);
+        debugDefaultTargetPlatformOverride = null;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+        if (await temporaryRoot.exists()) {
+          await temporaryRoot.delete(recursive: true);
+        }
+      }
+    },
+  );
+
+  test(
+    'NB-01 Flutter seam preserves target lock and semantic diagnostics phases',
+    () async {
+      const channel = MethodChannel(
+        'dexterous.com/flutter/local_notifications',
+      );
+      final calls = <MethodCall>[];
+      Completer<Object?>? platformGate;
+      var failSchedule = false;
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      FlutterLocalNotificationsPlatform.instance = _IntentAndroidPlugin();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            if (call.method == 'initialize') return true;
+            if (call.method == 'getNotificationAppLaunchDetails') {
+              return {'notificationLaunchedApp': false};
+            }
+            if (call.method == 'pendingNotificationRequests') {
+              return platformGate?.future ?? <Object?>[];
+            }
+            if (call.method == 'zonedSchedule') {
+              if (failSchedule) {
+                throw PlatformException(code: 'synthetic-failure');
+              }
+              return platformGate?.future;
+            }
+            return null;
+          });
+      try {
+        final gateway = FlutterReminderNotificationGateway();
+        await gateway.initialize();
+        final pendingEvents = <StartupPhaseEvent>[];
+        platformGate = Completer<Object?>();
+        final pendingContext =
+            NotificationExecutionContext(
+              budget: NotificationExecutionBudget(
+                diagnostics: StartupPhaseDiagnostics(sink: pendingEvents.add),
+                perAwaitLimit: const Duration(milliseconds: 2),
+              ),
+              origin: StartupDiagnosticOrigin.finalReconciliation,
+            ).forPlatformCall(
+              StartupPhase.pendingVerification,
+              'pending-verification',
+            );
+        await expectLater(
+          runWithNotificationExecution(
+            pendingContext,
+            gateway.pendingNotifications,
+          ),
+          throwsA(isA<NotificationPlatformBoundaryException>()),
+        );
+        expect(pendingEvents.last.phase, StartupPhase.pendingVerification);
+        expect(pendingEvents.last.outcome, StartupPhaseOutcome.timedOut);
+        expect(
+          pendingEvents.last.origin,
+          StartupDiagnosticOrigin.finalReconciliation,
+        );
+        platformGate.complete(<Object?>[]);
+        await Future<void>.delayed(Duration.zero);
+
+        calls.clear();
+        platformGate = Completer<Object?>();
+        final targetAttempts = NotificationPlatformAttemptRegistry();
+        final request = ReminderNotificationRequest(
+          platformId: 74402,
+          reminderId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          title: 'Target lock',
+          body: 'Semantic request',
+          scheduledAtUtc: '2036-09-09T06:00:00Z',
+        );
+        final scheduleContext = NotificationExecutionContext(
+          budget: NotificationExecutionBudget(
+            diagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+            attempts: targetAttempts,
+            perAwaitLimit: const Duration(milliseconds: 2),
+          ),
+          origin: StartupDiagnosticOrigin.backgroundReconciliation,
+        ).forPlatformCall(StartupPhase.schedule, 'schedule:74402');
+        await expectLater(
+          runWithNotificationExecution(
+            scheduleContext,
+            () => gateway.schedule(request),
+          ),
+          throwsA(isA<NotificationPlatformBoundaryException>()),
+        );
+        final cancelContext = NotificationExecutionContext(
+          budget: NotificationExecutionBudget(
+            diagnostics: StartupPhaseDiagnostics(sink: (_) {}),
+            attempts: targetAttempts,
+          ),
+          origin: StartupDiagnosticOrigin.backgroundReconciliation,
+        ).forPlatformCall(StartupPhase.cancel, 'cancel:74402');
+        NotificationPlatformBoundaryException? conflict;
+        try {
+          await runWithNotificationExecution(
+            cancelContext,
+            () => gateway.cancel(74402),
+          );
+        } on NotificationPlatformBoundaryException catch (error) {
+          conflict = error;
+        }
+        expect(
+          conflict?.safeErrorCode,
+          StartupSafeErrorCode.platformCallInFlight,
+        );
+        expect(calls.where((call) => call.method == 'cancel'), isEmpty);
+        platformGate.complete(null);
+        await Future<void>.delayed(Duration.zero);
+
+        failSchedule = true;
+        final fallbackEvents = <StartupPhaseEvent>[];
+        final fallbackContext = NotificationExecutionContext(
+          budget: NotificationExecutionBudget(
+            diagnostics: StartupPhaseDiagnostics(sink: fallbackEvents.add),
+          ),
+          origin: StartupDiagnosticOrigin.finalReconciliation,
+        ).forPlatformCall(StartupPhase.inexactFallback, 'fallback:74402');
+        await expectLater(
+          runWithNotificationExecution(
+            fallbackContext,
+            () => gateway.scheduleInexactFallback(request),
+          ),
+          throwsA(isA<PlatformException>()),
+        );
+        expect(fallbackEvents.last.phase, StartupPhase.inexactFallback);
+        expect(fallbackEvents.last.outcome, StartupPhaseOutcome.failed);
+        expect(
+          fallbackEvents.last.safeErrorCode,
+          StartupSafeErrorCode.platformFailure,
+        );
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      }
+    },
+  );
 }
 
 class _IntentAndroidPlugin extends AndroidFlutterLocalNotificationsPlugin {
@@ -455,6 +1209,17 @@ class _IntentAndroidPlugin extends AndroidFlutterLocalNotificationsPlugin {
           onDidReceiveBackgroundNotificationResponse,
     );
   }
+}
+
+class _GrantedFlutterReminderNotificationGateway
+    extends FlutterReminderNotificationGateway {
+  @override
+  Future<NotificationPermissionState> permissionStatus() async =>
+      NotificationPermissionState.granted;
+
+  @override
+  Future<NotificationPermissionState> requestPermission() async =>
+      NotificationPermissionState.granted;
 }
 
 class _NoNotificationDatabase implements DatabaseFactory {

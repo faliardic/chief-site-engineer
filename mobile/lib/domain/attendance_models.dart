@@ -57,6 +57,46 @@ enum WorkforceRecordStatus {
   );
 }
 
+const workforceTechnicalTeamStorageName = '__cse_default_team_v1__';
+
+String workforceTechnicalTeamId(String projectId, String subcontractorId) {
+  const namespace = 'workforce-technical-team:v1';
+  return _workforceStableUuid('$namespace:$projectId:$subcontractorId');
+}
+
+bool isWorkforceTechnicalTeamLink({
+  required String projectId,
+  required String? subcontractorId,
+  required String? teamId,
+}) =>
+    subcontractorId != null &&
+    teamId != null &&
+    teamId == workforceTechnicalTeamId(projectId, subcontractorId);
+
+String _workforceStableUuid(String seed) {
+  int hash(String value, int salt) {
+    var result = (2166136261 ^ salt) & 0xffffffff;
+    for (final unit in value.codeUnits) {
+      result ^= unit;
+      result = (result * 16777619) & 0xffffffff;
+    }
+    return result;
+  }
+
+  final raw = List.generate(
+    4,
+    (index) =>
+        hash(seed, 0x9e3779b9 * (index + 1)).toRadixString(16).padLeft(8, '0'),
+  ).join();
+  final chars = raw.split('');
+  chars[12] = '4';
+  chars[16] = '8';
+  final value = chars.join();
+  return '${value.substring(0, 8)}-${value.substring(8, 12)}-'
+      '${value.substring(12, 16)}-${value.substring(16, 20)}-'
+      '${value.substring(20)}';
+}
+
 class Subcontractor {
   const Subcontractor({
     required this.id,
@@ -574,7 +614,7 @@ class CreateWorkforceMemberCommand {
     required this.id,
     required this.projectId,
     required this.fullName,
-    required this.teamName,
+    this.teamName,
     required this.roleName,
     this.personnelCode,
     this.subcontractorId,
@@ -589,7 +629,7 @@ class CreateWorkforceMemberCommand {
   final String id;
   final String projectId;
   final String fullName;
-  final String teamName;
+  final String? teamName;
   final String roleName;
   final String? personnelCode;
   final String? subcontractorId;
@@ -606,11 +646,12 @@ class UpdateWorkforceMemberCommand {
     required this.id,
     required this.expectedRevision,
     required this.fullName,
-    required this.teamName,
+    this.teamName,
     required this.roleName,
     this.personnelCode,
     this.subcontractorId,
     this.teamId,
+    this.useTechnicalTeam = false,
     this.phone,
     this.address,
     this.startedOn,
@@ -623,11 +664,12 @@ class UpdateWorkforceMemberCommand {
   final String id;
   final int expectedRevision;
   final String fullName;
-  final String teamName;
+  final String? teamName;
   final String roleName;
   final String? personnelCode;
   final String? subcontractorId;
   final String? teamId;
+  final bool useTechnicalTeam;
   final String? phone;
   final String? address;
   final String? startedOn;

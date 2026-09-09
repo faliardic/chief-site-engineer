@@ -200,7 +200,7 @@ class _WorkforcePageState extends State<WorkforcePage> {
                       ),
                     ),
                     subtitle: Text(
-                      '${member.subcontractorName ?? 'Tanımsız taşeron'} • ${member.teamName}\n'
+                      '${_memberRegistryLabel(member)}\n'
                       '${member.roleName}${member.personnelCode == null ? '' : ' • ${member.personnelCode}'}'
                       '${member.isActive ? '' : '\nPasif'}',
                     ),
@@ -253,6 +253,7 @@ class WorkforceMemberFormPage extends StatefulWidget {
 class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
   static const _newSubcontractor = '__new_subcontractor__';
   static const _newTeam = '__new_team__';
+  static const _noTeam = '__no_explicit_team__';
   late final String _commandId;
   late final TextEditingController _name;
   late final TextEditingController _role;
@@ -281,7 +282,9 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
     _startedOn = TextEditingController(text: widget.member?.startedOn);
     _note = TextEditingController(text: widget.member?.note);
     _subcontractorId = widget.member?.subcontractorId;
-    _teamId = widget.member?.teamId;
+    _teamId = widget.member == null || _usesTechnicalTeam(widget.member!)
+        ? _noTeam
+        : widget.member!.teamId;
     _loadRegistry();
   }
 
@@ -365,7 +368,7 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
         ),
       );
       _subcontractorId = value.id;
-      _teamId = null;
+      _teamId = _noTeam;
       await _loadRegistry();
     } on Object catch (error) {
       if (mounted) {
@@ -405,7 +408,7 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
     }
     setState(() {
       _subcontractorId = value;
-      _teamId = null;
+      _teamId = _noTeam;
       _teams = const [];
     });
     if (value != null) {
@@ -422,8 +425,8 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
     final subcontractorId = _subcontractorId;
     final teamId = _teamId;
     final team = _teams.where((item) => item.id == teamId).firstOrNull;
-    if (subcontractorId == null || team == null) {
-      setState(() => _error = 'Taşeron ve ekip seçilmelidir.');
+    if (subcontractorId == null) {
+      setState(() => _error = 'Taşeron seçilmelidir.');
       return;
     }
     setState(() {
@@ -438,9 +441,9 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
                 eventId: RecordId.randomUuid(),
                 projectId: widget.project.id,
                 subcontractorId: subcontractorId,
-                teamId: team.id,
+                teamId: team?.id,
                 fullName: _name.text,
-                teamName: team.name,
+                teamName: team?.name,
                 roleName: _role.text,
                 personnelCode: _code.text,
                 phone: _phone.text,
@@ -455,9 +458,10 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
                 eventId: RecordId.randomUuid(),
                 expectedRevision: widget.member!.revision,
                 subcontractorId: subcontractorId,
-                teamId: team.id,
+                teamId: team?.id,
+                useTechnicalTeam: team == null,
                 fullName: _name.text,
-                teamName: team.name,
+                teamName: team?.name,
                 roleName: _role.text,
                 personnelCode: _code.text,
                 phone: _phone.text,
@@ -531,10 +535,14 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
                 initialValue: _teamId,
                 isExpanded: true,
                 decoration: const InputDecoration(
-                  labelText: 'Ekip seç *',
+                  labelText: 'Ekip (opsiyonel)',
                   border: OutlineInputBorder(),
                 ),
                 items: [
+                  const DropdownMenuItem(
+                    value: _noTeam,
+                    child: Text('Ekip belirtilmedi'),
+                  ),
                   if (_subcontractorId != null)
                     const DropdownMenuItem(
                       value: _newTeam,
@@ -629,6 +637,19 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
       border: const OutlineInputBorder(),
     ),
   );
+}
+
+bool _usesTechnicalTeam(WorkforceMember member) => isWorkforceTechnicalTeamLink(
+  projectId: member.projectId,
+  subcontractorId: member.subcontractorId,
+  teamId: member.teamId,
+);
+
+String _memberRegistryLabel(WorkforceMember member) {
+  final subcontractor = member.subcontractorName ?? 'Tanımsız taşeron';
+  return _usesTechnicalTeam(member)
+      ? subcontractor
+      : '$subcontractor • ${member.teamName}';
 }
 
 String _message(Object error, String fallback) =>

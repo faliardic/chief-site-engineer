@@ -47,6 +47,7 @@ class _AttendancePageState extends State<AttendancePage> {
   bool _creatingProject = false;
   String? _error;
   List<ActiveTeamCount> _teamCounts = const [];
+  int _activePersonCount = 0;
   StreamSubscription<void>? _projectSubscription;
   bool _detailNavigationBusy = false;
   int _projectFieldGeneration = 0;
@@ -103,6 +104,7 @@ class _AttendancePageState extends State<AttendancePage> {
       if (!preserveDetail) {
         _detail = null;
         _teamCounts = const [];
+        _activePersonCount = 0;
       }
     });
     try {
@@ -126,6 +128,7 @@ class _AttendancePageState extends State<AttendancePage> {
         if (_project?.id != project?.id) {
           _detail = null;
           _teamCounts = const [];
+          _activePersonCount = 0;
         }
         _projects = projects;
         _project = project;
@@ -147,6 +150,7 @@ class _AttendancePageState extends State<AttendancePage> {
           _projectFieldGeneration += 1;
           _detail = null;
           _teamCounts = const [];
+          _activePersonCount = 0;
         }
         _error = 'Projeler açılamadı. Lütfen tekrar deneyin.';
       });
@@ -187,6 +191,9 @@ class _AttendancePageState extends State<AttendancePage> {
       final teamCounts = await widget.attendance.listActiveTeamCounts(
         selectedProject.id,
       );
+      final activePersonCount = (await widget.attendance.listMembers(
+        selectedProject.id,
+      )).length;
       if (!mounted ||
           !widget.isActive ||
           generation != _dayLoadGeneration ||
@@ -196,6 +203,7 @@ class _AttendancePageState extends State<AttendancePage> {
       setState(() {
         _detail = detail;
         _teamCounts = teamCounts;
+        _activePersonCount = activePersonCount;
       });
       _restoreScrollOffset(restoreOffset);
       return true;
@@ -223,11 +231,13 @@ class _AttendancePageState extends State<AttendancePage> {
     final previousProject = _project;
     final previousDetail = _detail;
     final previousTeamCounts = _teamCounts;
+    final previousActivePersonCount = _activePersonCount;
     setState(() {
       _project = project;
       _projectFieldGeneration += 1;
       _detail = null;
       _teamCounts = const [];
+      _activePersonCount = 0;
     });
     final loaded = await _loadDay(project: project);
     if (!mounted || !widget.isActive || _project?.id != projectId) return;
@@ -240,6 +250,7 @@ class _AttendancePageState extends State<AttendancePage> {
       _projectFieldGeneration += 1;
       _detail = previousDetail;
       _teamCounts = previousTeamCounts;
+      _activePersonCount = previousActivePersonCount;
       _dayReadFailed = false;
       _error =
           'Proje açılamadı. Önceki seçim korundu. Yeniden proje seçerek deneyebilirsiniz.';
@@ -393,10 +404,7 @@ class _AttendancePageState extends State<AttendancePage> {
   @override
   Widget build(BuildContext context) {
     final detail = _detail;
-    final activePersonCount = _teamCounts.fold<int>(
-      0,
-      (total, team) => total + team.activePersonCount,
-    );
+    final activePersonCount = _activePersonCount;
     final needsWorkforce =
         !_loading &&
         !_projectReadFailed &&

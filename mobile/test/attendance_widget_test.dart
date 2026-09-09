@@ -6,6 +6,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
+import 'package:chief_site_engineer/features/attendance/workforce_directory_page.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_page.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_person_detail_page.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_registry_page.dart';
@@ -715,6 +716,52 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('Q04-A2 workforce form creates a member without a real team', (
+    tester,
+  ) async {
+    await _setPhoneSize(tester, const Size(430, 820));
+    final attendance = FakeAttendanceApplication();
+    final subcontractor = await attendance.createSubcontractor(
+      const CreateSubcontractorCommand(
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        eventId: '11111111-1111-4111-8111-111111111111',
+        projectId: projectId,
+        name: 'Taşeron A',
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkforceMemberFormPage(
+          attendance: attendance,
+          project: _project(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workforce-subcontractor')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(subcontractor.name).last);
+    await tester.pumpAndSettle();
+    expect(find.text('Ekip belirtilmedi'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('workforce-name')),
+      'Ekipsiz Personel',
+    );
+    await tester.enterText(find.byKey(const Key('workforce-role')), 'Usta');
+    final save = find.byKey(const Key('save-workforce-member'));
+    await _scrollWorkforceFormTo(tester, save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    expect(attendance.createMemberCalls, 1);
+    expect(
+      attendance.lastCreateMemberCommand!.subcontractorId,
+      subcontractor.id,
+    );
+    expect(attendance.lastCreateMemberCommand!.teamId, isNull);
+    expect(attendance.lastCreateMemberCommand!.teamName, isNull);
+  });
+
   testWidgets(
     'member selectors create and auto-select subcontractor and team',
     (tester) async {
@@ -865,6 +912,83 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('KKD zimmeti ekle'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Q04-A2 technical team is masked in count directory and detail', (
+    tester,
+  ) async {
+    await _setPhoneSize(tester, const Size(430, 900));
+    final attendance = FakeAttendanceApplication();
+    final subcontractor = await attendance.createSubcontractor(
+      const CreateSubcontractorCommand(
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        eventId: '11111111-1111-4111-8111-111111111111',
+        projectId: projectId,
+        name: 'Taşeron A',
+      ),
+    );
+    final member = await attendance.createMember(
+      CreateWorkforceMemberCommand(
+        id: memberId,
+        eventId: '33333333-3333-4333-8333-333333333333',
+        projectId: projectId,
+        subcontractorId: subcontractor.id,
+        fullName: 'Ekipsiz Personel',
+        roleName: 'Usta',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkforceRegistryPage(
+          attendance: attendance,
+          project: _project(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('0 aktif ekip • 1 aktif personel'), findsOneWidget);
+    expect(
+      find.textContaining(workforceTechnicalTeamStorageName),
+      findsNothing,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: WorkforceDirectoryPage(
+            attendance: attendance,
+            agenda: FakeAgendaApplication(projects: [_project()]),
+            initialProjectId: projectId,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(Key('workforce-directory-member-${member.id}')),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(workforceTechnicalTeamStorageName),
+      findsNothing,
+    );
+    expect(find.textContaining('Taşeron A'), findsWidgets);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkforcePersonDetailPage(
+          attendance: attendance,
+          memberId: member.id,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Belirtilmedi'), findsWidgets);
+    expect(
+      find.textContaining(workforceTechnicalTeamStorageName),
+      findsNothing,
+    );
   });
 
   testWidgets('notification tap deep-links directly to attendance day', (
