@@ -49,7 +49,7 @@ void main() {
         navigation.destinations.cast<NavigationDestination>().map(
           (item) => item.label,
         ),
-        ['Ana Sayfa', 'Hatırlatıcı', 'Ajanda', 'Envanter', 'Puantaj'],
+        ['Ana Sayfa', 'Hatırlatıcı', 'Ajanda', 'Envanter', 'İş Gücü'],
       );
 
       await _openDashboardTool(

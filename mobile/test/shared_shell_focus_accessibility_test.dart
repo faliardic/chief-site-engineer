@@ -14,7 +14,7 @@ const _destinationLabels = [
   'Hatırlatıcı',
   'Ajanda',
   'Envanter',
-  'Puantaj',
+  'İş Gücü',
 ];
 
 const _project = MobileProject(
@@ -45,7 +45,7 @@ void main() {
       expect(tester.widget<NavigationBar>(navigation).selectedIndex, 3);
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pump();
-      await _tabUntilDestination(tester, navigation, 'Puantaj');
+      await _tabUntilDestination(tester, navigation, 'İş Gücü');
       await _activateFocusedDestination(tester, LogicalKeyboardKey.enter);
       expect(tester.widget<NavigationBar>(navigation).selectedIndex, 4);
 

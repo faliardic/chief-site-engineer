@@ -400,7 +400,7 @@ void main() {
         find.byKey(const Key('inventory-project-selection-required')),
         findsOneWidget,
       );
-      await _openTab(tester, 'Puantaj');
+      await _openTab(tester, 'İş Gücü');
       _expectIndicator('Proje seçilmedi');
       await _openTab(tester, 'Hatırlatıcı');
       _expectIndicator('Proje seçilmedi');
@@ -662,7 +662,7 @@ void main() {
       _expectIndicator(_projectA.name);
       await _openTab(tester, 'Ajanda');
       _expectIndicator(_projectA.name);
-      await _openTab(tester, 'Puantaj');
+      await _openTab(tester, 'İş Gücü');
       _expectIndicator(_projectA.name);
       expect(tester.takeException(), isNull);
     },

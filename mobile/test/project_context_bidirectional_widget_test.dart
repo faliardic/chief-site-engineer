@@ -985,7 +985,7 @@ void main() {
   );
 
   testWidgets(
-    'shell opens Puantaj on exact shared project and adopts only successful load',
+    'shell opens İş Gücü on exact shared project and keeps shared context',
     (tester) async {
       final agenda = _PhoneAgenda(projects: const [_projectA, _projectB]);
       final attendance = _TrackingAttendance();
@@ -1017,18 +1017,11 @@ void main() {
       expect(attendance.ensureProjectIds, isEmpty);
       expect(attendance.rollingCalls, 0);
 
-      await tester.tap(find.text('Puantaj').last);
+      await tester.tap(find.text('İş Gücü').last);
       await tester.pumpAndSettle();
       expect(attendance.ensureProjectIds, [_projectB.id]);
       expect(attendance.rollingCalls, 1);
-      final attendanceProjectField = find.descendant(
-        of: find.byKey(const Key('attendance-project')),
-        matching: find.byType(DropdownButtonFormField<String>),
-      );
-      expect(
-        tester.state<FormFieldState<String>>(attendanceProjectField).value,
-        _projectB.id,
-      );
+      expect(find.byKey(const Key('attendance-project')), findsNothing);
       expect(
         find.descendant(
           of: find.byType(AppBar),
@@ -1054,36 +1047,16 @@ void main() {
       expect(attendance.ensureProjectIds, [_projectB.id]);
       expect(attendance.rollingCalls, 1);
 
-      await tester.tap(find.text('Puantaj').last);
+      await tester.tap(find.text('İş Gücü').last);
       await tester.pumpAndSettle();
       expect(attendance.ensureProjectIds, [_projectB.id, _projectA.id]);
       expect(attendance.rollingCalls, 2);
-      expect(
-        tester.state<FormFieldState<String>>(attendanceProjectField).value,
-        _projectA.id,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('attendance-project')),
-          matching: find.text(_projectA.name),
-        ),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('attendance-project')), findsNothing);
 
       attendance.failNextEnsureProjectId = _projectB.id;
-      await _chooseProject(tester, attendanceProjectField, _projectB.name);
+      await _chooseSharedProject(tester, _projectB.id);
       expect(attendance.ensureProjectIds.last, _projectB.id);
       expect(attendance.rollingCalls, 2);
-      expect(
-        find.descendant(
-          of: find.byType(AppBar),
-          matching: find.text(_projectA.name),
-        ),
-        findsOneWidget,
-      );
-
-      await _chooseProject(tester, attendanceProjectField, _projectB.name);
-      expect(attendance.rollingCalls, 3);
       expect(
         find.descendant(
           of: find.byType(AppBar),
@@ -1092,13 +1065,23 @@ void main() {
         findsOneWidget,
       );
 
-      await _chooseProject(tester, attendanceProjectField, _projectA.name);
-      expect(attendance.rollingCalls, 4);
-      expect(attendance.ensureProjectIds.last, _projectA.id);
+      await _chooseSharedProject(tester, _projectA.id);
+      expect(attendance.rollingCalls, 3);
       expect(
         find.descendant(
           of: find.byType(AppBar),
           matching: find.text(_projectA.name),
+        ),
+        findsOneWidget,
+      );
+
+      await _chooseSharedProject(tester, _projectB.id);
+      expect(attendance.rollingCalls, 4);
+      expect(attendance.ensureProjectIds.last, _projectB.id);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text(_projectB.name),
         ),
         findsOneWidget,
       );

@@ -19,6 +19,8 @@ class AttendancePage extends StatefulWidget {
     required this.agenda,
     required this.activeProjectId,
     required this.isActive,
+    this.showProjectSelector = true,
+    this.reloadOnReactivation = true,
     this.onProjectSelected,
     super.key,
   });
@@ -27,6 +29,8 @@ class AttendancePage extends StatefulWidget {
   final AgendaApplication agenda;
   final String? activeProjectId;
   final bool isActive;
+  final bool showProjectSelector;
+  final bool reloadOnReactivation;
   final ValueChanged<String>? onProjectSelected;
 
   @override
@@ -53,6 +57,7 @@ class _AttendancePageState extends State<AttendancePage> {
   int _projectFieldGeneration = 0;
   int _projectLoadGeneration = 0;
   int _dayLoadGeneration = 0;
+  bool _refreshOnActivation = false;
 
   @override
   void initState() {
@@ -60,6 +65,7 @@ class _AttendancePageState extends State<AttendancePage> {
     final now = DateTime.now().toUtc();
     _localDate = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
     _projectSubscription = widget.agenda.projectChanges.listen((_) {
+      _refreshOnActivation = true;
       if (widget.isActive) unawaited(_loadProjects());
     });
     if (widget.isActive) unawaited(_loadProjects());
@@ -79,7 +85,13 @@ class _AttendancePageState extends State<AttendancePage> {
         oldWidget.activeProjectId != widget.activeProjectId;
     final currentProjectIsShared =
         _project?.id == widget.activeProjectId && _detail != null;
-    if (becameActive || (sharedProjectChanged && !currentProjectIsShared)) {
+    final needsActivationRefresh =
+        becameActive &&
+        (widget.reloadOnReactivation ||
+            _refreshOnActivation ||
+            !currentProjectIsShared);
+    if (needsActivationRefresh ||
+        (sharedProjectChanged && !currentProjectIsShared)) {
       unawaited(_loadProjects());
     }
   }
@@ -124,6 +136,7 @@ class _AttendancePageState extends State<AttendancePage> {
                 .where((candidate) => candidate.id == activeProjectId)
                 .firstOrNull;
       setState(() {
+        _refreshOnActivation = false;
         _projectsDiscovered = true;
         if (_project?.id != project?.id) {
           _detail = null;
@@ -455,35 +468,37 @@ class _AttendancePageState extends State<AttendancePage> {
                           ),
                         )
                       else if (_projects.isNotEmpty) ...[
-                        KeyedSubtree(
-                          key: const Key('attendance-project'),
-                          child: DropdownButtonFormField<String>(
-                            key: ValueKey(
-                              'attendance-project-field-$_projectFieldGeneration',
-                            ),
-                            initialValue: _project?.id,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Proje',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: _projects
-                                .map(
-                                  (project) => DropdownMenuItem(
-                                    value: project.id,
-                                    child: Text(
-                                      project.name,
-                                      overflow: TextOverflow.ellipsis,
+                        if (widget.showProjectSelector) ...[
+                          KeyedSubtree(
+                            key: const Key('attendance-project'),
+                            child: DropdownButtonFormField<String>(
+                              key: ValueKey(
+                                'attendance-project-field-$_projectFieldGeneration',
+                              ),
+                              initialValue: _project?.id,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Proje',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: _projects
+                                  .map(
+                                    (project) => DropdownMenuItem(
+                                      value: project.id,
+                                      child: Text(
+                                        project.name,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                )
-                                .toList(growable: false),
-                            onChanged: (id) {
-                              if (id != null) unawaited(_selectProject(id));
-                            },
+                                  )
+                                  .toList(growable: false),
+                              onChanged: (id) {
+                                if (id != null) unawaited(_selectProject(id));
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 20),
+                        ],
                         Text(
                           'Seçili gün',
                           style: Theme.of(context).textTheme.labelLarge,

@@ -8,8 +8,8 @@ import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
 import 'package:chief_site_engineer/features/agenda/phone_call_result_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
-import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_directory_page.dart';
+import 'package:chief_site_engineer/features/attendance/workforce_hub_page.dart';
 import 'package:chief_site_engineer/features/attachments/attachment_catalog_page.dart';
 import 'package:chief_site_engineer/features/attachments/attachment_health_page.dart';
 import 'package:chief_site_engineer/features/attachments/project_media_album_page.dart';
@@ -867,7 +867,7 @@ class _MobileShellState extends State<MobileShell> {
       icon: Icon(Icons.inventory_2_outlined),
       label: 'Envanter',
     ),
-    NavigationDestination(icon: Icon(Icons.badge_outlined), label: 'Puantaj'),
+    NavigationDestination(icon: Icon(Icons.groups_outlined), label: 'İş Gücü'),
   ];
 
   @override
@@ -957,7 +957,7 @@ class _MobileShellState extends State<MobileShell> {
                       _buildVisitedPrimaryTab(
                         4,
                         () => switch (widget.bootstrap.attendance) {
-                          final attendance? => AttendancePage(
+                          final attendance? => WorkforceHubPage(
                             attendance: attendance,
                             agenda: widget.bootstrap.agenda,
                             activeProjectId:
@@ -966,8 +966,8 @@ class _MobileShellState extends State<MobileShell> {
                             onProjectSelected: _reportPrimaryProjectSelection,
                           ),
                           null => const _PreparingPage(
-                            icon: Icons.badge_outlined,
-                            title: 'Puantaj',
+                            icon: Icons.groups_outlined,
+                            title: 'İş Gücü',
                           ),
                         },
                       ),

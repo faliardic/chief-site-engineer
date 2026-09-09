@@ -13,7 +13,7 @@ const _destinationLabels = [
   'Hatırlatıcı',
   'Ajanda',
   'Envanter',
-  'Puantaj',
+  'İş Gücü',
 ];
 
 void main() {
