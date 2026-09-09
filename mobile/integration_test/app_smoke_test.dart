@@ -425,7 +425,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('reminder-list')), findsOneWidget);
 
-      await tester.tap(find.text('Puantaj').last);
+      await tester.tap(find.text('İş Gücü').last);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('attendance-page')), findsOneWidget);
 

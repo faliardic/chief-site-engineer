@@ -14,6 +14,9 @@ class WorkforceDirectoryPage extends StatefulWidget {
     required this.attendance,
     required this.agenda,
     this.initialProjectId,
+    this.activeProjectId,
+    this.usesSharedProjectContext = false,
+    this.isActive = true,
     this.onProjectSelected,
     super.key,
   });
@@ -21,6 +24,9 @@ class WorkforceDirectoryPage extends StatefulWidget {
   final AttendanceApplication attendance;
   final AgendaApplication agenda;
   final String? initialProjectId;
+  final String? activeProjectId;
+  final bool usesSharedProjectContext;
+  final bool isActive;
   final ValueChanged<String>? onProjectSelected;
 
   @override
@@ -43,6 +49,10 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
   String? _subcontractorId;
   String? _teamId;
   bool _loading = true;
+  bool _hasLoadedProjects = false;
+  bool _refreshOnActivation = false;
+  int _projectLoadGeneration = 0;
+  int _directoryLoadGeneration = 0;
   bool _projectDiscoveryFailed = false;
   bool _navigationBusy = false;
   String? _error;
@@ -50,12 +60,48 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
   @override
   void initState() {
     super.initState();
-    _projectIdToValidate = widget.initialProjectId;
+    _projectIdToValidate = _requestedProjectId;
     _search.addListener(_refreshFilter);
-    _projectSubscription = widget.agenda.projectChanges.listen(
-      (_) => _loadProjects(),
-    );
-    _loadProjects();
+    _projectSubscription = widget.agenda.projectChanges.listen((_) {
+      if (widget.isActive) {
+        unawaited(_loadProjects());
+      } else {
+        _refreshOnActivation = true;
+      }
+    });
+    if (widget.isActive) unawaited(_loadProjects());
+  }
+
+  String? get _requestedProjectId => widget.usesSharedProjectContext
+      ? widget.activeProjectId
+      : widget.initialProjectId;
+
+  @override
+  void didUpdateWidget(covariant WorkforceDirectoryPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldRequestedProjectId = oldWidget.usesSharedProjectContext
+        ? oldWidget.activeProjectId
+        : oldWidget.initialProjectId;
+    final requestedProjectChanged =
+        oldRequestedProjectId != _requestedProjectId ||
+        oldWidget.usesSharedProjectContext != widget.usesSharedProjectContext;
+    if (requestedProjectChanged) {
+      _projectIdToValidate = _requestedProjectId;
+      _refreshOnActivation = true;
+    }
+    if (!widget.isActive) {
+      if (oldWidget.isActive) {
+        _projectLoadGeneration += 1;
+        _directoryLoadGeneration += 1;
+        if (_loading) setState(() => _loading = false);
+      }
+      return;
+    }
+    if (!oldWidget.isActive || requestedProjectChanged) {
+      if (_refreshOnActivation || !_hasLoadedProjects) {
+        unawaited(_loadProjects());
+      }
+    }
   }
 
   @override
@@ -74,7 +120,11 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
   }
 
   Future<void> _loadProjects() async {
+    if (!widget.isActive) return;
+    final generation = ++_projectLoadGeneration;
+    _directoryLoadGeneration += 1;
     final projectIdToValidate = _projectIdToValidate;
+    _refreshOnActivation = false;
     setState(() {
       _projects = const [];
       _project = null;
@@ -82,6 +132,7 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
       _subcontractors = const [];
       _teams = const [];
       _loading = true;
+      _hasLoadedProjects = false;
       _projectDiscoveryFailed = false;
       _error = null;
     });
@@ -89,16 +140,23 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
       final projects = (await widget.agenda.listProjects())
           .where((project) => !project.isArchived)
           .toList(growable: false);
-      if (!mounted) return;
+      if (!mounted ||
+          !widget.isActive ||
+          generation != _projectLoadGeneration) {
+        return;
+      }
       final selected = projects
           .where((project) => project.id == projectIdToValidate)
           .firstOrNull;
       final project =
           selected ??
-          (widget.initialProjectId == null ? projects.firstOrNull : null);
+          (!widget.usesSharedProjectContext && widget.initialProjectId == null
+              ? projects.firstOrNull
+              : null);
       setState(() {
         _projects = projects;
         _project = project;
+        _hasLoadedProjects = true;
         if (project != null) _projectIdToValidate = project.id;
         _subcontractorId = null;
         _teamId = null;
@@ -113,7 +171,7 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
         await _loadDirectory(project);
       }
     } on Object catch (error) {
-      if (mounted) {
+      if (mounted && widget.isActive && generation == _projectLoadGeneration) {
         setState(() {
           _projects = const [];
           _project = null;
@@ -125,13 +183,17 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
         });
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && widget.isActive && generation == _projectLoadGeneration) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   Future<void> _loadDirectory([MobileProject? requestedProject]) async {
+    if (!widget.isActive) return;
     final project = requestedProject ?? _project;
     if (project == null) return;
+    final generation = ++_directoryLoadGeneration;
     setState(() {
       _loading = true;
       _error = null;
@@ -142,23 +204,34 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
         widget.attendance.listSubcontractors(project.id, includeArchived: true),
         widget.attendance.listTeams(project.id, includeArchived: true),
       ]);
-      if (!mounted || _project?.id != project.id) return;
+      if (!mounted ||
+          !widget.isActive ||
+          generation != _directoryLoadGeneration ||
+          _project?.id != project.id) {
+        return;
+      }
       setState(() {
         _members = values[0] as List<WorkforceMember>;
         _subcontractors = values[1] as List<Subcontractor>;
         _teams = values[2] as List<WorkforceTeam>;
       });
     } on Object catch (error) {
-      if (mounted) {
+      if (mounted &&
+          widget.isActive &&
+          generation == _directoryLoadGeneration) {
         setState(() => _error = _message(error, 'Sicil kayıtları açılamadı.'));
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted &&
+          widget.isActive &&
+          generation == _directoryLoadGeneration) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   Future<void> selectProject(String projectId) async {
-    if (projectId == _project?.id || _loading) return;
+    if (!widget.isActive || projectId == _project?.id || _loading) return;
     final project = _projects
         .where((candidate) => candidate.id == projectId)
         .firstOrNull;

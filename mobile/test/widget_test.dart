@@ -258,7 +258,7 @@ void main() {
         'Hatırlatıcı',
         'Ajanda',
         'Envanter',
-        'Puantaj',
+        'İş Gücü',
       ];
       final navigationFinder = find.byType(NavigationBar);
       final navigation = tester.widget<NavigationBar>(navigationFinder);
@@ -319,7 +319,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
+      expect(tester.widget<NavigationBar>(navigationFinder).selectedIndex, 2);
+      expect(
+        find.text('Ajanda kayıtlarını görmek için üstten aktif proje seçin.'),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('create-agenda-log')), findsOneWidget);
       semantics.dispose();
     },
@@ -353,6 +357,10 @@ void main() {
       expect(find.byType(AgendaPage, skipOffstage: false), findsNothing);
       expect(find.byType(InventoryPage, skipOffstage: false), findsNothing);
       expect(find.byType(AttendancePage, skipOffstage: false), findsNothing);
+      expect(
+        find.byKey(const Key('workforce-hub'), skipOffstage: false),
+        findsNothing,
+      );
       expect(agenda.listProjectsCalls, 2);
       expect(agenda.todayOverviewCalls, 0);
       expect(agenda.listAgendaCalls, 0);
@@ -394,12 +402,13 @@ void main() {
         findsOneWidget,
       );
 
-      await openTab(Icons.badge_outlined);
+      await openTab(Icons.groups_outlined);
       expect(agenda.listProjectsCalls, 5);
       expect(
         find.text('Puantaj için önce Ajanda bölümünden bir proje oluşturun.'),
         findsOneWidget,
       );
+      expect(find.byKey(const Key('workforce-hub')), findsOneWidget);
 
       final projectReadsAfterFirstVisits = agenda.listProjectsCalls;
       await openTab(Icons.notifications_none_rounded);
@@ -593,6 +602,10 @@ void main() {
         expect(find.byType(InventoryPage, skipOffstage: false), findsOneWidget);
         expect(
           find.byType(AttendancePage, skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('workforce-hub'), skipOffstage: false),
           findsOneWidget,
         );
         _selectPrimaryDestination(tester, 2);
