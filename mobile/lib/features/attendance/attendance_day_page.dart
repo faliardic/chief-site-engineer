@@ -136,37 +136,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
       _error = null;
     });
     try {
-      final values = <AttendanceRosterValue>[];
-      for (final member in _members) {
-        final result = _results[member.id];
-        if (result == null) continue;
-        final overtime = int.tryParse(_overtime[member.id]!.text.trim());
-        if (overtime == null) {
-          throw const AgendaValidationFailure(
-            'Fazla mesai tam dakika olarak girilmelidir.',
-          );
-        }
-        values.add(
-          AttendanceRosterValue(
-            entryId: _entryIds[member.id]!,
-            memberId: member.id,
-            result: result,
-            overtimeMinutes: overtime,
-            shortNote: _notes[member.id]!.text,
-          ),
-        );
-      }
-      await widget.attendance.saveRoster(
-        SaveAttendanceRosterCommand(
-          dayId: detail.day.id,
-          eventId: _saveEventId,
-          expectedRevision: detail.day.revision,
-          values: values,
-          replaceGeneralNote: true,
-          generalNote: _generalNote.text,
-        ),
-      );
-      _saveEventId = RecordId.randomUuid();
+      await _saveCurrentDraft(detail);
       await _load();
     } on Object catch (error) {
       if (!mounted) return;
@@ -174,6 +144,43 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  Future<AttendanceDayDetail> _saveCurrentDraft(
+    AttendanceDayDetail detail,
+  ) async {
+    final values = <AttendanceRosterValue>[];
+    for (final member in _members) {
+      final result = _results[member.id];
+      if (result == null) continue;
+      final overtime = int.tryParse(_overtime[member.id]!.text.trim());
+      if (overtime == null) {
+        throw const AgendaValidationFailure(
+          'Fazla mesai tam dakika olarak girilmelidir.',
+        );
+      }
+      values.add(
+        AttendanceRosterValue(
+          entryId: _entryIds[member.id]!,
+          memberId: member.id,
+          result: result,
+          overtimeMinutes: overtime,
+          shortNote: _notes[member.id]!.text,
+        ),
+      );
+    }
+    final saved = await widget.attendance.saveRoster(
+      SaveAttendanceRosterCommand(
+        dayId: detail.day.id,
+        eventId: _saveEventId,
+        expectedRevision: detail.day.revision,
+        values: values,
+        replaceGeneralNote: true,
+        generalNote: _generalNote.text,
+      ),
+    );
+    _saveEventId = RecordId.randomUuid();
+    return saved;
   }
 
   void _markDraftFull([String? teamId]) {
@@ -332,12 +339,24 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
       _error = null;
     });
     try {
+      var currentDetail = detail;
+      if (transition == AttendanceTransition.complete) {
+        try {
+          currentDetail = await _saveCurrentDraft(detail);
+        } on Object catch (error) {
+          if (!mounted) return;
+          setState(() => _error = _message(error, 'Puantaj kaydedilemedi.'));
+          return;
+        }
+        if (!mounted) return;
+        setState(() => _detail = currentDetail);
+      }
       await widget.attendance.transitionDay(
         TransitionAttendanceDayCommand(
-          dayId: detail.day.id,
+          dayId: currentDetail.day.id,
           dayEventId: _dayEventId,
           reminderEventId: _reminderEventId,
-          expectedRevision: detail.day.revision,
+          expectedRevision: currentDetail.day.revision,
           transition: transition,
         ),
       );

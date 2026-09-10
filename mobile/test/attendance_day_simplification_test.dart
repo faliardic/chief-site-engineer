@@ -312,7 +312,7 @@ void main() {
   );
 
   testWidgets(
-    'bulk stays in draft while transitions keep exact revision events',
+    'complete saves the visible draft before transitioning post-save revision',
     (tester) async {
       final attendance = await _fixture();
       await _pump(tester, attendance);
@@ -324,10 +324,110 @@ void main() {
       await _tap(tester, _key('mark-all-full'));
       expect(attendance.bulk, isEmpty);
       expect(attendance.saveCalls, 0);
+      await _tap(tester, _detailsTitle);
+      await tester.enterText(
+        _key('attendance-note-person-a'),
+        'Tamamlama öncesi not',
+      );
+      await tester.enterText(_key('attendance-general-note'), 'Gün sonu notu');
+      await _tap(tester, _detailsTitle);
+
+      await _tap(tester, _key('complete-attendance-day'));
+      await _tap(tester, _key('confirm-attendance-transition'));
+
+      final save = attendance.lastRosterCommand!;
+      final complete = attendance.transitions.single;
+      expect(save.expectedRevision, 7);
+      expect(save.values.single.shortNote, 'Tamamlama öncesi not');
+      expect(save.generalNote, 'Gün sonu notu');
+      expect(complete.dayId, 'day-a');
+      expect(complete.expectedRevision, 8);
+      expect(complete.transition, AttendanceTransition.complete);
+      expect(attendance.operations, ['save:7', 'transition:complete:8']);
+      expect(attendance.detail!.day.status, AttendanceDayStatus.completed);
+      expect(
+        attendance.detail!.entries.single.shortNote,
+        'Tamamlama öncesi not',
+      );
+      expect(attendance.detail!.day.generalNote, 'Gün sonu notu');
+    },
+  );
+
+  testWidgets('save failure blocks completion and keeps the draft editable', (
+    tester,
+  ) async {
+    final attendance = await _fixture();
+    attendance.saveFailure = const AgendaValidationFailure(
+      'Fazla mesai geçersiz.',
+    );
+    await _pump(tester, attendance);
+    await _tap(tester, _detailsTitle);
+    await tester.enterText(
+      _key('attendance-note-person-a'),
+      'Kaydedilemeyen not',
+    );
+    await _tap(tester, _detailsTitle);
+
+    await _tap(tester, _key('complete-attendance-day'));
+    await _tap(tester, _key('confirm-attendance-transition'));
+
+    expect(attendance.saveCalls, 1);
+    expect(attendance.transitions, isEmpty);
+    expect(attendance.detail!.day.status, AttendanceDayStatus.draft);
+    expect(attendance.detail!.day.revision, 7);
+    expect(find.text('Fazla mesai geçersiz.'), findsOneWidget);
+    expect(_key('save-attendance-draft').hitTestable(), findsOneWidget);
+    await _tap(tester, _detailsTitle);
+    expect(
+      tester
+          .widget<TextField>(_key('attendance-note-person-a'))
+          .controller!
+          .text,
+      'Kaydedilemeyen not',
+    );
+  });
+
+  testWidgets('completion failure retains the saved draft and draft status', (
+    tester,
+  ) async {
+    final attendance = await _fixture();
+    attendance.transitionFailure = const AgendaValidationFailure(
+      'Tamamlama şu anda yapılamadı.',
+    );
+    await _pump(tester, attendance);
+    await _tap(tester, _detailsTitle);
+    await tester.enterText(_key('attendance-note-person-a'), 'Kaydedilmiş not');
+    await _tap(tester, _detailsTitle);
+
+    await _tap(tester, _key('complete-attendance-day'));
+    await _tap(tester, _key('confirm-attendance-transition'));
+
+    expect(attendance.saveCalls, 1);
+    expect(attendance.transitions.single.expectedRevision, 8);
+    expect(attendance.detail!.day.status, AttendanceDayStatus.draft);
+    expect(attendance.detail!.day.revision, 8);
+    expect(attendance.detail!.entries.single.shortNote, 'Kaydedilmiş not');
+    expect(find.text('Tamamlama şu anda yapılamadı.'), findsOneWidget);
+    expect(_key('save-attendance-draft').hitTestable(), findsOneWidget);
+
+    attendance.transitionFailure = null;
+    await _tap(tester, _key('complete-attendance-day'));
+    await _tap(tester, _key('confirm-attendance-transition'));
+
+    expect(attendance.saveCalls, 2);
+    expect(attendance.lastRosterCommand!.expectedRevision, 8);
+    expect(attendance.transitions.last.expectedRevision, 9);
+    expect(attendance.detail!.day.status, AttendanceDayStatus.completed);
+  });
+
+  testWidgets(
+    'no-work and reopen transition directly without an implicit draft save',
+    (tester) async {
+      final attendance = await _fixture();
+      await _pump(tester, attendance);
       for (final step in [
-        ('complete-attendance-day', AttendanceTransition.complete),
-        ('reopen-attendance-day', AttendanceTransition.reopen),
         ('attendance-no-work', AttendanceTransition.noWork),
+        ('reopen-attendance-day', AttendanceTransition.reopen),
       ]) {
         final revision = attendance.detail!.day.revision;
         await _tap(tester, _key(step.$1));
@@ -339,12 +439,13 @@ void main() {
         expect(command.dayEventId, isNotEmpty);
         expect(command.reminderEventId, isNotEmpty);
       }
-      expect(attendance.transitions.map((c) => c.dayEventId).toSet().length, 3);
+      expect(attendance.saveCalls, 0);
+      expect(attendance.transitions.map((c) => c.dayEventId).toSet().length, 2);
       expect(
         attendance.transitions.map((c) => c.reminderEventId).toSet().length,
-        3,
+        2,
       );
-      expect(_key('reopen-attendance-day'), findsOneWidget);
+      expect(_key('complete-attendance-day'), findsOneWidget);
     },
   );
 
@@ -580,6 +681,8 @@ class _Attendance extends FakeAttendanceApplication {
   final removals = <RemoveAttendanceEntryCommand>[];
   final transitions = <TransitionAttendanceDayCommand>[];
   final exports = <(ExportAttendanceDayCommand, bool)>[];
+  final operations = <String>[];
+  Object? transitionFailure;
   @override
   Future<AttendanceDayDetail> getDayDetail(String dayId) async {
     reads.add('day:$dayId');
@@ -640,10 +743,21 @@ class _Attendance extends FakeAttendanceApplication {
   }
 
   @override
+  Future<AttendanceDayDetail> saveRoster(SaveAttendanceRosterCommand command) {
+    operations.add('save:${command.expectedRevision}');
+    return super.saveRoster(command);
+  }
+
+  @override
   Future<AttendanceDayDetail> transitionDay(
     TransitionAttendanceDayCommand command,
   ) {
     transitions.add(command);
+    operations.add(
+      'transition:${command.transition.name}:${command.expectedRevision}',
+    );
+    final failure = transitionFailure;
+    if (failure != null) return Future.error(failure);
     return super.transitionDay(command);
   }
 
