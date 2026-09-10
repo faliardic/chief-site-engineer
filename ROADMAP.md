@@ -1,7 +1,7 @@
 # CSE V2 — Kanonik Ürün Yol Haritası
 
 **Durum:** Güncel yürütme sırası ve ilk genel yayın öncesi tek kanonik kuyruk  
-**Güncelleme:** 7 Eylül 2026
+**Güncelleme:** 10 Eylül 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`  
 **Değişken repository gerçeği:** Güncel SHA, açık Issue/PR, merge ve gate durumu her görevde GitHub `master` üzerinden doğrulanır.
 
@@ -13,7 +13,8 @@ Bu `ROADMAP.md`, CSE için **güncel yürütme sırasının tek kanonik dosyası
 - Kalıcı ürün/veri ilkeleri `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` içindedir.
 - Çalışma, test, güvenlik ve publication kuralları `AGENTS.md` ve `docs/protocols/` altındaki bağlayıcı protokollerdedir.
 - **Sıradaki ürün/release işi bu dosyadaki `İlk genel yayın öncesi tek kanonik yürütme kuyruğu`ndan seçilir.**
-- Aynı anda açık bir production Issue/PR varsa önce onun required gate'leri tamamlanır; sonraki queue maddesine geçilmez.
+- Varsayılan parent mode `NONE` iken aynı anda açık bir production Issue/PR varsa önce onun required gate'leri tamamlanır; sonraki queue maddesine geçilmez.
+- Yalnız owner-approved `MULTI_FEATURE_PARALLEL` parent lock, queue sırasını değiştirmeden ve ilişkileri kendi parent kaydında tutarak en fazla üç önceden adlandırılmış feature dilimini paralel yürütebilir. Seçilen dilimler bu dosyanın sırasıyla uyumlu olmalıdır; bu dosya parent lock, roster, ilişki veya çalışma durumu tutmaz.
 - Queue sırası ancak Fatih'in yeni owner kararıyla değişir. Sıra değişikliği production işe başlamadan önce GitHub'da bu dosyaya yansıtılır.
 - Queue üzerindeki durum notları yön gösterir; gerçek `OPEN/CLOSED`, PR head, test ve Acceptance durumu her zaman current GitHub gerçeğinden okunur.
 - Eski Issue/PR, sohbet özeti, handoff, ZIP veya tarihsel roadmap metni bu sırayı override edemez.
@@ -864,14 +865,15 @@ Tüm zorunlu gate'ler geçtikten sonra public/store release ancak Fatih'in ayrı
 
 ChatGPT her yeni görevde veya `devam` talebinde:
 
-1. current GitHub `master`, `AGENTS.md`, açık production Issue/PR ve bu queue'yu okur;
-2. açık production Issue/PR varsa önce onu required gate'lerine kadar tamamlar;
-3. aksi halde Q01→Q26 içinde current GitHub'a göre tamamlanmamış ilk uygulanabilir maddeyi seçer;
-4. `DECISION GATE` maddesinde Fatih kararı yoksa implementation başlatmaz;
-5. CRITICAL etiketi taşıyan maddede exact Issue/allowlist/compatibility/manual gate olmadan değişiklik yaptırmaz;
-6. Fatih yeni sıra kararı verirse önce ROADMAP truth-sync yapılır, sonra production iş başlar;
-7. aynı anda ikinci production implementation child açmaz;
-8. tamamlanmış bir queue maddesini tekrar geliştirme işi gibi açmaz; yalnız kanıtlanmış regresyonda dar bug Issue açar veya ROADMAP'te açık owner-inserted dar refinement tanımlanır.
+1. current GitHub `master`, `AGENTS.md`, açık production Issue/PR, varsa yetkili parent lock ve bu queue'yu okur;
+2. parent mode `NONE` ise açık production Issue/PR'yi önce required gate'lerine kadar tamamlar;
+3. açık `MULTI_FEATURE_PARALLEL` parent lock varsa yalnız kaydedilmiş en fazla üç feature roster'ını, pairwise ilişkileri ve queue sırasını koruyarak koordine eder;
+4. aksi halde Q01→Q26 içinde current GitHub'a göre tamamlanmamış ilk uygulanabilir maddeyi seçer;
+5. `DECISION GATE` maddesinde Fatih kararı yoksa implementation başlatmaz;
+6. CRITICAL etiketi taşıyan maddede exact Issue/allowlist/compatibility/manual gate olmadan değişiklik yaptırmaz;
+7. Fatih yeni sıra kararı verirse önce ROADMAP truth-sync yapılır, sonra production iş başlar;
+8. parent lock olmadan aynı anda ikinci production implementation child açmaz;
+9. tamamlanmış bir queue maddesini tekrar geliştirme işi gibi açmaz; yalnız kanıtlanmış regresyonda dar bug Issue açar veya ROADMAP'te açık owner-inserted dar refinement tanımlanır.
 
 ### Owner geri bildirimi sonrası tam yeniden sıralama kuralı
 

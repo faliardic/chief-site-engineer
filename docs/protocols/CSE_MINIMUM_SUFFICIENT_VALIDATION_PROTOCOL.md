@@ -1,7 +1,7 @@
-# CSE Minimum Yeterli Doğrulama Protokolü — One-Pass Validation v4
+# CSE Minimum Yeterli Doğrulama Protokolü — One-Pass Validation v5
 
 **Belge türü:** Bağlayıcı validation ve evidence protokolü
-**Geçerlilik tarihi:** 2026-09-03
+**Geçerlilik tarihi:** 2026-09-10
 
 Doğru hedef maksimum test değil, değişen sözleşmenin riskini karşılayan minimum yeterli doğrulamadır.
 
@@ -89,6 +89,18 @@ Aşağıdaki contract değişmediyse son merged/validated kanıt yeniden kullan�
 - entrypoint/artifact provenance.
 
 Aynı source revision üzerinde geçen test tekrar çalıştırılmaz. Kaynak değiştiğinde yalnız etkilenen test ve gerekli üst kapı yeniden çalıştırılır.
+
+`MULTI_FEATURE_PARALLEL` integration kanıtı exact feature revision + exact
+target-master revision ve gerekiyorsa exact PR merge candidate üçlüsüne bağlanır.
+Target master veya merge candidate değiştiğinde eski PASS yeni birleşime taşınmaz;
+kalan feature conflict/protected drift'i yeniden değerlendirir ve yalnız etkilenen
+validation, review ve gerekiyorsa owner/manual acceptance'ı tekrarlar.
+
+Parent veya sibling status kaydı validation kanıtı değildir. Her feature kendi
+allowlist/protected-path ve gate sonuçlarını kendi Issue/PR kaydında taşır; #479
+manuel kabul kaynağı kalır ve Builder/Reviewer PASS yazamaz. Shared runtime
+resource lease'i bulunmayan eşzamanlı device, cache, generated output veya ortak
+artifact işlemi doğrulanmış sayılmaz.
 
 ## 5. Mikro adım doğrulaması
 

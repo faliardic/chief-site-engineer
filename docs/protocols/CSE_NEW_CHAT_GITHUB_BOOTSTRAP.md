@@ -1,4 +1,4 @@
-# CSE New Chat GitHub Bootstrap — Dynamic v2
+# CSE New Chat GitHub Bootstrap — Dynamic v3
 
 Repository: `faliardic/chief-site-engineer`
 Default branch: `master`
@@ -11,8 +11,8 @@ Yeni sohbet yalnız şu sırayı uygular:
 
 1. current `master` üzerindeki `AGENTS.md`;
 2. current master HEAD;
-3. açık Issue/PR/branch durumu;
-4. aktif görev ve owner'ın son scope kararı;
+3. açık Issue/PR/branch durumu ve varsa yetkili parent orchestration lock;
+4. aktif feature görevi, exact target master ve owner'ın son scope kararı;
 5. yalnız değişen sözleşmenin gerektirdiği koşullu protokol.
 
 Sabit SHA, schema, app version, aktif V2 item, test sayısı veya PR listesi bu bootstrap belgesinde tutulmaz.
@@ -35,7 +35,10 @@ FAST veya rutin resume sırasında bütün uzun kaynaklar yeniden okunmaz.
 Kullanıcı `devam` veya `GitHub'dan devam et` dediğinde ChatGPT:
 
 - current GitHub durumunu okur;
-- birden fazla açık iş varsa bağımlılık ve blocker'ı belirler;
+- birden fazla açık iş varsa varsayılan parent mode `NONE` kuralını uygular;
+- yalnız current owner-approved `MULTI_FEATURE_PARALLEL` parent lock varsa en fazla üç predeclared feature roster'ını, pairwise ilişkiyi, shared-surface owner'ını, runtime lease'i, exact target master'ı ve status freshness'ını doğrular;
+- stale parent/sibling status'u readiness, completion veya authority saymaz;
+- bağımlılık ve blocker'ı feature bazında belirler;
 - önce sıradaki tek güvenli aksiyonu ve sorumlu aktörü seçer;
 - aynı authority metnini tekrar üretmez;
 - Codex gerekiyorsa kullanıcının `Codex ile çalış` demesini beklemeden `Sıradaki aktör: Codex` der ve 10–15 satırı geçmeyen exact görevi verir; her handoff'ta kapsam/risk, beklenen validation/build/device işi ve blocker'a göre ChatGPT'nin belirlediği açık `Execution time budget: <süre>` bulunur, global sabit süre varsayılmaz;
@@ -49,6 +52,9 @@ Kullanıcıdan eski prompt/result/YAML kopyalaması istenmez.
 ## 4. Current-state sınırı
 
 README, `.cse/state`, task/result, ZIP, handoff, podcast veya sohbet hafızası current GitHub gerçeğini override edemez.
+Parent durum kaydı da ROADMAP, feature Issue/PR authority'si veya güncel GitHub
+kanıtı yerine geçmez. Açık parent lock yoksa yeni sohbet çoklu-feature mode
+uydurmaz ve bu protokolün varlığını pilot activation saymaz.
 
 GitHub'a erişilemiyorsa:
 

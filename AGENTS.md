@@ -61,14 +61,15 @@ ChatGPT/Work Mode sıradaki production veya release işini sohbet hafızasından
 
 Her yeni görev, `devam`, `sırada ne var`, `yayından önce ne kaldı` veya eşdeğer koordinasyon talebinde:
 
-1. önce current açık production Issue/PR kontrol edilir;
-2. açık production Issue/PR varsa required review/validation/manual gate'leri kapanmadan yeni production child başlatılmaz;
-3. açık production işi yoksa `ROADMAP.md` Q01→Q26 kuyruğunda current GitHub gerçeğine göre tamamlanmamış ilk uygulanabilir madde seçilir;
-4. `DECISION GATE` maddesi Fatih kararı olmadan implementation'a çevrilmez;
-5. `CRITICAL` maddesi exact Issue, allowlist, compatibility ve required manual/device gate olmadan çalıştırılmaz;
-6. completed/merged bir queue maddesi yeniden feature işi gibi açılmaz; yalnız kanıtlanmış regresyonda dar bug child açılır;
-7. Fatih queue sırasını değiştirirse production işe geçmeden önce owner kararı ROADMAP'e truth-sync edilir;
-8. ROADMAP durum etiketi ile current GitHub Issue/PR durumu çelişirse current GitHub gerçeği status için, ROADMAP ise sıra için otoritedir.
+1. önce current açık production Issue/PR ve varsa yetkili parent orchestration kaydı kontrol edilir;
+2. varsayılan parent mode `NONE` iken açık production Issue/PR required review/validation/manual gate'lerine ulaşmadan yeni production child başlatılmaz;
+3. yalnız owner-approved `MULTI_FEATURE_PARALLEL` parent lock varsa, ROADMAP sırası ve kaydedilmiş ilişkiler korunarak önceden adlandırılmış feature roster'ı paralel yürüyebilir;
+4. açık ve yetkili iş yoksa `ROADMAP.md` Q01→Q26 kuyruğunda current GitHub gerçeğine göre tamamlanmamış ilk uygulanabilir madde seçilir;
+5. `DECISION GATE` maddesi Fatih kararı olmadan implementation'a çevrilmez;
+6. `CRITICAL` maddesi exact Issue, allowlist, compatibility ve required manual/device gate olmadan çalıştırılmaz;
+7. completed/merged bir queue maddesi yeniden feature işi gibi açılmaz; yalnız kanıtlanmış regresyonda dar bug child açılır;
+8. Fatih queue sırasını değiştirirse production işe geçmeden önce owner kararı ROADMAP'e truth-sync edilir;
+9. ROADMAP durum etiketi ile current GitHub Issue/PR durumu çelişirse current GitHub gerçeği status için, ROADMAP ise sıra için otoritedir.
 
 Bu kuralın amacı, her sohbette aynı yayın yol haritasını sürdürmek ve owner kararı olmadan madde atlamayı, yeniden sıralamayı veya feature şişmesini engellemektir.
 
@@ -91,6 +92,15 @@ ADS execution topology'sini ve lane routing'ini seçer. `SINGLE`, tek
 1 `Scout/READ` + 1 `Reviewer/READ` kullanır; yalnız Builder production writer'dır.
 Scout ve Reviewer aynı task'ın read-only lane'leridir, ek production işi veya
 branch/PR değildir. Ayrıntılı davranış pinned ADS CORE ve ilgili skill'den okunur.
+
+`SINGLE | PARALLEL_READ` feature-içi topology'dir. Varsayılan parent mode
+`NONE` ve tek feature execution'ıdır. `MULTI_FEATURE_PARALLEL` yalnız ayrı owner
+authority'si ve exact parent lock ile seçilebilen orchestration mode'dur; bu
+protokolde bulunması pilotu etkinleştirmez. İlk pilotta `MAX_OPEN_FEATURES = 3`
+ve `MAX_OWNER_ACCEPTANCE_PENDING = 1` olur; bekleyen review/owner/authority gate'i
+açık feature sayısına dahildir. Her feature ayrı Issue, canonical-repo-derived
+worktree, branch, Draft PR, scope/allowlist/protected path, routing/topology lock
+ve tek Builder/WRITE taşır.
 
 Her Codex handoff'u ChatGPT'nin göreve özel belirlediği açık `Execution time budget: <süre>` alanını taşır. Bütçe; kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre seçilir.
 
@@ -193,6 +203,7 @@ Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro a
 - Gerçek kullanıcı data root'u açık CRITICAL authority olmadan okunmaz/değiştirilmez.
 - Production/debug paketleri sıradan automation tarafından başlatılmaz, temizlenmez veya mutate edilmez.
 - Stable identity, optimistic revision, append-only event/history, transaction, backup/restore ve attachment bütünlüğü korunur.
+- #502 pre-update recoverability/owner-data preservation, #503 restore safety ve #504 recovery sınırları P0 otoriteleridir; parent orchestration bunları daraltamaz.
 - Force-push, destructive reset/clean/stash, hard-delete ve beklenmeyen kullanıcı değişikliğinin üzerine yazma yasaktır.
 - Beklenmeyen tracked/untracked değişiklikte işlem durur; otomatik temizleme yapılmaz.
 - Gerekli review/validation/manual kapısı FAIL/PENDING iken veya blocker, REQUEST_CHANGES, scope/allowlist/base/head drift, conflict ya da mergeability sorunu varken Ready/merge yapılmaz.
@@ -202,10 +213,23 @@ Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro a
 ## 7. Git, publication ve Issue disposition
 
 - FAST: Codex automated PASS ve gerekiyorsa Fatih manuel/device PASS sonrası tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa tek minimal Draft PR, required review/gate PASS sonrası ChatGPT'nin otomatik Ready/squash merge'i ve `master` sync.
-- STANDARD: en fazla bir aktif production branch/PR; squash merge varsayılanı.
+- STANDARD: parent mode `NONE` iken en fazla bir aktif production branch/PR; squash merge varsayılanı.
 - CRITICAL: Issue'ya özel branch/PR/review zinciri.
 - `PARALLEL_READ` lane'leri aynı task ve tek production branch/PR içinde kalır;
   Scout/Reviewer yeni production branch, PR veya writer oluşturmaz.
+- Açık `MULTI_FEATURE_PARALLEL` parent lock'unda en fazla üç predeclared feature
+  envelope'u bulunur. Her envelope ayrı branch/worktree/Draft PR ve tek writer
+  taşır; iki aktif writer aynı path'i reserve edemez veya yazamaz.
+- Pairwise ilişki `INDEPENDENT | COORDINATION_REQUIRED | DEPENDENCY_BLOCKED`
+  olarak kaydedilir. `SHARED_INTEGRATION_SURFACE` exact path/contract ve tam olarak bir
+  owning feature belirtir; sibling consumer ayrı yetki olmadan read-only kalır.
+- Feature'lar serial integrate edilir. Kanıt exact feature revision + exact
+  target-master revision'a ve gerekliyse exact PR merge candidate'a bağlıdır;
+  master ilerleyince kalan feature conflict/protected drift'i yeniden değerlendirir
+  ve yalnız etkilenen validation/review/acceptance'ı yeniler.
+- Parent status koordinasyon içindir; ROADMAP veya feature authority'sinin yerine
+  geçmez. Stale durum kanıt/authority değildir; otomatik dördüncü/replacement
+  feature, merge, device veya release yoktur.
 - Force-push yapılmaz.
 - Stacked PR oluşturulmaz.
 - Protokol kabul edildiğinde zaten açık olan legacy/stacked production PR'lar bir defalık geçiş kuyruğudur; yeni stack açma yetkisi vermez. Kuyruk çözülene kadar yeni production branch açılmaz; mevcut PR'lar current master'a birer birer uyarlanır ve her biri required review/validation/manual ve drift/mergeability kapılarından geçmeden Ready/merge edilmez.

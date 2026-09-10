@@ -1,7 +1,7 @@
-# CSE Workflow Acceleration Protocol — v8
+# CSE Workflow Acceleration Protocol — v9
 
 **Belge türü:** Bağlayıcı execution, correction ve publication protokolü
-**Geçerlilik tarihi:** 2026-09-09
+**Geçerlilik tarihi:** 2026-09-10
 
 Amaç maksimum kanıt üretmek değil, değişen sözleşmenin riskini karşılayan en hafif süreçle güvenli ürünü hızla master'a taşımaktır.
 
@@ -67,9 +67,9 @@ Aşağıdakilerden biri vardır:
 
 Dosya sayısı, widget test karmaşıklığı, navigation veya callback tek başına CRITICAL gerekçesi değildir.
 
-### Execution topology ve agent rolleri
+### Feature topology, parent orchestration ve agent rolleri
 
-Risk lane'inden bağımsız olarak ADS'ye göre `SINGLE | PARALLEL_READ` topology'si
+Risk lane'inden bağımsız olarak ADS'ye göre `SINGLE | PARALLEL_READ` feature topology'si
 seçilir. FAST çoğunlukla `SINGLE` yürür; STANDARD/CRITICAL işte paralel salt-okuma
 araştırması ve review anlamlı değer sağlıyorsa `PARALLEL_READ` seçilebilir.
 Bu seçim zorunlu üç-ajan töreni değildir.
@@ -89,6 +89,45 @@ Her iki topology'de de tek production branch, tek Draft PR ve stacked-PR yasağ�
 korunur. ADS Reviewer, CSE'nin zorunlu ChatGPT/owner review veya manual/device
 gate'inin yerine geçmez. Ayrıntılı lane davranışı pinned ADS CORE/skill'lerdedir.
 
+Varsayılan parent orchestration `NONE`'dır; tek feature execution kuralı değişmez.
+`MULTI_FEATURE_PARALLEL`, üçüncü feature topology değil, yalnız ayrı owner-approved
+parent lock ile açılan opt-in mode'dur. Bu protokolün varlığı pilotu etkinleştirmez.
+İlk pilot sınırları `MAX_OPEN_FEATURES = 3` ve
+`MAX_OWNER_ACCEPTANCE_PENDING = 1`'dir. Review/owner/authority bekleyen feature
+açık sayılır; owner kabulü bekleyen slot doluyken yeni feature admission yapılmaz.
+
+Parent lock; exact target master'ı, en fazla üç feature roster'ını, her feature'ın
+Issue/branch/canonical-repo-derived worktree/Draft PR/scope/allowlist/protected
+path/routing-topology lock/tek Builder'ını ve pairwise
+`INDEPENDENT | COORDINATION_REQUIRED | DEPENDENCY_BLOCKED` ilişkisini kaydeder.
+Default relation guidance:
+
+- `INDEPENDENT`: disjoint production/test allowlist'li modüller, değişmeyen
+  application/domain contract'ını tüketen UI/navigation işleri ve shared
+  shell/registry/config/generated-file dokunuşu olmayan isolated UI regressions.
+- `COORDINATION_REQUIRED`: shell/navigation ve active-project context;
+  Firma/Personel/Workforce registry consumer'ları; shared widget, route table,
+  common test fake/harness veya search/filter altyapısı; shared Acceptance/build
+  runtime kaynakları.
+- `DEPENDENCY_BLOCKED` / single-feature default: schema/migration/generated DB;
+  backup/restore/recovery veya owner-data; application/domain/persistence/event/
+  history contract değişikliği; package ID/signing/permission/platform/runtime/
+  release/store; owner-phone MAIN işi; cross-cutting refactor; unmerged sibling'a
+  dayanan feature ve non-mechanical shared-contract conflict.
+
+İki aktif writer aynı path'i reserve edemez veya yazamaz. Varsa
+`SHARED_INTEGRATION_SURFACE`, exact path/contract ve tam olarak bir owning feature taşır;
+consumer feature ayrı yetki olmadan read-only kalır. Unmerged sibling'a gizli
+bağımlılık kurulmaz.
+
+Parent status yalnız koordinasyondur; ROADMAP, feature Issue'su veya PR kanıtının
+yerine geçmez ve authority üretmez. Stale cross-feature status readiness kanıtı
+değildir. Feature'lar serial integrate edilir; exact feature revision + exact
+target-master revision ve gerekiyorsa exact PR merge candidate değiştiğinde kalan
+feature conflict/protected drift'i yeniden değerlendirir ve yalnız etkilenen
+validation/review/acceptance'ı yeniler. Otomatik dördüncü/replacement feature,
+merge, device veya release yoktur.
+
 ## 2. Göreve özel execution time budget
 
 Her Codex handoff'u ChatGPT'nin kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre seçtiği açık `Execution time budget: <süre>` alanını içerir. Global sabit süre varsayılanı yoktur. Codex bu bütçe içinde tek bounded outcome üretir; yetkili inceleme, edit/fix, focused validation ve commit/push mümkünse aynı adımda tamamlanır.
@@ -100,7 +139,7 @@ Süre dolduğunda:
 - kapsam genişletilmez;
 - Codex durur ve mevcut çalışmayı güvenle korur; tamamlanan iş, exact blocker ve kalan tek adım raporlanır.
 
-Görev ancak kapsam veya gerçek süre ihtiyacı gerektiriyorsa açık bütçeli alt adımlara bölünür. Codex bütçeyi kendiliğinden uzatmaz. Aynı anda yalnız bir production writer yürür; `PARALLEL_READ` içindeki Scout/Reviewer salt-okuma lane'leri aynı task envelope'u içinde paralel olabilir. Süre bütçesi CRITICAL veya publication kapılarını gevşetmez.
+Görev ancak kapsam veya gerçek süre ihtiyacı gerektiriyorsa açık bütçeli alt adımlara bölünür. Codex bütçeyi kendiliğinden uzatmaz. Her feature envelope'unda yalnız bir production writer yürür; `PARALLEL_READ` içindeki Scout/Reviewer salt-okuma lane'leri aynı task envelope'u içinde paralel olabilir. Parent mode `NONE` iken yalnız bir feature envelope'u aktiftir. Süre bütçesi CRITICAL veya publication kapılarını gevşetmez.
 
 ## 3. Execution ve kabul sahipliği
 
@@ -167,13 +206,13 @@ short task/Issue
 
 Kurallar:
 
-- aynı anda en fazla bir production branch/PR;
+- parent mode `NONE` iken aynı anda en fazla bir production branch/PR;
 - stacked PR yok;
 - `.cse` ve routing YAML varsayılan değil;
 - Issue/PR sonucu 10–15 satırı hedefler;
 - bağımsız review yalnız material fayda varsa;
 - normalde ilk teslimden sonra en fazla bir same-scope correction turu; çözülmezse escalation;
-- current iş master'a alınmadan sonraki feature branch açılmaz.
+- parent mode `NONE` iken current iş master'a alınmadan sonraki feature branch açılmaz; açık `MULTI_FEATURE_PARALLEL` parent lock yalnız kendi predeclared roster'ı için istisnadır.
 
 ### Protokol geçişi
 
@@ -245,8 +284,9 @@ Aynı bilgi Issue, comment, task, result, state ve PR body içinde tekrarlanmaz.
 
 ## 9. Publication ve Issue disposition
 
-- FAST: Codex automated PASS ve yalnız gerekiyorsa Fatih manuel/device PASS sonrası tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa tek minimal Draft PR ve required review/gate PASS sonrası ChatGPT'nin otomatik Ready/squash merge'i.
-- STANDARD: tek branch; gerekiyorsa tek Draft PR; squash merge varsayılanı.
+- FAST: Codex automated PASS ve yalnız gerekiyorsa Fatih manuel/device PASS sonrası feature başına tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa feature başına tek minimal Draft PR ve required review/gate PASS sonrası ChatGPT'nin otomatik Ready/squash merge'i.
+- STANDARD: feature başına tek branch ve gerekiyorsa tek Draft PR; squash merge varsayılanı.
+- `MULTI_FEATURE_PARALLEL` yalnız parent lock'taki en fazla üç feature PR'ını açık tutabilir; integration yine birer birer ve güncel target-master kanıtıyla yürür.
 - CRITICAL: Issue'ya özel publication ve review zinciri.
 - Force-push yok.
 - Stacked PR yok.
@@ -290,7 +330,8 @@ Yalnız STANDARD correction turu tükendiyse `STOP — CORRECTION ESCALATION` ku
 - exact owner delegasyonu olmadan Codex emulator/ADB/device invocation: 0
 - gerekli automated veya manuel/device PASS olmadan non-CRITICAL commit/push: 0
 - stacked PR: 0
-- aynı anda production PR: en fazla 1
+- parent mode `NONE` iken aynı anda production PR: en fazla 1
+- `MULTI_FEATURE_PARALLEL` ilk pilot açık feature sayısı: en fazla 3; owner acceptance pending: en fazla 1
 - kararı değiştirmeyen diagnostic/test tekrarı: 0
 - tamamlanmış tekil Issue için açık `Closes`; devam eden takip için açık `Refs`: %100
 - CRITICAL işte ağır güvenlik süreci: %100
