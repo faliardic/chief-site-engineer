@@ -521,7 +521,7 @@ void main() {
       final pubspec = File('pubspec.yaml').readAsStringSync();
       final lock = File('pubspec.lock').readAsStringSync();
 
-      expect(schema, contains('static const schemaVersion = 23'));
+      expect(schema, contains('static const schemaVersion = 24'));
       expect(schema, contains('CREATE TABLE workforce_members'));
       expect(schema, contains('CREATE TABLE attendance_days'));
       expect(schema, contains('CREATE TABLE attendance_entries'));

@@ -346,6 +346,155 @@ class ProjectProfileEvent {
   final String payloadJson;
 }
 
+enum ProjectMetadataEventType {
+  created('project_metadata.created'),
+  updated('project_metadata.updated');
+
+  const ProjectMetadataEventType(this.storageValue);
+
+  final String storageValue;
+
+  static ProjectMetadataEventType fromStorage(String value) =>
+      values.firstWhere(
+        (event) => event.storageValue == value,
+        orElse: () => throw const AgendaValidationFailure(
+          'Proje metadata event turu desteklenmiyor.',
+        ),
+      );
+}
+
+class ProjectMetadata {
+  const ProjectMetadata({
+    required this.projectId,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    this.address,
+    this.permitNumber,
+    this.permitDate,
+    this.cadastralBlock,
+    this.cadastralParcel,
+    this.projectStartDate,
+    this.targetFinishDate,
+    this.usageType,
+    this.structuralSystem,
+  });
+
+  final String projectId;
+  final String? address;
+  final String? permitNumber;
+  final String? permitDate;
+  final String? cadastralBlock;
+  final String? cadastralParcel;
+  final String? projectStartDate;
+  final String? targetFinishDate;
+  final String? usageType;
+  final String? structuralSystem;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+}
+
+class ProjectMetadataEvent {
+  const ProjectMetadataEvent({
+    required this.id,
+    required this.projectId,
+    required this.sequence,
+    required this.eventType,
+    required this.occurredAt,
+    required this.payloadJson,
+  });
+
+  final String id;
+  final String projectId;
+  final int sequence;
+  final ProjectMetadataEventType eventType;
+  final String occurredAt;
+  final String payloadJson;
+}
+
+enum ProjectPartyRole {
+  employer('employer'),
+  mainContractor('main_contractor'),
+  buildingInspection('building_inspection'),
+  siteChief('site_chief');
+
+  const ProjectPartyRole(this.storageValue);
+
+  final String storageValue;
+
+  bool get usesCompany => this != ProjectPartyRole.siteChief;
+
+  static ProjectPartyRole fromStorage(String value) => values.firstWhere(
+    (role) => role.storageValue == value,
+    orElse: () =>
+        throw const AgendaValidationFailure('Proje taraf rolu desteklenmiyor.'),
+  );
+}
+
+enum ProjectPartyEventType {
+  assigned('project_party.assigned'),
+  replaced('project_party.replaced'),
+  removed('project_party.removed');
+
+  const ProjectPartyEventType(this.storageValue);
+
+  final String storageValue;
+
+  static ProjectPartyEventType fromStorage(String value) => values.firstWhere(
+    (event) => event.storageValue == value,
+    orElse: () => throw const AgendaValidationFailure(
+      'Proje taraf event turu desteklenmiyor.',
+    ),
+  );
+}
+
+class ProjectPartyAssignment {
+  const ProjectPartyAssignment({
+    required this.id,
+    required this.projectId,
+    required this.role,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    this.subcontractorId,
+    this.workforceMemberId,
+    this.archivedAt,
+  });
+
+  final String id;
+  final String projectId;
+  final ProjectPartyRole role;
+  final String? subcontractorId;
+  final String? workforceMemberId;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+  final String? archivedAt;
+
+  bool get isArchived => archivedAt != null;
+}
+
+class ProjectPartyEvent {
+  const ProjectPartyEvent({
+    required this.id,
+    required this.assignmentId,
+    required this.projectId,
+    required this.sequence,
+    required this.eventType,
+    required this.occurredAt,
+    required this.payloadJson,
+  });
+
+  final String id;
+  final String assignmentId;
+  final String projectId;
+  final int sequence;
+  final ProjectPartyEventType eventType;
+  final String occurredAt;
+  final String payloadJson;
+}
+
 class AgendaLog {
   const AgendaLog({
     required this.id,
@@ -880,6 +1029,86 @@ class ReorderProjectProfileFieldsCommand {
   final String eventId;
   final String projectId;
   final List<ProjectProfileFieldOrder> fields;
+}
+
+class SaveProjectMetadataCommand {
+  const SaveProjectMetadataCommand({
+    required this.eventId,
+    required this.projectId,
+    required this.expectedRevision,
+    this.address,
+    this.permitNumber,
+    this.permitDate,
+    this.cadastralBlock,
+    this.cadastralParcel,
+    this.projectStartDate,
+    this.targetFinishDate,
+    this.usageType,
+    this.structuralSystem,
+  });
+
+  final String eventId;
+  final String projectId;
+  final int expectedRevision;
+  final String? address;
+  final String? permitNumber;
+  final String? permitDate;
+  final String? cadastralBlock;
+  final String? cadastralParcel;
+  final String? projectStartDate;
+  final String? targetFinishDate;
+  final String? usageType;
+  final String? structuralSystem;
+}
+
+class CreateProjectPartyAssignmentCommand {
+  const CreateProjectPartyAssignmentCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.role,
+    this.subcontractorId,
+    this.workforceMemberId,
+  });
+
+  final String id;
+  final String eventId;
+  final String projectId;
+  final ProjectPartyRole role;
+  final String? subcontractorId;
+  final String? workforceMemberId;
+}
+
+class ReplaceProjectPartyAssignmentCommand {
+  const ReplaceProjectPartyAssignmentCommand({
+    required this.assignmentId,
+    required this.eventId,
+    required this.projectId,
+    required this.expectedRevision,
+    this.subcontractorId,
+    this.workforceMemberId,
+  });
+
+  final String assignmentId;
+  final String eventId;
+  final String projectId;
+  final int expectedRevision;
+  final String? subcontractorId;
+  final String? workforceMemberId;
+}
+
+class RemoveProjectPartyAssignmentCommand {
+  const RemoveProjectPartyAssignmentCommand({
+    required this.assignmentId,
+    required this.eventId,
+    required this.projectId,
+    required this.expectedRevision,
+  });
+
+  final String assignmentId;
+  final String eventId;
+  final String projectId;
+  final int expectedRevision;
 }
 
 class CreateAgendaLogCommand {

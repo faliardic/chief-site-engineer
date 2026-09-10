@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 23;
+  static const schemaVersion = 24;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2907,6 +2907,7 @@ class AppDatabase {
       apply: _applyInventoryCompatibilityMigration,
     ),
     DatabaseMigration(version: 23, apply: _applyProjectProfileMigration),
+    DatabaseMigration(version: 24, apply: _applyProjectFoundationMigration),
   ];
 
   final String path;
@@ -3112,6 +3113,205 @@ Future<void> _applyProjectProfileMigration(Transaction transaction) async {
   await transaction.execute('''
     CREATE TRIGGER project_profile_events_append_only_delete
     BEFORE DELETE ON project_profile_events
+    BEGIN
+      SELECT RAISE(ABORT, 'append-only event history');
+    END
+  ''');
+}
+
+Future<void> _applyProjectFoundationMigration(Transaction transaction) async {
+  await transaction.execute('''
+    CREATE TABLE project_metadata (
+      project_id TEXT PRIMARY KEY REFERENCES projects(id),
+      address TEXT CHECK (address IS NULL OR length(trim(address)) > 0),
+      permit_number TEXT CHECK (
+        permit_number IS NULL OR length(trim(permit_number)) > 0
+      ),
+      permit_date TEXT CHECK (
+        permit_date IS NULL OR (
+          length(permit_date) = 10
+          AND permit_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+          AND date(permit_date) IS NOT NULL
+          AND date(permit_date) = permit_date
+        )
+      ),
+      cadastral_block TEXT CHECK (
+        cadastral_block IS NULL OR length(trim(cadastral_block)) > 0
+      ),
+      cadastral_parcel TEXT CHECK (
+        cadastral_parcel IS NULL OR length(trim(cadastral_parcel)) > 0
+      ),
+      project_start_date TEXT CHECK (
+        project_start_date IS NULL OR (
+          length(project_start_date) = 10
+          AND project_start_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+          AND date(project_start_date) IS NOT NULL
+          AND date(project_start_date) = project_start_date
+        )
+      ),
+      target_finish_date TEXT CHECK (
+        target_finish_date IS NULL OR (
+          length(target_finish_date) = 10
+          AND target_finish_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+          AND date(target_finish_date) IS NOT NULL
+          AND date(target_finish_date) = target_finish_date
+        )
+      ),
+      usage_type TEXT CHECK (
+        usage_type IS NULL OR length(trim(usage_type)) > 0
+      ),
+      structural_system TEXT CHECK (
+        structural_system IS NULL OR length(trim(structural_system)) > 0
+      ),
+      revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      CHECK (
+        project_start_date IS NULL
+        OR target_finish_date IS NULL
+        OR target_finish_date >= project_start_date
+      )
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_metadata_events (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES project_metadata(project_id),
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (event_type IN (
+        'project_metadata.created', 'project_metadata.updated'
+      )),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      UNIQUE (project_id, sequence)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_party_assignments (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      role TEXT NOT NULL CHECK (role IN (
+        'employer',
+        'main_contractor',
+        'building_inspection',
+        'site_chief'
+      )),
+      subcontractor_id TEXT,
+      workforce_member_id TEXT,
+      revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE (id, project_id),
+      FOREIGN KEY (subcontractor_id, project_id)
+        REFERENCES subcontractors(id, project_id),
+      FOREIGN KEY (workforce_member_id, project_id)
+        REFERENCES workforce_members(id, project_id),
+      CHECK (
+        (
+          role IN ('employer', 'main_contractor', 'building_inspection')
+          AND subcontractor_id IS NOT NULL
+          AND workforce_member_id IS NULL
+        )
+        OR (
+          role = 'site_chief'
+          AND subcontractor_id IS NULL
+          AND workforce_member_id IS NOT NULL
+        )
+      )
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_party_assignment_events (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      assignment_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (event_type IN (
+        'project_party.assigned',
+        'project_party.replaced',
+        'project_party.removed'
+      )),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      UNIQUE (assignment_id, sequence),
+      FOREIGN KEY (assignment_id, project_id)
+        REFERENCES project_party_assignments(id, project_id)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_project_metadata_events_project
+    ON project_metadata_events(project_id, sequence, id)
+  ''');
+  await transaction.execute('''
+    CREATE UNIQUE INDEX ux_project_party_assignments_active_role
+    ON project_party_assignments(project_id, role)
+    WHERE archived_at IS NULL
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_project_party_assignments_project
+    ON project_party_assignments(project_id, archived_at, role, id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_project_party_assignment_events_assignment
+    ON project_party_assignment_events(assignment_id, sequence, id)
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_metadata_identity_immutable
+    BEFORE UPDATE OF project_id ON project_metadata
+    WHEN NEW.project_id != OLD.project_id
+    BEGIN
+      SELECT RAISE(ABORT, 'project metadata identity is immutable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_metadata_no_physical_delete
+    BEFORE DELETE ON project_metadata
+    BEGIN
+      SELECT RAISE(ABORT, 'physical delete is not allowed');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_metadata_events_append_only_update
+    BEFORE UPDATE ON project_metadata_events
+    BEGIN
+      SELECT RAISE(ABORT, 'append-only event history');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_metadata_events_append_only_delete
+    BEFORE DELETE ON project_metadata_events
+    BEGIN
+      SELECT RAISE(ABORT, 'append-only event history');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_party_assignments_identity_immutable
+    BEFORE UPDATE OF id, project_id, role ON project_party_assignments
+    WHEN NEW.id != OLD.id
+      OR NEW.project_id != OLD.project_id
+      OR NEW.role != OLD.role
+    BEGIN
+      SELECT RAISE(ABORT, 'project party identity is immutable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_party_assignments_no_physical_delete
+    BEFORE DELETE ON project_party_assignments
+    BEGIN
+      SELECT RAISE(ABORT, 'physical delete is not allowed');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_party_assignment_events_append_only_update
+    BEFORE UPDATE ON project_party_assignment_events
+    BEGIN
+      SELECT RAISE(ABORT, 'append-only event history');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_party_assignment_events_append_only_delete
+    BEFORE DELETE ON project_party_assignment_events
     BEGIN
       SELECT RAISE(ABORT, 'append-only event history');
     END

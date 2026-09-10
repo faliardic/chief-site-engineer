@@ -83,6 +83,7 @@ void main() {
       {'version': 21, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 22, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 23, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 24, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -132,7 +133,7 @@ void main() {
       final db = upgraded.database;
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        23,
+        AppDatabase.schemaVersion,
       );
       expect(await db.query('projects', orderBy: 'id ASC'), projectsBefore);
       expect(await db.query('smoke_records'), smokeBefore);
@@ -228,6 +229,261 @@ void main() {
       await upgraded.close();
     },
   );
+
+  test(
+    'schema 23 to 24 preserves project profile workforce and attendance rows',
+    () async {
+      const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const companyId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+      const personId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+      final old = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(23).toList(),
+      );
+      await old.open();
+      await old.database.insert('projects', {
+        'id': projectId,
+        'name': 'Korunan proje',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+        'revision': 1,
+      });
+      await old.database.insert('subcontractors', {
+        'id': companyId,
+        'project_id': projectId,
+        'name': 'Korunan firma',
+        'name_normalized': 'korunan firma',
+        'status': 'active',
+        'revision': 1,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await old.database.insert('workforce_teams', {
+        'id': 'team-preserved',
+        'project_id': projectId,
+        'subcontractor_id': companyId,
+        'name': 'Teknik ekip',
+        'name_normalized': 'teknik ekip',
+        'status': 'active',
+        'revision': 1,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await old.database.insert('workforce_members', {
+        'id': personId,
+        'project_id': projectId,
+        'full_name': 'Korunan kisi',
+        'team_name': 'Teknik ekip',
+        'role_name': 'Santiye sefi',
+        'subcontractor_id': companyId,
+        'team_id': 'team-preserved',
+        'is_active': 1,
+        'revision': 1,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      final profileFieldId = 'project-profile:$projectId:total_area';
+      await old.database.insert('project_profile_fields', {
+        'id': profileFieldId,
+        'project_id': projectId,
+        'field_kind': 'builtin',
+        'builtin_key': 'total_area',
+        'label': 'Toplam alan',
+        'value': '1250 m2',
+        'sort_order': 1,
+        'revision': 2,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T09:00:00Z',
+      });
+      await old.database.insert('project_profile_events', {
+        'id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'project_id': projectId,
+        'field_id': profileFieldId,
+        'sequence': 1,
+        'event_type': 'profile.field_updated',
+        'occurred_at': '2026-07-19T09:00:00Z',
+        'payload_json': '{"value":"1250 m2"}',
+      });
+      await old.database.insert('workforce_events', {
+        'id': 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        'aggregate_type': 'person',
+        'aggregate_id': personId,
+        'project_id': projectId,
+        'sequence': 1,
+        'event_type': 'person.created',
+        'occurred_at': '2026-07-19T08:00:00Z',
+        'payload_json': '{}',
+      });
+      await old.database.insert('attendance_days', {
+        'id': 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        'project_id': projectId,
+        'local_date': '2026-07-19',
+        'status': 'draft',
+        'revision': 3,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T09:00:00Z',
+      });
+      await old.database.insert('attendance_entries', {
+        'id': '11111111-1111-4111-8111-111111111111',
+        'attendance_day_id': 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        'workforce_member_id': personId,
+        'result': 'full_day',
+        'overtime_minutes': 30,
+        'short_note': 'Korunan puantaj',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T09:00:00Z',
+      });
+      final projects = await old.database.query('projects');
+      final companies = await old.database.query('subcontractors');
+      final teams = await old.database.query('workforce_teams');
+      final people = await old.database.query('workforce_members');
+      final workforceEvents = await old.database.query('workforce_events');
+      final profileFields = await old.database.query('project_profile_fields');
+      final profileEvents = await old.database.query('project_profile_events');
+      final attendanceDays = await old.database.query('attendance_days');
+      final attendanceEntries = await old.database.query('attendance_entries');
+      await old.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+      );
+      await upgraded.open();
+      expect(await upgraded.database.query('projects'), projects);
+      expect(await upgraded.database.query('subcontractors'), companies);
+      expect(await upgraded.database.query('workforce_teams'), teams);
+      expect(await upgraded.database.query('workforce_members'), people);
+      expect(
+        await upgraded.database.query('workforce_events'),
+        workforceEvents,
+      );
+      expect(
+        await upgraded.database.query('project_profile_fields'),
+        profileFields,
+      );
+      expect(
+        await upgraded.database.query('project_profile_events'),
+        profileEvents,
+      );
+      expect(await upgraded.database.query('attendance_days'), attendanceDays);
+      expect(
+        await upgraded.database.query('attendance_entries'),
+        attendanceEntries,
+      );
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await upgraded.database.rawQuery('PRAGMA user_version'),
+        ),
+        AppDatabase.schemaVersion,
+      );
+      expect(
+        await upgraded.database.rawQuery('PRAGMA foreign_key_check'),
+        isEmpty,
+      );
+      await upgraded.close();
+    },
+  );
+
+  test('migrated and fresh schema 24 project foundations match', () async {
+    final old = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(23).toList(),
+    );
+    await old.open();
+    await old.close();
+    final migrated = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+    );
+    await migrated.open();
+    final fresh = AppDatabase(
+      path: '${temporaryRoot.path}${Platform.pathSeparator}fresh.sqlite3',
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+    );
+    await fresh.open();
+    const sql = '''
+      SELECT type, name, tbl_name, sql
+      FROM sqlite_master
+      WHERE tbl_name LIKE 'project_metadata%'
+         OR tbl_name LIKE 'project_party%'
+      ORDER BY type, name
+    ''';
+    expect(
+      await migrated.database.rawQuery(sql),
+      await fresh.database.rawQuery(sql),
+    );
+    expect(
+      await migrated.database.rawQuery('PRAGMA foreign_key_check'),
+      isEmpty,
+    );
+    expect(await fresh.database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+    await fresh.close();
+    await migrated.close();
+  });
+
+  test('failed schema 24 migration rolls back intact schema 23 data', () async {
+    const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    final schemaTwentyThree = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(23).toList(),
+    );
+    await schemaTwentyThree.open();
+    await schemaTwentyThree.database.insert('projects', {
+      'id': projectId,
+      'name': 'Rollback V23',
+      'created_at': '2026-07-19T08:00:00Z',
+      'updated_at': '2026-07-19T08:00:00Z',
+      'revision': 7,
+    });
+    final projectsBefore = await schemaTwentyThree.database.query('projects');
+    await schemaTwentyThree.close();
+
+    final failing = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 19, 9),
+      migrations: [
+        ...AppDatabase.foundationMigrations.take(23),
+        DatabaseMigration(
+          version: 24,
+          apply: (transaction) async {
+            await AppDatabase.foundationMigrations[23].apply(transaction);
+            throw StateError('intentional schema 24 rollback');
+          },
+        ),
+      ],
+    );
+    await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+    final raw = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: sqflite.OpenDatabaseOptions(singleInstance: false),
+    );
+    expect(
+      sqflite.Sqflite.firstIntValue(await raw.rawQuery('PRAGMA user_version')),
+      23,
+    );
+    expect(await raw.query('projects'), projectsBefore);
+    expect(
+      await raw.rawQuery(
+        "SELECT name FROM sqlite_master WHERE name IN ("
+        "'project_metadata', 'project_metadata_events', "
+        "'project_party_assignments', 'project_party_assignment_events'"
+        ")",
+      ),
+      isEmpty,
+    );
+    expect(await raw.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+    await raw.close();
+  });
 
   test('failed schema 23 migration rolls back intact schema 22 data', () async {
     const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';

@@ -734,6 +734,317 @@ void main() {
   );
 
   test(
+    'project metadata is nullable revisioned no-op safe and append-only',
+    () async {
+      final empty = await agenda.getProjectMetadata(project1);
+      expect(empty.revision, 0);
+      expect(empty.address, isNull);
+      expect(await _countRows(directories.databaseFile, 'project_metadata'), 0);
+
+      final created = await agenda.saveProjectMetadata(
+        SaveProjectMetadataCommand(
+          eventId: eventId(330),
+          projectId: project1,
+          expectedRevision: 0,
+          address: '  Ankara Caddesi 1  ',
+          permitNumber: '  R-2026-1  ',
+          permitDate: '2026-07-01',
+          cadastralBlock: '  42  ',
+          cadastralParcel: '  7  ',
+          projectStartDate: '2026-07-15',
+          targetFinishDate: '2027-07-15',
+          usageType: '  Konut  ',
+          structuralSystem: '  Betonarme  ',
+        ),
+      );
+      expect(created.revision, 1);
+      expect(created.address, 'Ankara Caddesi 1');
+      expect(created.permitNumber, 'R-2026-1');
+      expect(created.cadastralBlock, '42');
+      expect(created.cadastralParcel, '7');
+      expect(created.usageType, 'Konut');
+      expect(created.structuralSystem, 'Betonarme');
+
+      final noOp = await agenda.saveProjectMetadata(
+        SaveProjectMetadataCommand(
+          eventId: eventId(331),
+          projectId: project1,
+          expectedRevision: 1,
+          address: 'Ankara Caddesi 1',
+          permitNumber: 'R-2026-1',
+          permitDate: '2026-07-01',
+          cadastralBlock: '42',
+          cadastralParcel: '7',
+          projectStartDate: '2026-07-15',
+          targetFinishDate: '2027-07-15',
+          usageType: 'Konut',
+          structuralSystem: 'Betonarme',
+        ),
+      );
+      expect(noOp.revision, 1);
+      expect(await agenda.listProjectMetadataEvents(project1), hasLength(1));
+
+      await expectLater(
+        agenda.saveProjectMetadata(
+          SaveProjectMetadataCommand(
+            eventId: eventId(332),
+            projectId: project1,
+            expectedRevision: 0,
+            address: created.address,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      await expectLater(
+        agenda.saveProjectMetadata(
+          SaveProjectMetadataCommand(
+            eventId: eventId(333),
+            projectId: project1,
+            expectedRevision: 1,
+            projectStartDate: '2027-01-02',
+            targetFinishDate: '2027-01-01',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      await expectLater(
+        agenda.saveProjectMetadata(
+          SaveProjectMetadataCommand(
+            eventId: eventId(334),
+            projectId: project1,
+            expectedRevision: 1,
+            permitDate: '2026-02-30',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+
+      final cleared = await agenda.saveProjectMetadata(
+        SaveProjectMetadataCommand(
+          eventId: eventId(335),
+          projectId: project1,
+          expectedRevision: 1,
+        ),
+      );
+      expect(cleared.revision, 2);
+      expect(cleared.address, isNull);
+      expect(await agenda.listProjectMetadataEvents(project1), hasLength(2));
+
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+      );
+      await expectLater(
+        raw.delete('project_metadata_events'),
+        throwsA(isA<DatabaseException>()),
+      );
+      await raw.close();
+    },
+  );
+
+  test(
+    'project parties preserve same-project identity revision and history',
+    () async {
+      const companyA = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
+      const companyB = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2';
+      const companyOther = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd3';
+      const personA = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+      const personOther = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
+      await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: 'Guney Santiyesi'),
+      );
+      await _insertPartyCompany(
+        directories.databaseFile,
+        id: companyA,
+        projectId: project1,
+        name: 'Firma A',
+      );
+      await _insertPartyCompany(
+        directories.databaseFile,
+        id: companyB,
+        projectId: project1,
+        name: 'Firma B',
+      );
+      await _insertPartyCompany(
+        directories.databaseFile,
+        id: companyOther,
+        projectId: project2,
+        name: 'Diger firma',
+      );
+      await _insertPartyPerson(
+        directories.databaseFile,
+        id: personA,
+        projectId: project1,
+        name: 'Sef A',
+      );
+      await _insertPartyPerson(
+        directories.databaseFile,
+        id: personOther,
+        projectId: project2,
+        name: 'Diger sef',
+      );
+
+      final employer = await agenda.createProjectPartyAssignment(
+        const CreateProjectPartyAssignmentCommand(
+          id: log1,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0340',
+          projectId: project1,
+          role: ProjectPartyRole.employer,
+          subcontractorId: companyA,
+        ),
+      );
+      final retried = await agenda.createProjectPartyAssignment(
+        const CreateProjectPartyAssignmentCommand(
+          id: log1,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0341',
+          projectId: project1,
+          role: ProjectPartyRole.employer,
+          subcontractorId: companyA,
+        ),
+      );
+      expect(retried.id, employer.id);
+      expect(await agenda.listProjectPartyEvents(log1), hasLength(1));
+      await expectLater(
+        agenda.createProjectPartyAssignment(
+          const CreateProjectPartyAssignmentCommand(
+            id: log2,
+            eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0342',
+            projectId: project1,
+            role: ProjectPartyRole.employer,
+            subcontractorId: companyB,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      await expectLater(
+        agenda.createProjectPartyAssignment(
+          const CreateProjectPartyAssignmentCommand(
+            id: log2,
+            eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0343',
+            projectId: project1,
+            role: ProjectPartyRole.mainContractor,
+            subcontractorId: companyOther,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final chief = await agenda.createProjectPartyAssignment(
+        const CreateProjectPartyAssignmentCommand(
+          id: log3,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0344',
+          projectId: project1,
+          role: ProjectPartyRole.siteChief,
+          workforceMemberId: personA,
+        ),
+      );
+      await expectLater(
+        agenda.createProjectPartyAssignment(
+          const CreateProjectPartyAssignmentCommand(
+            id: log4,
+            eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0345',
+            projectId: project1,
+            role: ProjectPartyRole.siteChief,
+            workforceMemberId: personOther,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+
+      final replaced = await agenda.replaceProjectPartyAssignment(
+        ReplaceProjectPartyAssignmentCommand(
+          assignmentId: employer.id,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0346',
+          projectId: project1,
+          expectedRevision: employer.revision,
+          subcontractorId: companyB,
+        ),
+      );
+      expect(replaced.revision, 2);
+      expect(replaced.subcontractorId, companyB);
+      final noOp = await agenda.replaceProjectPartyAssignment(
+        ReplaceProjectPartyAssignmentCommand(
+          assignmentId: replaced.id,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0347',
+          projectId: project1,
+          expectedRevision: replaced.revision,
+          subcontractorId: companyB,
+        ),
+      );
+      expect(noOp.revision, 2);
+      await expectLater(
+        agenda.replaceProjectPartyAssignment(
+          ReplaceProjectPartyAssignmentCommand(
+            assignmentId: replaced.id,
+            eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0348',
+            projectId: project1,
+            expectedRevision: 1,
+            subcontractorId: companyA,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final removed = await agenda.removeProjectPartyAssignment(
+        RemoveProjectPartyAssignmentCommand(
+          assignmentId: chief.id,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0349',
+          projectId: project1,
+          expectedRevision: chief.revision,
+        ),
+      );
+      expect(removed.isArchived, isTrue);
+      final removedNoOp = await agenda.removeProjectPartyAssignment(
+        RemoveProjectPartyAssignmentCommand(
+          assignmentId: removed.id,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0350',
+          projectId: project1,
+          expectedRevision: removed.revision,
+        ),
+      );
+      expect(removedNoOp.revision, removed.revision);
+      expect(await agenda.listProjectPartyAssignments(project1), hasLength(1));
+      expect(
+        await agenda.listProjectPartyAssignments(
+          project1,
+          includeArchived: true,
+        ),
+        hasLength(2),
+      );
+      expect(await agenda.listProjectPartyEvents(log1), hasLength(2));
+      expect(await agenda.listProjectPartyEvents(log3), hasLength(2));
+
+      await expectLater(
+        agenda.createProjectPartyAssignment(
+          const CreateProjectPartyAssignmentCommand(
+            id: log4,
+            eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0340',
+            projectId: project1,
+            role: ProjectPartyRole.buildingInspection,
+            subcontractorId: companyA,
+          ),
+        ),
+        throwsA(isA<DatabaseException>()),
+      );
+      expect(
+        (await agenda.listProjectPartyAssignments(
+          project1,
+        )).map((item) => item.id),
+        isNot(contains(log4)),
+      );
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+      );
+      await expectLater(
+        raw.update('project_party_assignment_events', {'sequence': 99}),
+        throwsA(isA<DatabaseException>()),
+      );
+      await expectLater(
+        raw.delete('project_party_assignment_events'),
+        throwsA(isA<DatabaseException>()),
+      );
+      await raw.close();
+    },
+  );
+
+  test(
     'future invalid and naive event times fail before database mutation',
     () async {
       now = DateTime.utc(2026, 7, 20, 8);
@@ -3429,6 +3740,69 @@ void main() {
       expect(gateway.scheduleCalls, 2);
     },
   );
+}
+
+Future<void> _insertPartyCompany(
+  String databasePath, {
+  required String id,
+  required String projectId,
+  required String name,
+}) async {
+  final raw = await databaseFactoryFfi.openDatabase(databasePath);
+  await raw.insert('subcontractors', {
+    'id': id,
+    'project_id': projectId,
+    'name': name,
+    'name_normalized': name.toLowerCase(),
+    'status': 'active',
+    'revision': 1,
+    'created_at': '2026-07-20T08:00:00Z',
+    'updated_at': '2026-07-20T08:00:00Z',
+  });
+  await raw.close();
+}
+
+Future<void> _insertPartyPerson(
+  String databasePath, {
+  required String id,
+  required String projectId,
+  required String name,
+}) async {
+  final raw = await databaseFactoryFfi.openDatabase(databasePath);
+  final companies = await raw.query(
+    'subcontractors',
+    columns: ['id'],
+    where: 'project_id = ? AND status = ?',
+    whereArgs: [projectId, 'active'],
+    limit: 1,
+  );
+  final companyId = companies.single['id']! as String;
+  final teamId = 'party-team-$projectId';
+  await raw.insert('workforce_teams', {
+    'id': teamId,
+    'project_id': projectId,
+    'subcontractor_id': companyId,
+    'name': 'Teknik ekip',
+    'name_normalized': 'teknik ekip',
+    'status': 'active',
+    'revision': 1,
+    'created_at': '2026-07-20T08:00:00Z',
+    'updated_at': '2026-07-20T08:00:00Z',
+  }, conflictAlgorithm: ConflictAlgorithm.ignore);
+  await raw.insert('workforce_members', {
+    'id': id,
+    'project_id': projectId,
+    'full_name': name,
+    'team_name': 'Teknik ekip',
+    'role_name': 'Santiye sefi',
+    'subcontractor_id': companyId,
+    'team_id': teamId,
+    'is_active': 1,
+    'revision': 1,
+    'created_at': '2026-07-20T08:00:00Z',
+    'updated_at': '2026-07-20T08:00:00Z',
+  });
+  await raw.close();
 }
 
 Future<int> _countRows(String path, String table) async {
