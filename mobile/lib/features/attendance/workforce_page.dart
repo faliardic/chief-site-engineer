@@ -154,7 +154,7 @@ class _WorkforcePageState extends State<WorkforcePage> {
               ),
               onPressed: _openRegistry,
               icon: const Icon(Icons.account_tree_outlined),
-              label: const Text('Taşeronlar ve ekipler'),
+              label: const Text('Firmalar ve ekipler'),
             ),
             SwitchListTile(
               key: const Key('show-inactive-workforce'),
@@ -238,12 +238,14 @@ class WorkforceMemberFormPage extends StatefulWidget {
     required this.attendance,
     required this.project,
     this.member,
+    this.initialSubcontractorId,
     super.key,
   });
 
   final AttendanceApplication attendance;
   final MobileProject project;
   final WorkforceMember? member;
+  final String? initialSubcontractorId;
 
   @override
   State<WorkforceMemberFormPage> createState() =>
@@ -281,7 +283,8 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
     _address = TextEditingController(text: widget.member?.address);
     _startedOn = TextEditingController(text: widget.member?.startedOn);
     _note = TextEditingController(text: widget.member?.note);
-    _subcontractorId = widget.member?.subcontractorId;
+    _subcontractorId =
+        widget.member?.subcontractorId ?? widget.initialSubcontractorId;
     _teamId = widget.member == null || _usesTechnicalTeam(widget.member!)
         ? _noTeam
         : widget.member!.teamId;
@@ -321,7 +324,7 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = _message(error, 'Taşeron ve ekip listesi açılamadı.');
+          _error = _message(error, 'Firma ve ekip listesi açılamadı.');
         });
       }
     }
@@ -356,7 +359,7 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
   }
 
   Future<void> _createSubcontractor() async {
-    final name = await _askName('Yeni taşeron', 'Taşeron/unvan adı');
+    final name = await _askName('Firma ekle', 'Firma adı');
     if (name == null) return;
     try {
       final value = await widget.attendance.createSubcontractor(
@@ -372,7 +375,7 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
       await _loadRegistry();
     } on Object catch (error) {
       if (mounted) {
-        setState(() => _error = _message(error, 'Taşeron oluşturulamadı.'));
+        setState(() => _error = _message(error, 'Firma oluşturulamadı.'));
       }
     }
   }
@@ -426,7 +429,7 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
     final teamId = _teamId;
     final team = _teams.where((item) => item.id == teamId).firstOrNull;
     if (subcontractorId == null) {
-      setState(() => _error = 'Taşeron seçilmelidir.');
+      setState(() => _error = 'Taşeron / İşveren seçilmelidir.');
       return;
     }
     setState(() {
@@ -484,6 +487,9 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    final boundSubcontractor = _subcontractors
+        .where((item) => item.id == _subcontractorId)
+        .firstOrNull;
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -507,99 +513,122 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
             if (_loading)
               const Center(child: CircularProgressIndicator())
             else ...[
-              DropdownButtonFormField<String>(
-                key: const Key('workforce-subcontractor'),
-                initialValue: _subcontractorId,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Taşeron seç *',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  const DropdownMenuItem(
-                    value: _newSubcontractor,
-                    child: Text('+ Yeni taşeron ekle'),
+              if (widget.member == null &&
+                  widget.initialSubcontractorId != null)
+                InputDecorator(
+                  key: const Key('workforce-subcontractor-context'),
+                  decoration: const InputDecoration(
+                    labelText: 'Taşeron / İşveren',
+                    border: OutlineInputBorder(),
                   ),
-                  ..._subcontractors.map(
-                    (item) => DropdownMenuItem(
-                      value: item.id,
-                      child: Text(item.name),
-                    ),
+                  child: Text(
+                    boundSubcontractor?.name ?? 'Firma bilgisi kullanılamıyor',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-                onChanged: _submitting ? null : _selectSubcontractor,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: const Key('workforce-team'),
-                initialValue: _teamId,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Ekip (opsiyonel)',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  const DropdownMenuItem(
-                    value: _noTeam,
-                    child: Text('Ekip belirtilmedi'),
+                )
+              else
+                DropdownButtonFormField<String>(
+                  key: const Key('workforce-subcontractor'),
+                  initialValue: _subcontractorId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Taşeron / İşveren *',
+                    border: OutlineInputBorder(),
                   ),
-                  if (_subcontractorId != null)
+                  items: [
                     const DropdownMenuItem(
-                      value: _newTeam,
-                      child: Text('+ Yeni ekip ekle'),
+                      value: _newSubcontractor,
+                      child: Text('+ Taşeron / İşveren ekle'),
                     ),
-                  ..._teams.map(
-                    (item) => DropdownMenuItem(
-                      value: item.id,
-                      child: Text(item.name),
+                    ..._subcontractors.map(
+                      (item) => DropdownMenuItem(
+                        value: item.id,
+                        child: Text(
+                          item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ),
+                  ],
+                  onChanged: _submitting ? null : _selectSubcontractor,
+                ),
+              const SizedBox(height: 12),
+              _field(const Key('workforce-name'), _name, 'Ad Soyad *'),
+              const SizedBox(height: 12),
+              _field(const Key('workforce-role'), _role, 'Meslek / Pozisyon *'),
+              const SizedBox(height: 4),
+              ExpansionTile(
+                key: const Key('workforce-other-information'),
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 4),
+                title: const Text('Diğer'),
+                children: [
+                  DropdownButtonFormField<String>(
+                    key: const Key('workforce-team'),
+                    initialValue: _teamId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Ekip (opsiyonel)',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: _noTeam,
+                        child: Text('Ekip belirtilmedi'),
+                      ),
+                      if (_subcontractorId != null)
+                        const DropdownMenuItem(
+                          value: _newTeam,
+                          child: Text('+ Yeni ekip ekle'),
+                        ),
+                      ..._teams.map(
+                        (item) => DropdownMenuItem(
+                          value: item.id,
+                          child: Text(
+                            item.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: _subcontractorId == null || _submitting
+                        ? null
+                        : (value) {
+                            if (value == _newTeam) {
+                              _createTeam();
+                            } else {
+                              setState(() => _teamId = value);
+                            }
+                          },
+                  ),
+                  const SizedBox(height: 12),
+                  _field(const Key('workforce-code'), _code, 'Personel kodu'),
+                  const SizedBox(height: 12),
+                  _field(const Key('workforce-phone'), _phone, 'Telefon'),
+                  const SizedBox(height: 12),
+                  _field(
+                    const Key('workforce-address'),
+                    _address,
+                    'Adres',
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 12),
+                  _field(
+                    const Key('workforce-started-on'),
+                    _startedOn,
+                    'İşe başlama tarihi (YYYY-AA-GG)',
+                  ),
+                  const SizedBox(height: 12),
+                  _field(
+                    const Key('workforce-note'),
+                    _note,
+                    'Not',
+                    maxLines: 3,
                   ),
                 ],
-                onChanged: _subcontractorId == null || _submitting
-                    ? null
-                    : (value) {
-                        if (value == _newTeam) {
-                          _createTeam();
-                        } else {
-                          setState(() => _teamId = value);
-                        }
-                      },
-              ),
-              const SizedBox(height: 12),
-              _field(const Key('workforce-name'), _name, 'Tam ad *'),
-              const SizedBox(height: 12),
-              _field(const Key('workforce-role'), _role, 'Meslek/pozisyon *'),
-              const SizedBox(height: 12),
-              _field(
-                const Key('workforce-code'),
-                _code,
-                'Personel kodu (opsiyonel)',
-              ),
-              const SizedBox(height: 12),
-              _field(
-                const Key('workforce-phone'),
-                _phone,
-                'Telefon (opsiyonel)',
-              ),
-              const SizedBox(height: 12),
-              _field(
-                const Key('workforce-address'),
-                _address,
-                'Adres (opsiyonel)',
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-              _field(
-                const Key('workforce-started-on'),
-                _startedOn,
-                'İşe başlama tarihi (YYYY-AA-GG)',
-              ),
-              const SizedBox(height: 12),
-              _field(
-                const Key('workforce-note'),
-                _note,
-                'Not (opsiyonel)',
-                maxLines: 3,
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
@@ -646,7 +675,7 @@ bool _usesTechnicalTeam(WorkforceMember member) => isWorkforceTechnicalTeamLink(
 );
 
 String _memberRegistryLabel(WorkforceMember member) {
-  final subcontractor = member.subcontractorName ?? 'Tanımsız taşeron';
+  final subcontractor = member.subcontractorName ?? 'Tanımsız firma';
   return _usesTechnicalTeam(member)
       ? subcontractor
       : '$subcontractor • ${member.teamName}';

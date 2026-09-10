@@ -8,11 +8,13 @@ class WorkforceRegistryPage extends StatefulWidget {
   const WorkforceRegistryPage({
     required this.attendance,
     required this.project,
+    this.startWithCompanyForm = false,
     super.key,
   });
 
   final AttendanceApplication attendance;
   final MobileProject project;
+  final bool startWithCompanyForm;
 
   @override
   State<WorkforceRegistryPage> createState() => _WorkforceRegistryPageState();
@@ -29,6 +31,11 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
   void initState() {
     super.initState();
     _load();
+    if (widget.startWithCompanyForm) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _saveSubcontractor();
+      });
+    }
   }
 
   Future<void> _load() async {
@@ -72,26 +79,60 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
     final result = await showDialog<_SubcontractorInput>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(value == null ? 'Yeni taşeron' : 'Taşeronu düzenle'),
+        title: Text(value == null ? 'Firma ekle' : 'Firmayı düzenle'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _field(name, 'Taşeron/unvan adı *'),
+              _field(name, 'Firma adı *', key: const Key('subcontractor-name')),
               _gap,
-              _field(contact, 'Yetkili adı'),
+              _field(
+                contact,
+                'Yetkili adı',
+                key: const Key('subcontractor-contact'),
+              ),
               _gap,
-              _field(phone, 'Telefon'),
-              _gap,
-              _field(address, 'Adres', maxLines: 3),
-              _gap,
-              _field(specialty, 'İş kalemi/uzmanlık'),
-              _gap,
-              _field(startedOn, 'Başlangıç tarihi (YYYY-AA-GG)'),
-              _gap,
-              _field(endedOn, 'Bitiş tarihi (YYYY-AA-GG)'),
-              _gap,
-              _field(note, 'Not', maxLines: 3),
+              _field(phone, 'Telefon', key: const Key('subcontractor-phone')),
+              const SizedBox(height: 4),
+              ExpansionTile(
+                key: const Key('subcontractor-other-information'),
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 4),
+                title: const Text('Diğer bilgiler'),
+                children: [
+                  _field(
+                    address,
+                    'Adres',
+                    key: const Key('subcontractor-address'),
+                    maxLines: 3,
+                  ),
+                  _gap,
+                  _field(
+                    specialty,
+                    'İş kalemi / uzmanlık',
+                    key: const Key('subcontractor-specialty'),
+                  ),
+                  _gap,
+                  _field(
+                    startedOn,
+                    'Başlangıç tarihi (YYYY-AA-GG)',
+                    key: const Key('subcontractor-started-on'),
+                  ),
+                  _gap,
+                  _field(
+                    endedOn,
+                    'Bitiş tarihi (YYYY-AA-GG)',
+                    key: const Key('subcontractor-ended-on'),
+                  ),
+                  _gap,
+                  _field(
+                    note,
+                    'Not',
+                    key: const Key('subcontractor-note'),
+                    maxLines: 3,
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -131,12 +172,18 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
     return result;
   }
 
-  Future<void> _saveSubcontractor([Subcontractor? current]) async {
+  Future<Subcontractor?> _saveSubcontractor([Subcontractor? current]) async {
     final input = await _subcontractorInput(current);
-    if (input == null) return;
+    if (input == null) {
+      if (mounted && widget.startWithCompanyForm && current == null) {
+        Navigator.pop(context);
+      }
+      return null;
+    }
     try {
+      late final Subcontractor saved;
       if (current == null) {
-        await widget.attendance.createSubcontractor(
+        saved = await widget.attendance.createSubcontractor(
           CreateSubcontractorCommand(
             id: RecordId.randomUuid(),
             eventId: RecordId.randomUuid(),
@@ -152,7 +199,7 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
           ),
         );
       } else {
-        await widget.attendance.updateSubcontractor(
+        saved = await widget.attendance.updateSubcontractor(
           UpdateSubcontractorCommand(
             id: current.id,
             eventId: RecordId.randomUuid(),
@@ -173,10 +220,15 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
         );
       }
       await _load();
+      if (mounted && widget.startWithCompanyForm && current == null) {
+        Navigator.pop(context, saved);
+      }
+      return saved;
     } on Object catch (error) {
       if (mounted) {
-        setState(() => _error = _message(error, 'Taşeron kaydedilemedi.'));
+        setState(() => _error = _message(error, 'Firma kaydedilemedi.'));
       }
+      return null;
     }
   }
 
@@ -275,7 +327,7 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
     } on Object catch (error) {
       if (mounted) {
         setState(
-          () => _error = _message(error, 'Taşeron durumu değiştirilemedi.'),
+          () => _error = _message(error, 'Firma durumu değiştirilemedi.'),
         );
       }
     }
@@ -304,12 +356,12 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Taşeronlar ve ekipler')),
+      appBar: AppBar(title: const Text('Firmalar ve ekipler')),
       floatingActionButton: FloatingActionButton.extended(
         key: const Key('add-subcontractor'),
         onPressed: _saveSubcontractor,
         icon: const Icon(Icons.add_business_outlined),
-        label: const Text('Taşeron ekle'),
+        label: const Text('Firma ekle'),
       ),
       body: SafeArea(
         child: ListView(
@@ -335,7 +387,7 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
               const Card(
                 child: Padding(
                   padding: EdgeInsets.all(16),
-                  child: Text('Henüz taşeron veya ekip kaydı yok.'),
+                  child: Text('Henüz firma veya ekip kaydı yok.'),
                 ),
               )
             else
@@ -449,8 +501,10 @@ const _gap = SizedBox(height: 10);
 TextField _field(
   TextEditingController controller,
   String label, {
+  Key? key,
   int maxLines = 1,
 }) => TextField(
+  key: key,
   controller: controller,
   maxLines: maxLines,
   decoration: InputDecoration(

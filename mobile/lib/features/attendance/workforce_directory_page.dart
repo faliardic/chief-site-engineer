@@ -6,6 +6,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_page.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_person_detail_page.dart';
+import 'package:chief_site_engineer/features/attendance/workforce_registry_page.dart';
 import 'package:chief_site_engineer/features/screen_tool_rail.dart';
 import 'package:flutter/material.dart';
 
@@ -281,6 +282,80 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
     }
   }
 
+  Future<void> _openFirstUseFlow() async {
+    final project = _project;
+    if (project == null || _navigationBusy) return;
+    _navigationBusy = true;
+    try {
+      final subcontractor = await Navigator.of(context).push<Subcontractor>(
+        MaterialPageRoute(
+          builder: (_) => WorkforceRegistryPage(
+            attendance: widget.attendance,
+            project: project,
+            startWithCompanyForm: true,
+          ),
+        ),
+      );
+      if (!mounted) return;
+      if (!widget.isActive ||
+          _project?.id != project.id ||
+          subcontractor == null) {
+        return;
+      }
+
+      var addAnother = true;
+      while (addAnother) {
+        if (!mounted) break;
+        if (!widget.isActive || _project?.id != project.id) break;
+        final member = await Navigator.of(context).push<WorkforceMember>(
+          MaterialPageRoute(
+            builder: (_) => WorkforceMemberFormPage(
+              attendance: widget.attendance,
+              project: project,
+              initialSubcontractorId: subcontractor.id,
+            ),
+          ),
+        );
+        if (!mounted ||
+            !widget.isActive ||
+            _project?.id != project.id ||
+            member == null) {
+          break;
+        }
+        await _loadDirectory(project);
+        if (!mounted || !widget.isActive || _project?.id != project.id) {
+          break;
+        }
+        addAnother =
+            await showDialog<bool>(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('Personel kaydedildi'),
+                content: Text('${member.fullName} sicile eklendi.'),
+                actions: [
+                  TextButton(
+                    key: const Key('workforce-quick-flow-done'),
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('Sicile dön'),
+                  ),
+                  FilledButton(
+                    key: const Key('workforce-quick-flow-add-another'),
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: const Text('Başka personel ekle'),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+      }
+      if (mounted && widget.isActive && _project?.id == project.id) {
+        await _loadDirectory(project);
+      }
+    } finally {
+      _navigationBusy = false;
+    }
+  }
+
   List<WorkforceMember> get _visibleMembers {
     final query = _normalized(_search.text);
     return _members
@@ -403,13 +478,13 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
                   initialValue: subcontractorId,
                   isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Taşeron',
+                    labelText: 'Taşeron / İşveren',
                     border: OutlineInputBorder(),
                   ),
                   items: [
                     const DropdownMenuItem(
                       value: null,
-                      child: Text('Tüm taşeronlar'),
+                      child: Text('Tüm firmalar'),
                     ),
                     for (final item in subcontractors)
                       DropdownMenuItem(
@@ -576,7 +651,7 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
         Text('Saha Rehberi', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 4),
         const Text(
-          'Personel sicili, taşeron ve ekip bağlarıyla proje kapsamında görünür.',
+          'Personel sicili, firma ve ekip bağlarıyla proje kapsamında görünür.',
         ),
         const SizedBox(height: 12),
         if (_projectDiscoveryFailed && !_loading)
@@ -633,7 +708,7 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
               focusNode: _searchFocus,
               controller: _search,
               decoration: const InputDecoration(
-                labelText: 'Ad, telefon, görev, taşeron veya ekip ara',
+                labelText: 'Ad, telefon, görev, firma veya ekip ara',
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
               ),
@@ -654,7 +729,7 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
                 if (_subcontractorId != null)
                   _filterChip(
                     'workforce-directory-summary-subcontractor',
-                    'Taşeron: ${_subcontractors.where((item) => item.id == _subcontractorId).map((item) => item.name).firstOrNull ?? _subcontractorId}',
+                    'Firma: ${_subcontractors.where((item) => item.id == _subcontractorId).map((item) => item.name).firstOrNull ?? _subcontractorId}',
                     () => _subcontractorId = null,
                   ),
                 if (_teamId != null)
@@ -688,6 +763,33 @@ class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
             const Padding(
               padding: EdgeInsets.all(24),
               child: Center(child: CircularProgressIndicator()),
+            )
+          else if (project != null &&
+              _error == null &&
+              members.isEmpty &&
+              _members.isEmpty &&
+              _subcontractors.isEmpty)
+            Card(
+              key: const Key('workforce-directory-first-use'),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'İlk firma ve personel kaydınızı oluşturarak sicili başlatın.',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      key: const Key('add-first-workforce-company'),
+                      onPressed: _openFirstUseFlow,
+                      icon: const Icon(Icons.add_business_outlined),
+                      label: const Text('Taşeron / İşveren ekle'),
+                    ),
+                  ],
+                ),
+              ),
             )
           else if (members.isEmpty)
             const Card(
@@ -749,7 +851,7 @@ bool _usesTechnicalTeam(WorkforceMember member) => isWorkforceTechnicalTeamLink(
 );
 
 String _memberRegistryLabel(WorkforceMember member) {
-  final subcontractor = member.subcontractorName ?? 'Tanımsız taşeron';
+  final subcontractor = member.subcontractorName ?? 'Tanımsız firma';
   return _usesTechnicalTeam(member)
       ? subcontractor
       : '$subcontractor • ${member.teamName}';
