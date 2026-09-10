@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
@@ -13,40 +11,19 @@ const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const dayId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const subcontractorAId = '11111111-1111-4111-8111-111111111111';
 const subcontractorBId = '22222222-2222-4222-8222-222222222222';
-const teamA1Id = '33333333-3333-4333-8333-333333333331';
-const teamA2Id = '33333333-3333-4333-8333-333333333332';
+const teamAId = '33333333-3333-4333-8333-333333333331';
 const teamBId = '44444444-4444-4444-8444-444444444444';
-const memberA1Id = '55555555-5555-4555-8555-555555555551';
-const memberA2Id = '55555555-5555-4555-8555-555555555552';
+const memberAId = '55555555-5555-4555-8555-555555555551';
 const memberBId = '66666666-6666-4666-8666-666666666666';
 const archivedMemberId = '77777777-7777-4777-8777-777777777771';
-const restoredMemberId = '77777777-7777-4777-8777-777777777772';
+const inactiveMemberId = '77777777-7777-4777-8777-777777777772';
 
 void main() {
   testWidgets(
-    'subcontractor and team scope candidates while selected rows stay visible',
+    'Q04-C1 active people are immediately visible in deterministic flat order',
     (tester) async {
       final attendance = _attendance(
         members: [
-          _member(
-            id: memberA1Id,
-            name: 'Ali Kalıpçı',
-            subcontractorId: subcontractorAId,
-            subcontractorName: 'Taşeron A',
-            teamId: teamA1Id,
-            teamName: 'Ekip A1',
-            role: 'Kalıpçı',
-            phone: '0555 111 11 11',
-          ),
-          _member(
-            id: memberA2Id,
-            name: 'Ayşe Demirci',
-            subcontractorId: subcontractorAId,
-            subcontractorName: 'Taşeron A',
-            teamId: teamA2Id,
-            teamName: 'Ekip A2',
-            role: 'Demirci',
-          ),
           _member(
             id: memberBId,
             name: 'Veli Sıvacı',
@@ -56,88 +33,70 @@ void main() {
             teamName: 'Ekip B',
             role: 'Sıvacı',
           ),
+          _member(
+            id: memberAId,
+            name: 'Ali Kalıpçı',
+            subcontractorId: subcontractorAId,
+            subcontractorName: 'Taşeron A',
+            teamId: teamAId,
+            teamName: 'Ekip A',
+            role: 'Kalıpçı',
+            phone: '0555 111 11 11',
+          ),
         ],
       );
+
       await _pumpPage(tester, attendance);
 
+      expect(find.byKey(const Key('attendance-flat-list')), findsOneWidget);
+      expect(find.byKey(const Key('attendance-roster-selector')), findsNothing);
       expect(
-        find.byKey(const Key('attendance-roster-selector')),
-        findsOneWidget,
+        find.byKey(const Key('attendance-inline-member-form')),
+        findsNothing,
       );
-      expect(find.byKey(Key('attendance-candidate-$memberA1Id')), findsNothing);
-      expect(find.byKey(Key('attendance-candidate-$memberBId')), findsNothing);
-
-      await _selectSubcontractor(tester, 'Taşeron A');
+      expect(find.byKey(Key('attendance-member-$memberAId')), findsOneWidget);
+      expect(find.byKey(Key('attendance-member-$memberBId')), findsOneWidget);
+      expect(find.text('Taşeron A • Kalıpçı'), findsOneWidget);
+      expect(find.textContaining('0555 111 11 11'), findsNothing);
       expect(
-        find.byKey(Key('attendance-candidate-$memberA1Id')),
-        findsOneWidget,
+        tester.getTopLeft(find.byKey(Key('attendance-member-$memberAId'))).dy,
+        lessThan(
+          tester.getTopLeft(find.byKey(Key('attendance-member-$memberBId'))).dy,
+        ),
       );
-      expect(
-        find.byKey(Key('attendance-candidate-$memberA2Id')),
-        findsOneWidget,
-      );
-      expect(find.byKey(Key('attendance-candidate-$memberBId')), findsNothing);
-      expect(find.textContaining('0555 111 11 11'), findsOneWidget);
-
-      await _selectTeam(tester, 'Ekip A1');
-      expect(
-        find.byKey(Key('attendance-candidate-$memberA1Id')),
-        findsOneWidget,
-      );
-      expect(find.byKey(Key('attendance-candidate-$memberA2Id')), findsNothing);
-
-      await tester.tap(find.byKey(Key('add-attendance-member-$memberA1Id')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(Key('attendance-member-$memberA1Id')), findsOneWidget);
-      expect(find.byKey(Key('attendance-candidate-$memberA1Id')), findsNothing);
-
-      await _selectSubcontractor(tester, 'Taşeron B');
-      expect(find.byKey(Key('attendance-member-$memberA1Id')), findsOneWidget);
-      expect(
-        find.byKey(Key('attendance-candidate-$memberBId')),
-        findsOneWidget,
-      );
-      expect(find.byKey(Key('attendance-candidate-$memberA2Id')), findsNothing);
       expect(attendance.detail!.entries, isEmpty);
+      expect(attendance.saveCalls, 0);
     },
   );
 
   testWidgets(
-    'archived historical member stays selected but only restored member is candidate',
+    'Q04-C1 inactive historical person stays visible and inactive non-entry stays hidden',
     (tester) async {
       final archived = _member(
         id: archivedMemberId,
         name: 'Arşivli Usta',
         subcontractorId: subcontractorAId,
         subcontractorName: 'Taşeron A',
-        teamId: teamA1Id,
-        teamName: 'Ekip A1',
+        teamId: teamAId,
+        teamName: 'Ekip A',
         role: 'Usta',
         isActive: false,
       );
-      final inactiveCandidate = _member(
-        id: memberA2Id,
-        name: 'Arşivli Aday',
+      final inactive = _member(
+        id: inactiveMemberId,
+        name: 'Eski Aday',
         subcontractorId: subcontractorAId,
         subcontractorName: 'Taşeron A',
-        teamId: teamA1Id,
-        teamName: 'Ekip A1',
+        teamId: teamAId,
+        teamName: 'Ekip A',
         role: 'İşçi',
         isActive: false,
       );
-      final restored = _member(
-        id: restoredMemberId,
-        name: 'Geri Açılan Usta',
-        subcontractorId: subcontractorAId,
-        subcontractorName: 'Taşeron A',
-        teamId: teamA1Id,
-        teamName: 'Ekip A1',
-        role: 'Usta',
-      );
       final attendance = _attendance(
-        members: [archived, inactiveCandidate, restored],
+        members: [inactive, archived],
         detail: _detail(entries: [_entry(archived)]),
       );
+
       await _pumpPage(tester, attendance);
 
       expect(
@@ -145,198 +104,186 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Arşivli Usta (pasif)'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('attendance-add-people')));
-      await tester.pumpAndSettle();
-      await _selectSubcontractor(tester, 'Taşeron A');
-
       expect(
-        find.byKey(Key('attendance-candidate-$archivedMemberId')),
+        find.byKey(Key('attendance-member-$inactiveMemberId')),
         findsNothing,
       );
-      expect(find.byKey(Key('attendance-candidate-$memberA2Id')), findsNothing);
-      expect(
-        find.byKey(Key('attendance-candidate-$restoredMemberId')),
-        findsOneWidget,
-      );
+      expect(attendance.saveCalls, 0);
     },
   );
 
-  testWidgets('Q04-A2 zero active team allows no-team inline person create', (
+  testWidgets('Q04-C1 bulk marking stays local until explicit save', (
     tester,
   ) async {
-    final attendance = FakeAttendanceApplication(detail: _detail())
-      ..subcontractors = [_subcontractor(subcontractorAId, 'Taşeron A')];
+    final attendance = _attendance(
+      members: [
+        _member(
+          id: memberAId,
+          name: 'Ali Kalıpçı',
+          subcontractorId: subcontractorAId,
+          subcontractorName: 'Taşeron A',
+          teamId: teamAId,
+          teamName: 'Ekip A',
+          role: 'Kalıpçı',
+        ),
+        _member(
+          id: memberBId,
+          name: 'Veli Sıvacı',
+          subcontractorId: subcontractorBId,
+          subcontractorName: 'Taşeron B',
+          teamId: teamBId,
+          teamName: 'Ekip B',
+          role: 'Sıvacı',
+        ),
+      ],
+    );
     await _pumpPage(tester, attendance);
-    await _selectSubcontractor(tester, 'Taşeron A');
 
-    expect(find.byKey(const Key('attendance-no-active-team')), findsNothing);
-    final button = tester.widget<OutlinedButton>(
-      find.byKey(const Key('attendance-new-member')),
-    );
-    expect(button.onPressed, isNotNull);
-    await tester.tap(find.byKey(const Key('attendance-new-member')));
+    await _scrollDayTo(tester, find.byKey(const Key('attendance-bulk-tools')));
+    await tester.tap(find.byKey(const Key('attendance-bulk-tools')));
     await tester.pumpAndSettle();
-    expect(find.text('Ekip belirtilmedi'), findsOneWidget);
-    await tester.enterText(
-      find.byKey(const Key('attendance-inline-member-name')),
-      'Ekipsiz Usta',
-    );
-    await tester.enterText(
-      find.byKey(const Key('attendance-inline-member-role')),
-      'Usta',
-    );
-    await tester.tap(find.byKey(const Key('save-attendance-inline-member')));
-    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mark-all-full')));
+    await tester.pump();
 
-    expect(attendance.createMemberCalls, 1);
+    expect(attendance.saveCalls, 0);
+    expect(attendance.detail!.entries, isEmpty);
     expect(
-      attendance.lastCreateMemberCommand!.subcontractorId,
-      subcontractorAId,
+      find.text('Tam gün 2 • Yarım gün 0 • Gelmedi 0 • İzinli 0'),
+      findsOneWidget,
     );
-    expect(attendance.lastCreateMemberCommand!.teamId, isNull);
-    expect(attendance.lastCreateMemberCommand!.teamName, isNull);
+    expect(find.text('İşaretlenmedi 0'), findsOneWidget);
+
+    await _scrollDayTo(tester, find.byKey(const Key('save-attendance-draft')));
+    await tester.tap(find.byKey(const Key('save-attendance-draft')));
+    await tester.pumpAndSettle();
+
+    expect(attendance.saveCalls, 1);
+    expect(attendance.lastRosterCommand!.values, hasLength(2));
+    expect(
+      attendance.lastRosterCommand!.values.map((value) => value.memberId),
+      containsAll(<String>[memberAId, memberBId]),
+    );
   });
 
-  testWidgets('Q04-A2 explicit inline team selection keeps existing behavior', (
+  testWidgets('Q04-C1 Personel ekle reuses the canonical Sicil form', (
     tester,
   ) async {
-    final attendance = _attendance();
+    final attendance = _attendance(
+      members: [
+        _member(
+          id: memberAId,
+          name: 'Ali Kalıpçı',
+          subcontractorId: subcontractorAId,
+          subcontractorName: 'Taşeron A',
+          teamId: teamAId,
+          teamName: 'Ekip A',
+          role: 'Kalıpçı',
+        ),
+      ],
+      subcontractors: [_subcontractor(subcontractorAId, 'Taşeron A')],
+    );
     await _pumpPage(tester, attendance);
-    await _selectSubcontractor(tester, 'Taşeron A');
-    await tester.tap(find.byKey(const Key('attendance-new-member')));
+
+    await _scrollDayTo(tester, find.byKey(const Key('attendance-add-person')));
+    await tester.tap(find.byKey(const Key('attendance-add-person')));
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const Key('attendance-inline-member-name')),
-      'Yeni Usta',
+    expect(find.byKey(const Key('workforce-member-form')), findsOneWidget);
+    expect(
+      find.byKey(const Key('workforce-subcontractor-context')),
+      findsOneWidget,
     );
-    await tester.enterText(
-      find.byKey(const Key('attendance-inline-member-role')),
-      'Usta',
+    expect(
+      find.byKey(const Key('attendance-inline-member-form')),
+      findsNothing,
     );
-    await _selectInlineTeam(tester, 'Ekip A2');
-    await tester.tap(find.byKey(const Key('save-attendance-inline-member')));
-    await tester.pumpAndSettle();
+    expect(attendance.createMemberCalls, 0);
+  });
 
-    expect(attendance.createMemberCalls, 1);
-    expect(attendance.lastCreateMemberCommand!.projectId, projectId);
+  testWidgets('Q04-C1 no company shows one canonical company CTA', (
+    tester,
+  ) async {
+    final attendance = _attendance(subcontractors: const []);
+    await _pumpPage(tester, attendance);
+
+    expect(find.byKey(const Key('attendance-add-company')), findsOneWidget);
+    expect(find.byKey(const Key('attendance-add-person')), findsNothing);
+    expect(attendance.detail!.entries, isEmpty);
+    expect(attendance.saveCalls, 0);
+
+    await tester.tap(find.byKey(const Key('attendance-add-company')));
+    await tester.pumpAndSettle();
     expect(
-      attendance.lastCreateMemberCommand!.subcontractorId,
-      subcontractorAId,
-    );
-    expect(attendance.lastCreateMemberCommand!.teamId, teamA2Id);
-    expect(
-      find.byKey(const Key('attendance-new-member-warning')),
+      find.byKey(const Key('workforce-directory-first-use')),
       findsOneWidget,
     );
     expect(attendance.detail!.entries, isEmpty);
+    expect(attendance.saveCalls, 0);
   });
 
-  testWidgets(
-    'inline create is single-submit and roster save uses the same canonical ID',
-    (tester) async {
-      final pending = Completer<WorkforceMember>();
-      final attendance = _attendance(teams: [_teamA1()])
-        ..createMemberCompleter = pending;
-      await _pumpPage(tester, attendance);
-      await _selectSubcontractor(tester, 'Taşeron A');
-      await tester.tap(find.byKey(const Key('attendance-new-member')));
-      await tester.pumpAndSettle();
-      await _selectInlineTeam(tester, 'Ekip A1');
+  testWidgets('Q04-C1 company without people shows one canonical person CTA', (
+    tester,
+  ) async {
+    final attendance = _attendance(
+      subcontractors: [_subcontractor(subcontractorAId, 'Taşeron A')],
+    );
+    await _pumpPage(tester, attendance);
 
-      await tester.enterText(
-        find.byKey(const Key('attendance-inline-member-name')),
-        'Tek Kimlikli Yeni Eleman',
-      );
-      await tester.enterText(
-        find.byKey(const Key('attendance-inline-member-role')),
-        'Elektrikçi',
-      );
-      await tester.enterText(
-        find.byKey(const Key('attendance-inline-member-phone')),
-        '0555 999 99 99',
-      );
-      final create = tester.widget<FilledButton>(
-        find.byKey(const Key('save-attendance-inline-member')),
-      );
-      create.onPressed!();
-      create.onPressed!();
-      await tester.pump();
+    expect(find.byKey(const Key('attendance-add-company')), findsNothing);
+    expect(find.byKey(const Key('attendance-add-person')), findsOneWidget);
+    expect(attendance.detail!.entries, isEmpty);
+    expect(attendance.saveCalls, 0);
 
-      expect(attendance.createMemberCalls, 1);
-      final command = attendance.lastCreateMemberCommand!;
-      expect(command.projectId, projectId);
-      expect(command.subcontractorId, subcontractorAId);
-      expect(command.teamId, teamA1Id);
-      expect(command.teamName, 'Ekip A1');
-      final created = _member(
-        id: command.id,
-        name: command.fullName,
-        subcontractorId: subcontractorAId,
-        subcontractorName: 'Taşeron A',
-        teamId: teamA1Id,
-        teamName: 'Ekip A1',
-        role: command.roleName,
-        phone: command.phone,
-      );
-      attendance.members = [created];
-      pending.complete(created);
-      await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('attendance-add-person')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('workforce-member-form')), findsOneWidget);
+    expect(
+      find.byKey(const Key('workforce-subcontractor-context')),
+      findsOneWidget,
+    );
+    expect(attendance.detail!.entries, isEmpty);
+    expect(attendance.saveCalls, 0);
+  });
 
-      expect(
-        find.byKey(const Key('attendance-new-member-warning')),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('CSE resmi uygunluk kararı vermez'),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(Key('attendance-member-${command.id}')),
-        findsOneWidget,
-      );
-      expect(attendance.detail!.entries, isEmpty);
+  testWidgets('Q04-C1 technical team stays hidden in direct list', (
+    tester,
+  ) async {
+    final technicalMember = _member(
+      id: memberAId,
+      name: 'Ekipsiz Personel',
+      subcontractorId: subcontractorAId,
+      subcontractorName: 'Taseron A',
+      teamId: workforceTechnicalTeamId(projectId, subcontractorAId),
+      teamName: workforceTechnicalTeamStorageName,
+      role: 'Usta',
+    );
+    final attendance = _attendance(members: [technicalMember]);
+    await _pumpPage(tester, attendance);
 
-      await _scrollDayTo(
-        tester,
-        find.byKey(const Key('save-attendance-draft')),
-      );
-      await tester.tap(find.byKey(const Key('save-attendance-draft')));
-      await tester.pumpAndSettle();
-
-      expect(attendance.saveCalls, 1);
-      expect(attendance.lastRosterCommand!.values, hasLength(1));
-      expect(attendance.lastRosterCommand!.values.single.memberId, command.id);
-      expect(attendance.detail!.entries.single.memberId, command.id);
-    },
-  );
+    expect(find.text('Taseron A • Usta'), findsOneWidget);
+    expect(
+      find.textContaining(workforceTechnicalTeamStorageName),
+      findsNothing,
+    );
+    await tester.tap(
+      find.byKey(Key('attendance-member-details-${technicalMember.id}')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Ekip:'), findsNothing);
+    expect(attendance.saveCalls, 0);
+  });
 }
 
 FakeAttendanceApplication _attendance({
   List<WorkforceMember> members = const [],
-  List<WorkforceTeam>? teams,
+  List<Subcontractor>? subcontractors,
   AttendanceDayDetail? detail,
 }) => FakeAttendanceApplication(members: members, detail: detail ?? _detail())
-  ..subcontractors = [
-    _subcontractor(subcontractorAId, 'Taşeron A'),
-    _subcontractor(subcontractorBId, 'Taşeron B'),
-  ]
-  ..teams =
-      teams ??
+  ..subcontractors =
+      subcontractors ??
       [
-        _teamA1(),
-        _team(
-          id: teamA2Id,
-          subcontractorId: subcontractorAId,
-          subcontractorName: 'Taşeron A',
-          name: 'Ekip A2',
-        ),
-        _team(
-          id: teamBId,
-          subcontractorId: subcontractorBId,
-          subcontractorName: 'Taşeron B',
-          name: 'Ekip B',
-        ),
+        _subcontractor(subcontractorAId, 'Taşeron A'),
+        _subcontractor(subcontractorBId, 'Taşeron B'),
       ];
 
 Subcontractor _subcontractor(String id, String name) => Subcontractor(
@@ -348,34 +295,6 @@ Subcontractor _subcontractor(String id, String name) => Subcontractor(
   note: null,
   status: WorkforceRecordStatus.active,
   activeTeamCount: 0,
-  activePersonCount: 0,
-  revision: 1,
-  createdAt: '2026-08-09T08:00:00Z',
-  updatedAt: '2026-08-09T08:00:00Z',
-  archivedAt: null,
-);
-
-WorkforceTeam _teamA1() => _team(
-  id: teamA1Id,
-  subcontractorId: subcontractorAId,
-  subcontractorName: 'Taşeron A',
-  name: 'Ekip A1',
-);
-
-WorkforceTeam _team({
-  required String id,
-  required String subcontractorId,
-  required String subcontractorName,
-  required String name,
-}) => WorkforceTeam(
-  id: id,
-  projectId: projectId,
-  subcontractorId: subcontractorId,
-  subcontractorName: subcontractorName,
-  name: name,
-  leadName: null,
-  note: null,
-  status: WorkforceRecordStatus.active,
   activePersonCount: 0,
   revision: 1,
   createdAt: '2026-08-09T08:00:00Z',
@@ -476,6 +395,7 @@ Future<void> _pumpPage(
         attendance: attendance,
         agenda: FakeAgendaApplication(projects: const [_project]),
         dayId: dayId,
+        project: _project,
       ),
     ),
   );
@@ -490,48 +410,6 @@ const _project = MobileProject(
   revision: 1,
 );
 
-Future<void> _selectSubcontractor(WidgetTester tester, String name) async {
-  final dropdown = find.descendant(
-    of: find.byKey(const Key('attendance-subcontractor-selector')),
-    matching: find.byType(DropdownButtonFormField<String>),
-  );
-  await tester.scrollUntilVisible(
-    dropdown,
-    260,
-    scrollable: find
-        .descendant(
-          of: find.byKey(const Key('attendance-day-detail')),
-          matching: find.byType(Scrollable),
-        )
-        .first,
-    maxScrolls: 12,
-  );
-  await tester.tap(dropdown);
-  await tester.pumpAndSettle();
-  await tester.tap(find.text(name).last);
-  await tester.pumpAndSettle();
-}
-
-Future<void> _selectTeam(WidgetTester tester, String name) async {
-  final dropdown = find.descendant(
-    of: find.byKey(const Key('attendance-team-filter')),
-    matching: find.byType(DropdownButtonFormField<String>),
-  );
-  await tester.ensureVisible(dropdown);
-  await tester.tap(dropdown);
-  await tester.pumpAndSettle();
-  await tester.tap(find.text(name).last);
-  await tester.pumpAndSettle();
-}
-
-Future<void> _selectInlineTeam(WidgetTester tester, String name) async {
-  final dropdown = find.byKey(const Key('attendance-inline-member-team'));
-  await tester.tap(dropdown);
-  await tester.pumpAndSettle();
-  await tester.tap(find.text(name).last);
-  await tester.pumpAndSettle();
-}
-
 Future<void> _scrollDayTo(WidgetTester tester, Finder target) async {
   final scrollable = find
       .descendant(
@@ -543,7 +421,7 @@ Future<void> _scrollDayTo(WidgetTester tester, Finder target) async {
     target,
     260,
     scrollable: scrollable,
-    maxScrolls: 12,
+    maxScrolls: 16,
   );
   await tester.pumpAndSettle();
 }

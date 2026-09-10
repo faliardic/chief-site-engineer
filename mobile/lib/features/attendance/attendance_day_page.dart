@@ -4,6 +4,8 @@ import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
+import 'package:chief_site_engineer/features/attendance/workforce_directory_page.dart';
+import 'package:chief_site_engineer/features/attendance/workforce_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/platform/attendance_export_gateway.dart';
 import 'package:flutter/material.dart';
@@ -14,12 +16,14 @@ class AttendanceDayPage extends StatefulWidget {
     required this.attendance,
     required this.agenda,
     required this.dayId,
+    this.project,
     super.key,
   });
 
   final AttendanceApplication attendance;
   final AgendaApplication agenda;
   final String dayId;
+  final MobileProject? project;
 
   @override
   State<AttendanceDayPage> createState() => _AttendanceDayPageState();
@@ -30,21 +34,16 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
   List<WorkforceMember> _allMembers = const [];
   List<WorkforceMember> _members = const [];
   List<Subcontractor> _subcontractors = const [];
-  List<WorkforceTeam> _teams = const [];
   final Map<String, AttendanceResult?> _results = {};
   final Map<String, String> _entryIds = {};
   final Map<String, TextEditingController> _overtime = {};
   final Map<String, TextEditingController> _notes = {};
   final TextEditingController _generalNote = TextEditingController();
   bool _loading = true;
-  bool _registryLoading = false;
   bool _submitting = false;
   bool _showNewMemberWarning = false;
-  String? _selectedSubcontractorId;
-  String? _selectedTeamId;
   String? _error;
   String _saveEventId = RecordId.randomUuid();
-  String _bulkEventId = RecordId.randomUuid();
   String _dayEventId = RecordId.randomUuid();
   String _reminderEventId = RecordId.randomUuid();
   String _exportEventId = RecordId.randomUuid();
@@ -87,19 +86,6 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
       final subcontractors = await widget.attendance.listSubcontractors(
         detail.day.projectId,
       );
-      final selectedSubcontractorId =
-          subcontractors.any((item) => item.id == _selectedSubcontractorId)
-          ? _selectedSubcontractorId
-          : null;
-      final teams = selectedSubcontractorId == null
-          ? const <WorkforceTeam>[]
-          : await widget.attendance.listTeams(
-              detail.day.projectId,
-              subcontractorId: selectedSubcontractorId,
-            );
-      final selectedTeamId = teams.any((item) => item.id == _selectedTeamId)
-          ? _selectedTeamId
-          : null;
       if (!mounted) return;
       _disposeDraftControllers();
       _results.clear();
@@ -107,21 +93,24 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
       final entryByMember = {
         for (final entry in detail.entries) entry.memberId: entry,
       };
-      _allMembers = members;
-      _members = members
-          .where((member) => entryByMember.containsKey(member.id))
-          .toList(growable: false);
+      final visibleMembers =
+          members
+              .where(
+                (member) =>
+                    member.isActive || entryByMember.containsKey(member.id),
+              )
+              .toList(growable: false)
+            ..sort(_compareMembers);
+      _allMembers = List.of(members)..sort(_compareMembers);
+      _members = visibleMembers;
       _subcontractors = subcontractors;
-      _teams = teams;
-      _selectedSubcontractorId = selectedSubcontractorId;
-      _selectedTeamId = selectedTeamId;
       for (final member in members.where(
         (item) => item.isActive || entryByMember.containsKey(item.id),
       )) {
         _entryIds[member.id] =
             entryByMember[member.id]?.id ?? RecordId.randomUuid();
       }
-      for (final member in _members) {
+      for (final member in visibleMembers) {
         final entry = entryByMember[member.id];
         _results[member.id] = entry?.result;
         _overtime[member.id] = TextEditingController(
@@ -187,31 +176,15 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
     }
   }
 
-  Future<void> _markFull([String? teamId]) async {
-    final detail = _detail;
-    if (detail == null || _submitting) return;
+  void _markDraftFull([String? teamId]) {
+    if (_submitting) return;
     setState(() {
-      _submitting = true;
-      _error = null;
+      for (final member in _members) {
+        if (!member.isActive) continue;
+        if (teamId != null && member.teamId != teamId) continue;
+        _results[member.id] = AttendanceResult.fullDay;
+      }
     });
-    try {
-      await widget.attendance.markFullDay(
-        MarkAttendanceFullCommand(
-          dayId: detail.day.id,
-          eventId: _bulkEventId,
-          expectedRevision: detail.day.revision,
-          entryIdsByMember: _entryIds,
-          teamId: teamId,
-        ),
-      );
-      _bulkEventId = RecordId.randomUuid();
-      await _load();
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() => _error = _message(error, 'Hızlı işlem uygulanamadı.'));
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
   }
 
   Future<void> _pickTeam() async {
@@ -259,113 +232,68 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
         ),
       ),
     );
-    if (selected != null) await _markFull(selected);
+    if (selected != null) _markDraftFull(selected);
   }
 
-  List<WorkforceMember> get _candidateMembers {
-    final subcontractorId = _selectedSubcontractorId;
-    if (subcontractorId == null || _registryLoading) return const [];
-    final activeTeamIds = _teams.map((item) => item.id).toSet();
-    final selectedIds = _members.map((item) => item.id).toSet();
-    return _allMembers
+  Future<MobileProject> _currentProject(String projectId) async {
+    final supplied = widget.project;
+    if (supplied != null && supplied.id == projectId) return supplied;
+    final projects = await widget.agenda.listProjects();
+    final project = projects
         .where(
-          (member) =>
-              member.isActive &&
-              member.subcontractorId == subcontractorId &&
-              (_usesTechnicalTeam(member)
-                  ? _selectedTeamId == null
-                  : member.teamId != null &&
-                        activeTeamIds.contains(member.teamId) &&
-                        (_selectedTeamId == null ||
-                            member.teamId == _selectedTeamId)) &&
-              !selectedIds.contains(member.id),
+          (candidate) => candidate.id == projectId && !candidate.isArchived,
         )
-        .toList(growable: false);
-  }
-
-  Future<void> _selectSubcontractor(String? value) async {
-    final detail = _detail;
-    if (detail == null || value == _selectedSubcontractorId) return;
-    setState(() {
-      _selectedSubcontractorId = value;
-      _selectedTeamId = null;
-      _teams = const [];
-      _registryLoading = value != null;
-      _error = null;
-    });
-    if (value == null) return;
-    try {
-      final teams = await widget.attendance.listTeams(
-        detail.day.projectId,
-        subcontractorId: value,
-      );
-      if (!mounted || _selectedSubcontractorId != value) return;
-      setState(() {
-        _teams = teams;
-        _registryLoading = false;
-      });
-    } on Object catch (error) {
-      if (!mounted || _selectedSubcontractorId != value) return;
-      setState(() {
-        _registryLoading = false;
-        _error = _message(error, 'Aktif ekipler açılamadı.');
-      });
-    }
-  }
-
-  void _addDraftMember(WorkforceMember member) {
-    if (_members.any((item) => item.id == member.id)) return;
-    setState(() {
-      _members = [..._members, member];
-      _entryIds.putIfAbsent(member.id, RecordId.randomUuid);
-      _results[member.id] = AttendanceResult.fullDay;
-      _overtime[member.id] = TextEditingController(text: '0');
-      _notes[member.id] = TextEditingController();
-    });
-  }
-
-  void _discardDraftMember(WorkforceMember member) {
-    final hasPersistedEntry =
-        _detail?.entries.any((entry) => entry.memberId == member.id) ?? false;
-    if (hasPersistedEntry) return;
-    setState(() {
-      _members = _members
-          .where((item) => item.id != member.id)
-          .toList(growable: false);
-      _results.remove(member.id);
-      _overtime.remove(member.id)?.dispose();
-      _notes.remove(member.id)?.dispose();
-    });
-  }
-
-  Future<void> _createInlineMember() async {
-    final detail = _detail;
-    final subcontractorId = _selectedSubcontractorId;
-    final subcontractor = _subcontractors
-        .where((item) => item.id == subcontractorId)
         .firstOrNull;
-    if (detail == null || subcontractor == null || _submitting) return;
-    final member = await showModalBottomSheet<WorkforceMember>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => _InlineWorkforceMemberSheet(
-        attendance: widget.attendance,
-        projectId: detail.day.projectId,
-        subcontractor: subcontractor,
-        teams: _teams,
-      ),
-    );
-    if (!mounted || member == null) return;
-    setState(() {
-      _allMembers = [
-        ..._allMembers.where((item) => item.id != member.id),
-        member,
-      ];
-      _showNewMemberWarning = true;
-      _error = null;
-    });
-    _addDraftMember(member);
+    if (project == null) {
+      throw const AgendaValidationFailure('Aktif proje artık kullanılamıyor.');
+    }
+    return project;
+  }
+
+  Future<void> _openEmptyWorkforceAction() async {
+    final detail = _detail;
+    if (detail == null || _submitting) return;
+    try {
+      final project = await _currentProject(detail.day.projectId);
+      if (!mounted) return;
+      var createdMember = false;
+      if (_subcontractors.isEmpty) {
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('Sicil')),
+              body: WorkforceDirectoryPage(
+                attendance: widget.attendance,
+                agenda: widget.agenda,
+                initialProjectId: project.id,
+              ),
+            ),
+          ),
+        );
+      } else {
+        createdMember =
+            await Navigator.of(context).push<WorkforceMember>(
+              MaterialPageRoute(
+                builder: (_) => WorkforceMemberFormPage(
+                  attendance: widget.attendance,
+                  project: project,
+                  initialSubcontractorId: _subcontractors.length == 1
+                      ? _subcontractors.single.id
+                      : null,
+                ),
+              ),
+            ) !=
+            null;
+      }
+      if (mounted) {
+        if (createdMember) _showNewMemberWarning = true;
+        await _load();
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _error = _message(error, 'Sicil formu açılamadı.'));
+      }
+    }
   }
 
   Future<void> _transition(AttendanceTransition transition) async {
@@ -468,28 +396,6 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
     );
   }
 
-  Future<void> _remove(AttendanceEntry entry) async {
-    final detail = _detail;
-    if (detail == null || _submitting) return;
-    setState(() => _submitting = true);
-    try {
-      await widget.attendance.removeEntry(
-        RemoveAttendanceEntryCommand(
-          dayId: detail.day.id,
-          entryId: entry.id,
-          eventId: RecordId.randomUuid(),
-          expectedRevision: detail.day.revision,
-        ),
-      );
-      await _load();
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() => _error = _message(error, 'Puantaj kaydı kaldırılamadı.'));
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final detail = _detail;
@@ -499,7 +405,28 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : detail == null
-            ? Center(child: Text(_error ?? 'Puantaj günü bulunamadı.'))
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _error ?? 'Puantaj günü bulunamadı.',
+                        key: const Key('attendance-day-load-error'),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        key: const Key('attendance-day-retry'),
+                        onPressed: _load,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Tekrar dene'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
             : ListView(
                 key: const Key('attendance-day-detail'),
                 padding: const EdgeInsets.all(12),
@@ -511,6 +438,13 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _DayHeader(detail: detail),
+                          const SizedBox(height: 8),
+                          _SummaryCard(
+                            detail: detail,
+                            members: _members,
+                            results: _results,
+                            overtime: _overtime,
+                          ),
                           if (_error != null)
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -565,58 +499,116 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
                                 ),
                               ),
                             const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                OutlinedButton.icon(
-                                  key: const Key('mark-all-full'),
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size(48, 48),
-                                  ),
-                                  onPressed: _submitting ? null : _markFull,
-                                  icon: const Icon(Icons.done_all_outlined),
-                                  label: const Text('Tümünü tam gün'),
-                                ),
-                                OutlinedButton.icon(
-                                  key: const Key('mark-team-full'),
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size(48, 48),
-                                  ),
-                                  onPressed:
-                                      _submitting ||
-                                          !_allMembers.any(
-                                            (member) =>
-                                                member.isActive &&
-                                                !_usesTechnicalTeam(member),
-                                          )
-                                      ? null
-                                      : _pickTeam,
-                                  icon: const Icon(Icons.groups_outlined),
-                                  label: const Text('Ekibi tam gün'),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
                             if (_members.isEmpty)
-                              const Card(
+                              Card(
+                                key: const Key('attendance-workforce-empty'),
                                 child: Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: Text(
-                                    'Bu gün için seçilmiş personel yok. Personel ekle '
-                                    'alanından İşveren ve personel seçin.',
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Text(
+                                        _subcontractors.isEmpty
+                                            ? 'Bu projede henüz firma ve personel yok.'
+                                            : 'Bu firmalarda henüz aktif personel yok.',
+                                      ),
+                                      const SizedBox(height: 12),
+                                      FilledButton.icon(
+                                        key: Key(
+                                          _subcontractors.isEmpty
+                                              ? 'attendance-add-company'
+                                              : 'attendance-add-person',
+                                        ),
+                                        onPressed: _submitting
+                                            ? null
+                                            : _openEmptyWorkforceAction,
+                                        icon: Icon(
+                                          _subcontractors.isEmpty
+                                              ? Icons.add_business_outlined
+                                              : Icons.person_add_alt_1_outlined,
+                                        ),
+                                        label: Text(
+                                          _subcontractors.isEmpty
+                                              ? 'Taşeron / İşveren ekle'
+                                              : 'Personel ekle',
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               )
                             else
-                              ..._buildTeamSections(detail),
+                              ..._buildFlatRoster(),
+                            if (_members.isNotEmpty &&
+                                _subcontractors.isNotEmpty)
+                              OutlinedButton.icon(
+                                key: const Key('attendance-add-person'),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(48),
+                                ),
+                                onPressed: _submitting
+                                    ? null
+                                    : _openEmptyWorkforceAction,
+                                icon: const Icon(
+                                  Icons.person_add_alt_1_outlined,
+                                ),
+                                label: const Text('Personel ekle'),
+                              ),
                             Card(
                               child: ExpansionTile(
-                                key: const Key('attendance-add-people'),
-                                initiallyExpanded: _members.isEmpty,
+                                key: const Key('attendance-bulk-tools'),
                                 maintainState: true,
-                                title: const Text('Personel ekle'),
-                                children: [_buildRosterSelector()],
+                                title: const Text('Toplu işlemler'),
+                                subtitle: const Text(
+                                  'Seçimler yalnız mevcut taslağa uygulanır.',
+                                ),
+                                childrenPadding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  0,
+                                  12,
+                                  12,
+                                ),
+                                children: [
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      OutlinedButton.icon(
+                                        key: const Key('mark-all-full'),
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(48, 48),
+                                        ),
+                                        onPressed: _submitting
+                                            ? null
+                                            : _markDraftFull,
+                                        icon: const Icon(
+                                          Icons.done_all_outlined,
+                                        ),
+                                        label: const Text('Aktifleri tam gün'),
+                                      ),
+                                      OutlinedButton.icon(
+                                        key: const Key('mark-team-full'),
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(48, 48),
+                                        ),
+                                        onPressed:
+                                            _submitting ||
+                                                !_allMembers.any(
+                                                  (member) =>
+                                                      member.isActive &&
+                                                      !_usesTechnicalTeam(
+                                                        member,
+                                                      ),
+                                                )
+                                            ? null
+                                            : _pickTeam,
+                                        icon: const Icon(Icons.groups_outlined),
+                                        label: const Text('Ekibi tam gün'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -688,8 +680,6 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
                               icon: const Icon(Icons.lock_open_outlined),
                               label: const Text('Günü yeniden aç'),
                             ),
-                          const SizedBox(height: 16),
-                          _SummaryCard(detail: detail),
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 8,
@@ -763,404 +753,46 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
     _ => 'Puantaj kaydı güncellendi',
   };
 
-  Widget _buildRosterSelector() {
-    const allTeams = '__all-active-teams__';
-    final subcontractorId = _selectedSubcontractorId;
-    final candidates = _candidateMembers;
-    return Card(
-      key: const Key('attendance-roster-selector'),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
+  List<Widget> _buildFlatRoster() {
+    return [
+      if (_results.values.every((result) => result == null))
+        const Padding(
+          padding: EdgeInsets.fromLTRB(4, 4, 4, 8),
+          child: Text(
+            'Bugün için henüz Puantaj işaretlenmedi.',
+            key: Key('attendance-unmarked-guidance'),
+          ),
+        ),
+      KeyedSubtree(
+        key: const Key('attendance-flat-list'),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Personel seçimi',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Önce İşveren seçin; yalnız o işverenin aktif personelleri '
-              'aday olarak gösterilir.',
-            ),
-            const SizedBox(height: 12),
-            KeyedSubtree(
-              key: const Key('attendance-subcontractor-selector'),
-              child: DropdownButtonFormField<String>(
-                key: ValueKey('attendance-subcontractor-$subcontractorId'),
-                initialValue: subcontractorId,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'İşveren seç *',
-                  border: OutlineInputBorder(),
+          children: _members
+              .map(
+                (member) => _MemberAttendanceCard(
+                  member: member,
+                  result: _results[member.id],
+                  overtime: _overtime[member.id]!,
+                  note: _notes[member.id]!,
+                  onDraftChanged: () => setState(() {}),
+                  onResultChanged: (value) {
+                    setState(() {
+                      _results[member.id] = value;
+                      if (value == AttendanceResult.absent ||
+                          value == AttendanceResult.leave) {
+                        _overtime[member.id]!.text = '0';
+                      }
+                    });
+                  },
                 ),
-                items: _subcontractors
-                    .map(
-                      (item) => DropdownMenuItem(
-                        value: item.id,
-                        child: Text(item.name),
-                      ),
-                    )
-                    .toList(growable: false),
-                onChanged: _submitting ? null : _selectSubcontractor,
-              ),
-            ),
-            if (_subcontractors.isEmpty) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Aktif işveren yok. Önce Sicil’den işveren oluşturun.',
-              ),
-            ],
-            if (subcontractorId != null) ...[
-              const SizedBox(height: 12),
-              if (_registryLoading)
-                const LinearProgressIndicator(
-                  key: Key('attendance-registry-loading'),
-                )
-              else ...[
-                KeyedSubtree(
-                  key: const Key('attendance-team-filter'),
-                  child: DropdownButtonFormField<String>(
-                    key: ValueKey(
-                      'attendance-team-$subcontractorId-${_selectedTeamId ?? allTeams}',
-                    ),
-                    initialValue: _selectedTeamId ?? allTeams,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Ekip filtresi',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: allTeams,
-                        child: Text('Tüm aktif ekipler'),
-                      ),
-                      ..._teams.map(
-                        (item) => DropdownMenuItem(
-                          value: item.id,
-                          child: Text(item.name),
-                        ),
-                      ),
-                    ],
-                    onChanged: _submitting
-                        ? null
-                        : (value) => setState(
-                            () => _selectedTeamId = value == allTeams
-                                ? null
-                                : value,
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
-                    key: const Key('attendance-new-member'),
-                    onPressed: _submitting ? null : _createInlineMember,
-                    icon: const Icon(Icons.person_add_alt_1_outlined),
-                    label: const Text('+ Yeni eleman'),
-                  ),
-                ),
-                const Divider(),
-                Text(
-                  'Aday personeller (${candidates.length})',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                if (candidates.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      'Bu filtrede rostere eklenebilecek aktif personel yok.',
-                    ),
-                  )
-                else
-                  ...candidates.map(
-                    (member) => ListTile(
-                      key: Key('attendance-candidate-${member.id}'),
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(member.fullName),
-                      subtitle: Text(
-                        '${_usesTechnicalTeam(member) ? '' : '${member.teamName} • '}${member.roleName}'
-                        '${member.phone == null ? '' : ' • ${member.phone}'}',
-                      ),
-                      trailing: IconButton(
-                        key: Key('add-attendance-member-${member.id}'),
-                        tooltip: 'Rostere ekle',
-                        onPressed: _submitting
-                            ? null
-                            : () => _addDraftMember(member),
-                        icon: const Icon(Icons.add_circle_outline),
-                      ),
-                    ),
-                  ),
-              ],
-            ],
-          ],
+              )
+              .toList(growable: false),
         ),
       ),
-    );
-  }
-
-  List<Widget> _buildTeamSections(AttendanceDayDetail detail) {
-    final entryByMember = {
-      for (final entry in detail.entries) entry.memberId: entry,
-    };
-    final groups = <String, List<WorkforceMember>>{};
-    for (final member in _members) {
-      groups
-          .putIfAbsent(member.teamId ?? member.teamName, () => [])
-          .add(member);
-    }
-    return groups.entries
-        .expand((group) {
-          return <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
-              child: Text(
-                _usesTechnicalTeam(group.value.first)
-                    ? group.value.first.subcontractorName ?? 'Tanımsız taşeron'
-                    : '${group.value.first.teamName} — '
-                          '${group.value.first.subcontractorName ?? 'Tanımsız taşeron'}',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            ...group.value.map(
-              (member) => _MemberAttendanceCard(
-                member: member,
-                result: _results[member.id],
-                overtime: _overtime[member.id]!,
-                note: _notes[member.id]!,
-                hasPersistedEntry: entryByMember.containsKey(member.id),
-                onResultChanged: (value) {
-                  setState(() {
-                    _results[member.id] = value;
-                    if (value == AttendanceResult.absent ||
-                        value == AttendanceResult.leave) {
-                      _overtime[member.id]!.text = '0';
-                    }
-                  });
-                },
-                onRemove: entryByMember[member.id] == null
-                    ? () => _discardDraftMember(member)
-                    : () => _remove(entryByMember[member.id]!),
-              ),
-            ),
-          ];
-        })
-        .toList(growable: false);
+    ];
   }
 
   String _message(Object error, String fallback) =>
       error is AgendaValidationFailure ? error.message : fallback;
-}
-
-class _InlineWorkforceMemberSheet extends StatefulWidget {
-  const _InlineWorkforceMemberSheet({
-    required this.attendance,
-    required this.projectId,
-    required this.subcontractor,
-    required this.teams,
-  });
-
-  final AttendanceApplication attendance;
-  final String projectId;
-  final Subcontractor subcontractor;
-  final List<WorkforceTeam> teams;
-
-  @override
-  State<_InlineWorkforceMemberSheet> createState() =>
-      _InlineWorkforceMemberSheetState();
-}
-
-class _InlineWorkforceMemberSheetState
-    extends State<_InlineWorkforceMemberSheet> {
-  static const _noTeam = '__no_explicit_team__';
-  late final String _memberId;
-  late final String _eventId;
-  final TextEditingController _name = TextEditingController();
-  final TextEditingController _role = TextEditingController();
-  final TextEditingController _phone = TextEditingController();
-  final TextEditingController _personnelCode = TextEditingController();
-  String? _teamId = _noTeam;
-  bool _submitting = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _memberId = RecordId.randomUuid();
-    _eventId = RecordId.randomUuid();
-  }
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _role.dispose();
-    _phone.dispose();
-    _personnelCode.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (_submitting) return;
-    final team = widget.teams.where((item) => item.id == _teamId).firstOrNull;
-    setState(() {
-      _submitting = true;
-      _error = null;
-    });
-    try {
-      final member = await widget.attendance.createMember(
-        CreateWorkforceMemberCommand(
-          id: _memberId,
-          eventId: _eventId,
-          projectId: widget.projectId,
-          subcontractorId: widget.subcontractor.id,
-          teamId: team?.id,
-          fullName: _name.text,
-          teamName: team?.name,
-          roleName: _role.text,
-          phone: _phone.text,
-          personnelCode: _personnelCode.text,
-        ),
-      );
-      if (mounted) Navigator.pop(context, member);
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(
-        () => _error = error is AgendaValidationFailure
-            ? error.message
-            : 'Personel oluşturulamadı.',
-      );
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        top: 16,
-        right: 16,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
-      ),
-      child: SingleChildScrollView(
-        key: const Key('attendance-inline-member-form'),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '+ Yeni eleman',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 4),
-            Text('İşveren: ${widget.subcontractor.name}'),
-            const SizedBox(height: 12),
-            if (_error case final error?) ...[
-              Text(
-                error,
-                key: const Key('attendance-inline-member-error'),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-              const SizedBox(height: 12),
-            ],
-            DropdownButtonFormField<String>(
-              key: const Key('attendance-inline-member-team'),
-              initialValue: _teamId,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Ekip (opsiyonel)',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                const DropdownMenuItem(
-                  value: _noTeam,
-                  child: Text('Ekip belirtilmedi'),
-                ),
-                ...widget.teams.map(
-                  (item) =>
-                      DropdownMenuItem(value: item.id, child: Text(item.name)),
-                ),
-              ],
-              onChanged: _submitting
-                  ? null
-                  : (value) => setState(() => _teamId = value),
-            ),
-            const SizedBox(height: 12),
-            _inlineField(
-              key: const Key('attendance-inline-member-name'),
-              controller: _name,
-              label: 'Ad soyad *',
-            ),
-            const SizedBox(height: 12),
-            _inlineField(
-              key: const Key('attendance-inline-member-role'),
-              controller: _role,
-              label: 'Görev/meslek *',
-            ),
-            const SizedBox(height: 12),
-            _inlineField(
-              key: const Key('attendance-inline-member-phone'),
-              controller: _phone,
-              label: 'Telefon (opsiyonel)',
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 12),
-            _inlineField(
-              key: const Key('attendance-inline-member-code'),
-              controller: _personnelCode,
-              label: 'Personel kodu (opsiyonel)',
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: _submitting
-                        ? null
-                        : () => Navigator.pop(context),
-                    child: const Text('Vazgeç'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton.icon(
-                    key: const Key('save-attendance-inline-member'),
-                    onPressed: _submitting ? null : _submit,
-                    icon: _submitting
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.person_add_alt_1_outlined),
-                    label: const Text('Oluştur'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  TextField _inlineField({
-    required Key key,
-    required TextEditingController controller,
-    required String label,
-    TextInputType? keyboardType,
-  }) => TextField(
-    key: key,
-    controller: controller,
-    keyboardType: keyboardType,
-    textInputAction: TextInputAction.next,
-    decoration: InputDecoration(
-      labelText: label,
-      border: const OutlineInputBorder(),
-    ),
-  );
 }
 
 class _DayHeader extends StatelessWidget {
@@ -1200,18 +832,16 @@ class _MemberAttendanceCard extends StatelessWidget {
     required this.result,
     required this.overtime,
     required this.note,
-    required this.hasPersistedEntry,
+    required this.onDraftChanged,
     required this.onResultChanged,
-    required this.onRemove,
   });
 
   final WorkforceMember member;
   final AttendanceResult? result;
   final TextEditingController overtime;
   final TextEditingController note;
-  final bool hasPersistedEntry;
+  final VoidCallback onDraftChanged;
   final ValueChanged<AttendanceResult?> onResultChanged;
-  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -1222,38 +852,13 @@ class _MemberAttendanceCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${member.fullName}${member.isActive ? '' : ' (pasif)'}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-                if (onRemove != null)
-                  IconButton(
-                    key: Key('remove-attendance-${member.id}'),
-                    constraints: const BoxConstraints(
-                      minWidth: 48,
-                      minHeight: 48,
-                    ),
-                    tooltip: hasPersistedEntry
-                        ? 'Kaydı kaldır'
-                        : 'Taslak seçimden çıkar',
-                    onPressed: onRemove,
-                    icon: const Icon(Icons.remove_circle_outline),
-                  ),
-              ],
+            Text(
+              '${member.fullName}${member.isActive ? '' : ' (pasif)'}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             Text(
-              _usesTechnicalTeam(member)
-                  ? member.subcontractorName ?? 'Tanımsız taşeron'
-                  : '${member.subcontractorName ?? 'Tanımsız taşeron'} • '
-                        '${member.teamName}',
-            ),
-            Text(
-              '${member.roleName}'
-              '${member.phone == null ? '' : ' • ${member.phone}'}',
+              '${member.subcontractorName ?? 'Firma belirtilmedi'} • '
+              '${member.roleName}',
             ),
             const SizedBox(height: 8),
             Column(
@@ -1322,6 +927,13 @@ class _MemberAttendanceCard extends StatelessWidget {
               title: const Text('FM ve not'),
               childrenPadding: const EdgeInsets.symmetric(vertical: 8),
               children: [
+                if (!_usesTechnicalTeam(member)) ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Ekip: ${member.teamName}'),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 TextField(
                   key: Key('attendance-overtime-${member.id}'),
                   controller: overtime,
@@ -1329,6 +941,7 @@ class _MemberAttendanceCard extends StatelessWidget {
                       result != AttendanceResult.absent &&
                       result != AttendanceResult.leave,
                   keyboardType: TextInputType.number,
+                  onChanged: (_) => onDraftChanged(),
                   decoration: const InputDecoration(
                     labelText: 'FM dk',
                     border: OutlineInputBorder(),
@@ -1338,6 +951,7 @@ class _MemberAttendanceCard extends StatelessWidget {
                 TextField(
                   key: Key('attendance-note-${member.id}'),
                   controller: note,
+                  onChanged: (_) => onDraftChanged(),
                   decoration: const InputDecoration(
                     labelText: 'Kısa not',
                     border: OutlineInputBorder(),
@@ -1353,13 +967,52 @@ class _MemberAttendanceCard extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.detail});
+  const _SummaryCard({
+    required this.detail,
+    required this.members,
+    required this.results,
+    required this.overtime,
+  });
 
   final AttendanceDayDetail detail;
+  final List<WorkforceMember> members;
+  final Map<String, AttendanceResult?> results;
+  final Map<String, TextEditingController> overtime;
 
   @override
   Widget build(BuildContext context) {
-    final totals = detail.totals;
+    var fullDay = 0;
+    var halfDay = 0;
+    var absent = 0;
+    var leave = 0;
+    var unmarked = 0;
+    var overtimeMinutes = 0;
+    if (detail.day.status == AttendanceDayStatus.draft) {
+      for (final member in members) {
+        switch (results[member.id]) {
+          case AttendanceResult.fullDay:
+            fullDay += 1;
+          case AttendanceResult.halfDay:
+            halfDay += 1;
+          case AttendanceResult.absent:
+            absent += 1;
+          case AttendanceResult.leave:
+            leave += 1;
+          case null:
+            unmarked += 1;
+        }
+        overtimeMinutes += int.tryParse(overtime[member.id]?.text ?? '') ?? 0;
+      }
+    } else {
+      final totals = detail.totals;
+      fullDay = totals.fullDayCount;
+      halfDay = totals.halfDayCount;
+      absent = totals.absentCount;
+      leave = totals.leaveCount;
+      overtimeMinutes = totals.overtimeMinutes;
+    }
+    final present = fullDay + halfDay;
+    final personDays = fullDay + (halfDay * 0.5);
     return Card(
       key: const Key('attendance-summary'),
       child: Padding(
@@ -1370,19 +1023,20 @@ class _SummaryCard extends StatelessWidget {
             Text('Günlük özet', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(
-              'Tam gün ${totals.fullDayCount} • '
-              'Yarım gün ${totals.halfDayCount} • '
-              'Gelmedi ${totals.absentCount} • İzinli ${totals.leaveCount}',
+              'Tam gün $fullDay • Yarım gün $halfDay • '
+              'Gelmedi $absent • İzinli $leave',
             ),
             Text(
-              'Sahada ${totals.presentCount} • '
-              '${totals.personDayEquivalent.toStringAsFixed(1)} kişi-gün',
+              'İşaretlenmedi $unmarked',
+              key: const Key('attendance-unmarked-count'),
             ),
+            Text('Sahada $present • ${personDays.toStringAsFixed(1)} kişi-gün'),
             Text(
-              'Fazla mesai ${totals.overtimeMinutes} dk '
-              '(${(totals.overtimeMinutes / 60).toStringAsFixed(2)} saat)',
+              'Fazla mesai $overtimeMinutes dk '
+              '(${(overtimeMinutes / 60).toStringAsFixed(2)} saat)',
             ),
-            if (detail.teamSummaries.isNotEmpty) ...[
+            if (detail.day.status != AttendanceDayStatus.draft &&
+                detail.teamSummaries.isNotEmpty) ...[
               const Divider(),
               ...detail.teamSummaries.map(
                 (team) => Padding(
@@ -1407,3 +1061,15 @@ bool _usesTechnicalTeam(WorkforceMember member) => isWorkforceTechnicalTeamLink(
   subcontractorId: member.subcontractorId,
   teamId: member.teamId,
 );
+
+int _compareMembers(WorkforceMember left, WorkforceMember right) {
+  final company = (left.subcontractorName ?? '').toLowerCase().compareTo(
+    (right.subcontractorName ?? '').toLowerCase(),
+  );
+  if (company != 0) return company;
+  final name = left.fullName.toLowerCase().compareTo(
+    right.fullName.toLowerCase(),
+  );
+  if (name != 0) return name;
+  return left.id.compareTo(right.id);
+}

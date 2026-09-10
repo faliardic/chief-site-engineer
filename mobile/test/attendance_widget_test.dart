@@ -210,9 +210,23 @@ void main() {
     await tester.tap(find.byKey(const Key('open-attendance-day')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('attendance-day-detail')), findsOneWidget);
-    expect(find.byKey(const Key('attendance-roster-selector')), findsOneWidget);
-    expect(find.byKey(Key('attendance-member-$memberId')), findsNothing);
-    expect(find.textContaining('Önce İşveren seçin'), findsOneWidget);
+    expect(find.byKey(const Key('attendance-roster-selector')), findsNothing);
+    expect(find.byKey(Key('attendance-member-$memberId')), findsOneWidget);
+    expect(find.text('Firma belirtilmedi • Demir Ustası'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('attendance-bulk-tools')),
+      240,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('attendance-day-detail')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+      maxScrolls: 12,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('attendance-bulk-tools')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('mark-all-full')), findsOneWidget);
     final save = find.byKey(const Key('save-attendance-draft'));
     await tester.scrollUntilVisible(

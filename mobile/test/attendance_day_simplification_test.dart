@@ -14,7 +14,7 @@ import 'support/fake_attendance_application.dart';
 
 Finder _key(String value) => find.byKey(Key(value));
 Finder get _addTitle => find.descendant(
-  of: _key('attendance-add-people'),
+  of: _key('attendance-add-person'),
   matching: find.text('Personel ekle'),
 );
 Finder get _detailsTitle => find.descendant(
@@ -76,16 +76,16 @@ void main() {
           }
           expect(
             tester.getTopLeft(_key('attendance-member-person-a')).dy,
-            lessThan(tester.getTopLeft(_key('attendance-add-people')).dy),
+            lessThan(tester.getTopLeft(_key('attendance-add-person')).dy),
           );
           expect(
             tester.getSize(_key('attendance-member-person-a')).width,
             lessThanOrEqualTo(840),
           );
+          await _tap(tester, _key('attendance-bulk-tools'));
           for (final key in [
             'mark-all-full',
             'mark-team-full',
-            'remove-attendance-person-a',
             'attendance-clear-result-person-a',
             'save-attendance-draft',
             'attendance-no-work',
@@ -118,10 +118,9 @@ void main() {
             'Mevcut not',
           );
           await _tap(tester, _detailsTitle);
-          await _tap(tester, _addTitle);
-          expect(find.text('İşveren seç *'), findsOneWidget);
-          expect(find.text('Taşeron seç *'), findsNothing);
-          await _reveal(tester, _key('attendance-subcontractor-selector'));
+          await _reveal(tester, _addTitle);
+          expect(_addTitle.hitTestable(), findsOneWidget);
+          expect(_key('attendance-roster-selector'), findsNothing);
           expect(tester.takeException(), isNull);
           expect(attendance.reads, [
             'day:day-a',
@@ -287,57 +286,44 @@ void main() {
   );
 
   testWidgets(
-    'empty roster employer team candidate selection and draft discard keep identity',
+    'empty day projects active person directly without creating a record',
     (tester) async {
       final attendance = await _fixture(empty: true);
       await _pump(tester, attendance);
-      expect(find.text('İşveren seç *'), findsOneWidget);
-      await _tap(tester, _key('attendance-subcontractor-selector'));
-      await tester.tap(find.text('Firma A').last);
-      await tester.pumpAndSettle();
-      expect(attendance.teamQueries, ['project-a:employer-a']);
-      await _tap(tester, _key('attendance-team-filter'));
-      await tester.tap(find.text('Ekip A').last);
-      await tester.pumpAndSettle();
-      await _tap(tester, _key('add-attendance-member-person-a'));
       expect(_key('attendance-member-person-a'), findsOneWidget);
+      expect(_key('attendance-roster-selector'), findsNothing);
+      expect(find.text('Kayıt yok'), findsOneWidget);
       expect(attendance.saveCalls, 0);
       expect(attendance.removals, isEmpty);
-      await _tap(tester, _key('remove-attendance-person-a'));
-      expect(_key('attendance-member-person-a'), findsNothing);
-      expect(attendance.removals, isEmpty);
-      await _tap(tester, _key('add-attendance-member-person-a'));
+      expect(attendance.bulk, isEmpty);
+      await _tap(
+        tester,
+        _key('attendance-result-person-a-${AttendanceResult.fullDay.name}'),
+      );
+      expect(attendance.saveCalls, 0);
       await _tap(tester, _key('save-attendance-draft'));
       expect(attendance.lastRosterCommand!.values.single.memberId, 'person-a');
       expect(
         attendance.lastRosterCommand!.values.single.result,
         AttendanceResult.fullDay,
       );
-      final entry = attendance.detail!.entries.single;
-      await _tap(tester, _key('remove-attendance-person-a'));
-      expect(attendance.removals.single.entryId, entry.id);
-      expect(attendance.removals.single.expectedRevision, 8);
-      expect(attendance.removals.single.dayId, 'day-a');
-      expect(attendance.removals.single.eventId, isNotEmpty);
+      expect(attendance.removals, isEmpty);
     },
   );
 
   testWidgets(
-    'bulk and transitions keep exact revision event and team commands',
+    'bulk stays in draft while transitions keep exact revision events',
     (tester) async {
       final attendance = await _fixture();
       await _pump(tester, attendance);
+      await _tap(tester, _key('attendance-bulk-tools'));
       await _tap(tester, _key('mark-team-full'));
       await _tap(tester, _key('mark-team-full-team-a'));
-      final team = attendance.bulk.single;
-      expect(team.teamId, 'team-a');
-      expect(team.expectedRevision, 7);
-      expect(team.dayId, 'day-a');
-      expect(team.eventId, isNotEmpty);
+      expect(attendance.bulk, isEmpty);
+      expect(attendance.saveCalls, 0);
       await _tap(tester, _key('mark-all-full'));
-      expect(attendance.bulk.last.teamId, isNull);
-      expect(attendance.bulk.last.expectedRevision, 8);
-      expect(attendance.bulk.last.eventId, isNot(team.eventId));
+      expect(attendance.bulk, isEmpty);
+      expect(attendance.saveCalls, 0);
       for (final step in [
         ('complete-attendance-day', AttendanceTransition.complete),
         ('reopen-attendance-day', AttendanceTransition.reopen),
@@ -363,39 +349,15 @@ void main() {
   );
 
   testWidgets(
-    'inline new member keeps employer team fields and existing warning',
+    'Personel ekle opens the canonical Sicil form without inline creation',
     (tester) async {
       final attendance = await _fixture(empty: true);
       await _pump(tester, attendance);
-      await _tap(tester, _key('attendance-subcontractor-selector'));
-      await tester.tap(find.text('Firma A').last);
-      await tester.pumpAndSettle();
-      await _tap(tester, _key('attendance-new-member'));
-      expect(find.text('İşveren: Firma A'), findsOneWidget);
-      await tester.enterText(
-        _key('attendance-inline-member-name'),
-        'Yeni Personel',
-      );
-      await tester.enterText(_key('attendance-inline-member-role'), 'Usta');
-      await tester.enterText(_key('attendance-inline-member-phone'), '0555 11');
-      await tester.enterText(_key('attendance-inline-member-code'), 'K-02');
-      await _tap(tester, _key('save-attendance-inline-member'));
-      final command = attendance.lastCreateMemberCommand!;
-      expect(command.projectId, 'project-a');
-      expect(command.subcontractorId, 'employer-a');
-      expect(command.teamId, 'team-a');
-      expect(command.fullName, 'Yeni Personel');
-      expect(command.roleName, 'Usta');
-      expect(command.phone, '0555 11');
-      expect(command.personnelCode, 'K-02');
-      expect(command.eventId, isNotEmpty);
-      expect(_key('attendance-member-${command.id}'), findsOneWidget);
-      expect(_key('attendance-new-member-warning'), findsOneWidget);
-      expect(find.text('Yeni personel Sicil’e kaydedildi'), findsOneWidget);
-      expect(
-        find.textContaining('SGK işe giriş ve İSG/OSGB kayıtlarını Sicil’den'),
-        findsOneWidget,
-      );
+      await _tap(tester, _key('attendance-add-person'));
+      expect(_key('workforce-member-form'), findsOneWidget);
+      expect(_key('workforce-subcontractor-context'), findsOneWidget);
+      expect(_key('attendance-inline-member-form'), findsNothing);
+      expect(attendance.createMemberCalls, 1);
       expect(attendance.saveCalls, 0);
     },
   );
@@ -516,6 +478,13 @@ Future<void> _pump(
         attendance: attendance,
         agenda: FakeAgendaApplication(),
         dayId: 'day-a',
+        project: const MobileProject(
+          id: 'project-a',
+          name: 'Aktif proje',
+          createdAt: '2026-09-05T08:00:00Z',
+          updatedAt: '2026-09-05T08:00:00Z',
+          revision: 1,
+        ),
       ),
     ),
   );
