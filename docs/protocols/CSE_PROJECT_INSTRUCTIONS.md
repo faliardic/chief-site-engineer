@@ -1,7 +1,7 @@
 # CSE Proje Talimatları — Git ve Veri Güvenliği
 
 **Belge türü:** Bağlayıcı güvenlik ve repository protokolü
-**Güncelleme tarihi:** 2026-09-04
+**Güncelleme tarihi:** 2026-09-10
 
 Bu belge günlük workflow'u tekrar etmez. Günlük lane, süre, test sahipliği ve publication için `AGENTS.md` ile `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` uygulanır. Bu belge kritik Git, kullanıcı verisi ve repository güvenliği için yetkilidir.
 
@@ -52,6 +52,11 @@ Local edit öncesinde:
 - beklenmeyen değişiklik varsa işlem durur.
 
 CSE için otomatik alternatif clone/workspace production execution kaynağı yapılmaz.
+Owner-approved `MULTI_FEATURE_PARALLEL` parent lock kullanılırsa her feature,
+yalnız bu canonical repository'den exact target-master revision üzerinde türetilmiş
+ve parent roster'da önceden adlandırılmış ayrı linked worktree'de yürür. Bu dar
+izin alternatif clone, fallback workspace veya sibling worktree'ye WRITE yetkisi
+vermez.
 
 Documentation-only policy/source güncellemesi, owner açıkça isterse authenticated GitHub yüzeyinde ayrı branch üzerinden yapılabilir. Bu istisna production kodu, test, schema, artifact veya kullanıcı verisi düzenleme yetkisi vermez. Sonraki local işten önce resmî repository `--ff-only` senkronlanır.
 
@@ -60,6 +65,9 @@ Documentation-only policy/source güncellemesi, owner açıkça isterse authenti
 - Force-push yoktur.
 - Destructive reset/clean/stash yoktur.
 - Beklenmeyen kullanıcı değişikliği silinmez veya üzerine yazılmaz.
+- `MULTI_FEATURE_PARALLEL` içinde her feature yalnız kendi Issue/branch/worktree/
+  Draft PR/allowlist sınırında yazar; iki aktif writer aynı path'i eşzamanlı
+  reserve edemez veya değiştiremez ve sibling branch/worktree'ye yazamaz.
 - Branch/ref yalnız fast-forward veya geçerli owner yetkisi kapsamında gate'leri geçmiş squash merge ile ilerletilir.
 - Hard-delete ve branch deletion otomatik yapılmaz.
 - Ignored ZIP, backup, report veya kullanıcı artifact'larına dokunulmaz.
@@ -79,6 +87,16 @@ Documentation-only policy/source güncellemesi, owner açıkça isterse authenti
 - Uninstall, clear-data, hard-delete, restore veya destructive migration ayrı owner onayı ister.
 - Test projesi ve package kimliği açıkça doğrulanır.
 - ADB seri numarası, yerel yol, imzalama bilgisi ve kişisel veri public evidence'a yazılmaz.
+
+#502 pre-update recoverability ve owner-data preservation, #503 restore safety ve
+#504 recovery boundaries P0 otoriteleridir. Parent mode, sibling feature veya
+integration görevi bu sınırları daraltamaz. Fiziksel Acceptance/owner cihazı ve
+ADB; MAIN signed build/install ve owner-data erişimi; backup/restore/recovery/
+migration fixture'ları; signing/release artifact'ları; mutable generated output
+ve code generation; shared port/service; global Git config; güvenli eşzamanlı
+mutation'ı kanıtlanmamış Flutter/Dart/Gradle cache'leri ve ortak APK/output
+hedefleri tek owner lease ile serial yürütülür. Worktree ayrımı runtime izolasyonu
+kanıtı değildir.
 
 ## 6. Kritik sözleşmeler
 
