@@ -286,56 +286,61 @@ void main() {
     expect(find.textContaining('Son kayıt: 2026-08-08'), findsOneWidget);
   });
 
-  testWidgets('member profile edit exposes values and explicit clear flags', (
-    tester,
-  ) async {
-    final attendance = _ProfileAttendance(members: [_activeMember])
-      ..subcontractors = [_firstSubcontractor]
-      ..teams = [_firstTeam];
-    await tester.pumpWidget(
-      MaterialApp(
-        home: WorkforceMemberFormPage(
-          attendance: attendance,
-          project: _firstProject,
-          member: _activeMember,
+  testWidgets(
+    'member progressive edit preserves values and explicit clear flags',
+    (tester) async {
+      final attendance = _ProfileAttendance(members: [_activeMember])
+        ..subcontractors = [_firstSubcontractor]
+        ..teams = [_firstTeam];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: WorkforceMemberFormPage(
+            attendance: attendance,
+            project: _firstProject,
+            member: _activeMember,
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    final address = find.byKey(const Key('workforce-address'));
-    final startedOn = find.byKey(const Key('workforce-started-on'));
-    expect(address, findsOneWidget);
-    expect(startedOn, findsOneWidget);
-    expect(
-      tester.widget<TextField>(address).controller!.text,
-      'Şantiye lojmanı',
-    );
-    await tester.enterText(address, '');
-    final save = find.byKey(const Key('save-workforce-member'));
-    final formScrollable = find
-        .descendant(
-          of: find.byKey(const Key('workforce-member-form')),
-          matching: find.byType(Scrollable),
-        )
-        .first;
-    await tester.scrollUntilVisible(
-      save,
-      240,
-      scrollable: formScrollable,
-      maxScrolls: 8,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(save);
-    await tester.pumpAndSettle();
+      expect(find.byKey(const Key('workforce-address')), findsNothing);
+      await tester.tap(find.byKey(const Key('workforce-other-information')));
+      await tester.pumpAndSettle();
 
-    expect(attendance.memberUpdate!.replaceAddress, isTrue);
-    expect(attendance.memberUpdate!.address, isEmpty);
-    expect(attendance.memberUpdate!.replaceStartedOn, isTrue);
-    expect(attendance.memberUpdate!.startedOn, '2026-07-01');
-  });
+      final address = find.byKey(const Key('workforce-address'));
+      final startedOn = find.byKey(const Key('workforce-started-on'));
+      expect(address, findsOneWidget);
+      expect(startedOn, findsOneWidget);
+      expect(
+        tester.widget<TextField>(address).controller!.text,
+        'Şantiye lojmanı',
+      );
+      await tester.enterText(address, '');
+      final save = find.byKey(const Key('save-workforce-member'));
+      final formScrollable = find
+          .descendant(
+            of: find.byKey(const Key('workforce-member-form')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        save,
+        240,
+        scrollable: formScrollable,
+        maxScrolls: 8,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(save);
+      await tester.pumpAndSettle();
 
-  testWidgets('subcontractor profile edit exposes values and clear flags', (
+      expect(attendance.memberUpdate!.replaceAddress, isTrue);
+      expect(attendance.memberUpdate!.address, isEmpty);
+      expect(attendance.memberUpdate!.replaceStartedOn, isTrue);
+      expect(attendance.memberUpdate!.startedOn, '2026-07-01');
+    },
+  );
+
+  testWidgets('company progressive edit preserves values and clear flags', (
     tester,
   ) async {
     final attendance = _ProfileAttendance()
@@ -355,8 +360,12 @@ void main() {
     await tester.tap(find.text('Düzenle').last);
     await tester.pumpAndSettle();
 
-    final address = _textFieldWithLabel('Adres');
-    final specialty = _textFieldWithLabel('İş kalemi/uzmanlık');
+    expect(find.byKey(const Key('subcontractor-address')), findsNothing);
+    await tester.tap(find.byKey(const Key('subcontractor-other-information')));
+    await tester.pumpAndSettle();
+
+    final address = find.byKey(const Key('subcontractor-address'));
+    final specialty = find.byKey(const Key('subcontractor-specialty'));
     expect(address, findsOneWidget);
     expect(specialty, findsOneWidget);
     expect(tester.widget<TextField>(address).controller!.text, 'Merkez adresi');
@@ -456,10 +465,6 @@ FakeAttendanceApplication _directoryAttendance() =>
       )
       ..subcontractors = [_firstSubcontractor, _secondSubcontractor]
       ..teams = [_firstTeam, _secondTeam];
-
-Finder _textFieldWithLabel(String label) => find.byWidgetPredicate(
-  (widget) => widget is TextField && widget.decoration?.labelText == label,
-);
 
 Future<void> _setPhoneSize(WidgetTester tester) async {
   tester.view.devicePixelRatio = 1;

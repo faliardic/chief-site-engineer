@@ -630,6 +630,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openWorkforceOtherInformation(tester);
     await tester.tap(find.byKey(const Key('workforce-subcontractor')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Uzun Türkçe Taşeron').last);
@@ -647,6 +648,14 @@ void main() {
     final save = find.byKey(const Key('save-workforce-member'));
     await _scrollWorkforceFormTo(tester, save);
     await tester.tap(save);
+    await tester.pumpAndSettle();
+    final formScrollable = find
+        .descendant(
+          of: find.byKey(const Key('workforce-member-form')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    tester.state<ScrollableState>(formScrollable).position.jumpTo(0);
     await tester.pumpAndSettle();
 
     expect(find.textContaining('zaten kullanılıyor'), findsOneWidget);
@@ -687,6 +696,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openWorkforceOtherInformation(tester);
     await tester.tap(find.byKey(const Key('workforce-subcontractor')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(subcontractor.name).last);
@@ -738,6 +748,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openWorkforceOtherInformation(tester);
     await tester.tap(find.byKey(const Key('workforce-subcontractor')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(subcontractor.name).last);
@@ -776,9 +787,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await _openWorkforceOtherInformation(tester);
       await tester.tap(find.byKey(const Key('workforce-subcontractor')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('+ Yeni taşeron ekle').last);
+      await tester.tap(find.text('+ Taşeron / İşveren ekle').last);
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).first, 'Yeni Taşeron');
       await tester.tap(find.text('Oluştur'));
@@ -1200,6 +1212,11 @@ Future<void> _scrollWorkforceFormTo(WidgetTester tester, Finder target) async {
     scrollable: scrollable,
     maxScrolls: 8,
   );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openWorkforceOtherInformation(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('workforce-other-information')));
   await tester.pumpAndSettle();
 }
 
