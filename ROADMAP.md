@@ -602,6 +602,18 @@ Dashboard hâlâ canlı proje kontrol merkezi olmalı; bakım/form yoğunluğu g
 - ilk proje oluşturma onlarca zorunlu alana dönüşmez;
 - schema/stable identity/persistence değişikliği gerekiyorsa ayrı CRITICAL yetki olmadan yapılmaz.
 
+#### Q04 + Q05 sonrası ilk multi-feature pilot sıra kapısı
+
+Q04 ve Q05 current GitHub gerçeğine göre disposition edilip gerekli kapıları kapanmadan ilk gerçek `MULTI_FEATURE_PARALLEL` pilotu aktive edilmez. Bu gate sonrasında owner-approved ilk pilot roster'ı ve parent ilişki sınıfları şöyledir:
+
+| Queue maddesi | Parent ilişkisi |
+| --- | --- |
+| Q06 — Envanter / Kroki hedefli interaction refinement | `INDEPENDENT` |
+| Q07 — KKD hızlı seçim | `COORDINATION_REQUIRED` |
+| Q09 — Malzemeler ortak UI/UX sistem uyumu | `INDEPENDENT` |
+
+Parent coordination authority Issue #760'tır. Bu ROADMAP kaydı yalnız kanonik yürütme sırasını gösterir; parent lock, feature roster durumu veya çalışma kanıtı tutmaz ve kendi başına pilotu aktive etmez. Q08, bu üçlü pilotin ardından yürütülür.
+
 ### Q06 — Envanter / Kroki hedefli interaction refinement
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi — `Envanter / Kroki` başlığı; tamamlanmış #709–#714 baseline'ı; `docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md`.  
@@ -686,19 +698,19 @@ Bu Q, tamamlanmış Inventory v1'i yeniden tasarım programına açmaz. Yalnız 
 
 Amaç: günlük saha kullanımında mevcut canonical KKD semantiğini değiştirmeden hızlı, erişilebilir ve minimum dokunuşlu seçim/atama akışı. Q04 İş Gücü/Sicil first-class alanı canonical person/firma/Puantaj akışını netleştirdiği için KKD hızlı seçim bu person identity yüzeyi üzerine oturur.
 
-### Q08 — Beton tamamlanma / sonuç / detay / düzenleme akışı
-
-**Kaynak:** #617 Phase 5 / item 23  
-**Durum:** `QUEUED`
-
-Amaç: Beton Paketi'nin gerçek saha kullanımında create → sonuç → detail → edit/completion zincirini tamamlamak ve mevcut identity/attachment davranışını korumak.
-
 ### Q09 — Malzemeler ortak UI/UX sistem uyumu
 
-**Kaynak:** #617 Phase 5 / item 24  
+**Kaynak:** #617 Phase 5 / item 24
 **Durum:** `QUEUED`
 
 Amaç: İstenecek Malzemeler ekranını shared project context, action, state, accessibility ve compact/adaptive görsel dile oturtmak; lifecycle source-of-truth'u değiştirmemek.
+
+### Q08 — Beton tamamlanma / sonuç / detay / düzenleme akışı
+
+**Kaynak:** #617 Phase 5 / item 23
+**Durum:** `QUEUED`
+
+Amaç: Beton Paketi'nin gerçek saha kullanımında create → sonuç → detail → edit/completion zincirini tamamlamak ve mevcut identity/attachment davranışını korumak.
 
 ### Q10 — Albüm + Dosyalar + Yedekleme + Ayarlar yerleşimi
 
