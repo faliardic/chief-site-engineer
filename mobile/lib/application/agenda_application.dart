@@ -312,6 +312,33 @@ abstract interface class ProjectPartyApplication {
   Future<List<ProjectPartyEvent>> listProjectPartyEvents(String assignmentId);
 }
 
+abstract interface class ProjectFloorLocationApplication {
+  Future<List<ProjectFloorLocationRelation>> listProjectFloorLocations(
+    String projectId, {
+    bool includeArchived = false,
+  });
+
+  Future<ProjectFloorLocationRelation> getProjectFloorLocation(
+    String relationId,
+  );
+
+  Future<ProjectFloorLocationRelation> createProjectFloorLocation(
+    CreateProjectFloorLocationRelationCommand command,
+  );
+
+  Future<ProjectFloorLocationRelation> replaceProjectFloorLocation(
+    ReplaceProjectFloorLocationRelationCommand command,
+  );
+
+  Future<ProjectFloorLocationRelation> removeProjectFloorLocation(
+    RemoveProjectFloorLocationRelationCommand command,
+  );
+
+  Future<List<ProjectFloorLocationEvent>> listProjectFloorLocationEvents(
+    String relationId,
+  );
+}
+
 abstract interface class ReminderSourceAgendaMediaApplication {
   Future<ReminderSourceAgendaMedia> getReminderSourceAgendaMedia(
     String sourceLogId,
@@ -346,6 +373,7 @@ class SqliteAgendaApplication
         ProjectProfileApplication,
         ProjectMetadataApplication,
         ProjectPartyApplication,
+        ProjectFloorLocationApplication,
         ProjectLocationApplication,
         AttachmentCatalogHost,
         AgendaExistingAttachmentApplication,
@@ -1544,6 +1572,296 @@ class SqliteAgendaApplication
         orderBy: 'sequence ASC, id ASC',
       );
       return rows.map(_projectPartyEventFromRow).toList(growable: false);
+    });
+  }
+
+  @override
+  Future<List<ProjectFloorLocationRelation>> listProjectFloorLocations(
+    String projectId, {
+    bool includeArchived = false,
+  }) async {
+    validateUuid(projectId, 'Proje kimligi');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      await _requireProjectRecord(database, projectId);
+      final rows = await database.query(
+        'project_floor_location_relations',
+        where:
+            'project_id = ?${includeArchived ? '' : ' AND archived_at IS NULL'}',
+        whereArgs: [projectId],
+        orderBy: 'floor_id ASC, location_id ASC, id ASC',
+      );
+      return rows.map(_projectFloorLocationFromRow).toList(growable: false);
+    });
+  }
+
+  @override
+  Future<ProjectFloorLocationRelation> getProjectFloorLocation(
+    String relationId,
+  ) async {
+    validateUuid(relationId, 'Kat mahal iliski kimligi');
+    final now = _readClockOnce();
+    return _withDatabase(
+      now,
+      (database) => _requireProjectFloorLocationById(database, relationId),
+    );
+  }
+
+  @override
+  Future<ProjectFloorLocationRelation> createProjectFloorLocation(
+    CreateProjectFloorLocationRelationCommand command,
+  ) async {
+    validateUuid(command.id, 'Kat mahal iliski kimligi');
+    validateUuid(command.eventId, 'Kat mahal event kimligi');
+    validateUuid(command.projectId, 'Proje kimligi');
+    validateUuid(command.floorId, 'Kat kimligi');
+    validateUuid(command.locationId, 'Mahal kimligi');
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final project = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(project);
+        await _requireActiveFloorLocationTargets(
+          transaction,
+          projectId: project.id,
+          floorId: command.floorId,
+          locationId: command.locationId,
+        );
+        final existingRows = await transaction.query(
+          'project_floor_location_relations',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        if (existingRows.isNotEmpty) {
+          final existing = _projectFloorLocationFromRow(existingRows.single);
+          if (!existing.isArchived &&
+              existing.projectId == project.id &&
+              existing.floorId == command.floorId &&
+              existing.locationId == command.locationId) {
+            return existing;
+          }
+          throw const AgendaValidationFailure(
+            'Kat mahal iliski kimligi baska bir kayit tarafindan kullaniliyor.',
+          );
+        }
+        final activeRows = await transaction.query(
+          'project_floor_location_relations',
+          columns: ['id'],
+          where: 'project_id = ? AND location_id = ? AND archived_at IS NULL',
+          whereArgs: [project.id, command.locationId],
+          limit: 1,
+        );
+        if (activeRows.isNotEmpty) {
+          throw const AgendaValidationFailure(
+            'Mahal zaten aktif bir kata baglidir.',
+          );
+        }
+        await transaction.insert('project_floor_location_relations', {
+          'id': command.id,
+          'project_id': project.id,
+          'floor_id': command.floorId,
+          'location_id': command.locationId,
+          'revision': 1,
+          'created_at': occurredAt,
+          'updated_at': occurredAt,
+          'archived_at': null,
+        });
+        final relation = await _requireProjectFloorLocation(
+          transaction,
+          projectId: project.id,
+          relationId: command.id,
+        );
+        await _insertProjectFloorLocationEvent(
+          transaction,
+          id: command.eventId,
+          relation: relation,
+          eventType: ProjectFloorLocationEventType.assigned,
+          occurredAt: occurredAt,
+          payload: {
+            'floor_id': relation.floorId,
+            'location_id': relation.locationId,
+            'revision_after': relation.revision,
+          },
+        );
+        return relation;
+      });
+    });
+  }
+
+  @override
+  Future<ProjectFloorLocationRelation> replaceProjectFloorLocation(
+    ReplaceProjectFloorLocationRelationCommand command,
+  ) async {
+    validateUuid(command.relationId, 'Kat mahal iliski kimligi');
+    validateUuid(command.eventId, 'Kat mahal event kimligi');
+    validateUuid(command.projectId, 'Proje kimligi');
+    validateUuid(command.floorId, 'Kat kimligi');
+    _validateProjectFloorLocationRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final project = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(project);
+        final current = await _requireProjectFloorLocation(
+          transaction,
+          projectId: project.id,
+          relationId: command.relationId,
+          includeArchived: true,
+        );
+        if (current.revision != command.expectedRevision) {
+          throw const AgendaValidationFailure(
+            'Kat mahal iliskisi baska bir islem tarafindan degistirilmis.',
+          );
+        }
+        if (current.isArchived) {
+          throw const AgendaValidationFailure(
+            'Kaldirilmis kat mahal iliskisi degistirilemez.',
+          );
+        }
+        await _requireActiveFloorLocationTargets(
+          transaction,
+          projectId: project.id,
+          floorId: command.floorId,
+          locationId: current.locationId,
+        );
+        if (current.floorId == command.floorId) return current;
+        final changed = await transaction.update(
+          'project_floor_location_relations',
+          {
+            'floor_id': command.floorId,
+            'revision': current.revision + 1,
+            'updated_at': occurredAt,
+          },
+          where:
+              'id = ? AND project_id = ? AND revision = ? '
+              'AND archived_at IS NULL',
+          whereArgs: [current.id, project.id, current.revision],
+        );
+        if (changed != 1) {
+          throw const AgendaValidationFailure(
+            'Kat mahal iliskisi baska bir islem tarafindan degistirilmis.',
+          );
+        }
+        final updated = await _requireProjectFloorLocation(
+          transaction,
+          projectId: project.id,
+          relationId: current.id,
+        );
+        await _insertProjectFloorLocationEvent(
+          transaction,
+          id: command.eventId,
+          relation: updated,
+          eventType: ProjectFloorLocationEventType.replaced,
+          occurredAt: occurredAt,
+          payload: {
+            'old_floor_id': current.floorId,
+            'new_floor_id': updated.floorId,
+            'location_id': updated.locationId,
+            'revision_before': current.revision,
+            'revision_after': updated.revision,
+          },
+        );
+        return updated;
+      });
+    });
+  }
+
+  @override
+  Future<ProjectFloorLocationRelation> removeProjectFloorLocation(
+    RemoveProjectFloorLocationRelationCommand command,
+  ) async {
+    validateUuid(command.relationId, 'Kat mahal iliski kimligi');
+    validateUuid(command.eventId, 'Kat mahal event kimligi');
+    validateUuid(command.projectId, 'Proje kimligi');
+    _validateProjectFloorLocationRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final project = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(project);
+        final current = await _requireProjectFloorLocation(
+          transaction,
+          projectId: project.id,
+          relationId: command.relationId,
+          includeArchived: true,
+        );
+        if (current.revision != command.expectedRevision) {
+          throw const AgendaValidationFailure(
+            'Kat mahal iliskisi baska bir islem tarafindan degistirilmis.',
+          );
+        }
+        if (current.isArchived) return current;
+        final changed = await transaction.update(
+          'project_floor_location_relations',
+          {
+            'revision': current.revision + 1,
+            'updated_at': occurredAt,
+            'archived_at': occurredAt,
+          },
+          where:
+              'id = ? AND project_id = ? AND revision = ? '
+              'AND archived_at IS NULL',
+          whereArgs: [current.id, project.id, current.revision],
+        );
+        if (changed != 1) {
+          throw const AgendaValidationFailure(
+            'Kat mahal iliskisi baska bir islem tarafindan degistirilmis.',
+          );
+        }
+        final removed = await _requireProjectFloorLocation(
+          transaction,
+          projectId: project.id,
+          relationId: current.id,
+          includeArchived: true,
+        );
+        await _insertProjectFloorLocationEvent(
+          transaction,
+          id: command.eventId,
+          relation: removed,
+          eventType: ProjectFloorLocationEventType.removed,
+          occurredAt: occurredAt,
+          payload: {
+            'floor_id': removed.floorId,
+            'location_id': removed.locationId,
+            'revision_before': current.revision,
+            'revision_after': removed.revision,
+          },
+        );
+        return removed;
+      });
+    });
+  }
+
+  @override
+  Future<List<ProjectFloorLocationEvent>> listProjectFloorLocationEvents(
+    String relationId,
+  ) async {
+    validateUuid(relationId, 'Kat mahal iliski kimligi');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      await _requireProjectFloorLocationById(database, relationId);
+      final rows = await database.query(
+        'project_floor_location_relation_events',
+        where: 'relation_id = ?',
+        whereArgs: [relationId],
+        orderBy: 'sequence ASC, id ASC',
+      );
+      return rows
+          .map(_projectFloorLocationEventFromRow)
+          .toList(growable: false);
     });
   }
 
@@ -6310,6 +6628,121 @@ Future<void> _insertProjectPartyEvent(
   });
 }
 
+void _validateProjectFloorLocationRevision(int revision) {
+  if (revision < 1) {
+    throw const AgendaValidationFailure(
+      'Beklenen kat mahal iliski revision degeri gecersizdir.',
+    );
+  }
+}
+
+Future<void> _requireActiveFloorLocationTargets(
+  DatabaseExecutor database, {
+  required String projectId,
+  required String floorId,
+  required String locationId,
+}) async {
+  final floors = await database.rawQuery(
+    '''
+      SELECT floor.id
+      FROM inventory_floors floor
+      JOIN inventory_blocks block
+        ON block.id = floor.block_id
+        AND block.project_id = floor.project_id
+      WHERE floor.id = ?
+        AND floor.project_id = ?
+        AND floor.archived_at IS NULL
+        AND block.state != 'ARCHIVED'
+      LIMIT 1
+    ''',
+    [floorId, projectId],
+  );
+  if (floors.isEmpty) {
+    throw const AgendaValidationFailure(
+      'Kat aktif olmali ve ayni projeye ait olmalidir.',
+    );
+  }
+  final locations = await database.query(
+    'project_locations',
+    columns: ['id'],
+    where: 'id = ? AND project_id = ? AND archived_at IS NULL',
+    whereArgs: [locationId, projectId],
+    limit: 1,
+  );
+  if (locations.isEmpty) {
+    throw const AgendaValidationFailure(
+      'Mahal aktif olmali ve ayni projeye ait olmalidir.',
+    );
+  }
+}
+
+Future<ProjectFloorLocationRelation> _requireProjectFloorLocation(
+  DatabaseExecutor database, {
+  required String projectId,
+  required String relationId,
+  bool includeArchived = false,
+}) async {
+  final rows = await database.query(
+    'project_floor_location_relations',
+    where:
+        'id = ? AND project_id = ?'
+        '${includeArchived ? '' : ' AND archived_at IS NULL'}',
+    whereArgs: [relationId, projectId],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    throw const AgendaValidationFailure('Kat mahal iliskisi bulunamadi.');
+  }
+  return _projectFloorLocationFromRow(rows.single);
+}
+
+Future<ProjectFloorLocationRelation> _requireProjectFloorLocationById(
+  DatabaseExecutor database,
+  String relationId,
+) async {
+  final rows = await database.query(
+    'project_floor_location_relations',
+    where: 'id = ?',
+    whereArgs: [relationId],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    throw const AgendaValidationFailure('Kat mahal iliskisi bulunamadi.');
+  }
+  return _projectFloorLocationFromRow(rows.single);
+}
+
+Future<void> _insertProjectFloorLocationEvent(
+  DatabaseExecutor database, {
+  required String id,
+  required ProjectFloorLocationRelation relation,
+  required ProjectFloorLocationEventType eventType,
+  required String occurredAt,
+  required Map<String, Object?> payload,
+}) async {
+  final sequence =
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          '''
+            SELECT COALESCE(MAX(sequence), 0) + 1
+            FROM project_floor_location_relation_events
+            WHERE relation_id = ?
+          ''',
+          [relation.id],
+        ),
+      ) ??
+      1;
+  await database.insert('project_floor_location_relation_events', {
+    'id': id,
+    'relation_id': relation.id,
+    'project_id': relation.projectId,
+    'sequence': sequence,
+    'event_type': eventType.storageValue,
+    'occurred_at': occurredAt,
+    'payload_json': jsonEncode(payload),
+  });
+}
+
 String _projectProfileValue(String value) {
   final normalized = value.trim();
   if (normalized.length > 4000) {
@@ -6932,6 +7365,76 @@ ProjectPartyEvent _projectPartyEventFromRow(Map<String, Object?> row) {
     assignmentId: row['assignment_id']! as String,
     projectId: row['project_id']! as String,
     sequence: row['sequence']! as int,
+    eventType: eventType,
+    occurredAt: occurredAt,
+    payloadJson: row['payload_json']! as String,
+  );
+}
+
+ProjectFloorLocationRelation _projectFloorLocationFromRow(
+  Map<String, Object?> row,
+) {
+  final id = row['id']! as String;
+  final projectId = row['project_id']! as String;
+  final floorId = row['floor_id']! as String;
+  final locationId = row['location_id']! as String;
+  final createdAt = row['created_at']! as String;
+  final updatedAt = row['updated_at']! as String;
+  final archivedAt = row['archived_at'] as String?;
+  validateUuid(id, 'Kat mahal iliski kimligi');
+  validateUuid(projectId, 'Proje kimligi');
+  validateUuid(floorId, 'Kat kimligi');
+  validateUuid(locationId, 'Mahal kimligi');
+  validateCanonicalTimestamp(createdAt, 'Kat mahal iliski olusturma zamani');
+  validateCanonicalTimestamp(updatedAt, 'Kat mahal iliski guncelleme zamani');
+  if (archivedAt != null) {
+    validateCanonicalTimestamp(archivedAt, 'Kat mahal iliski kaldirma zamani');
+  }
+  final revision = row['revision'];
+  if (revision is! int ||
+      revision < 1 ||
+      updatedAt.compareTo(createdAt) < 0 ||
+      (archivedAt != null && archivedAt != updatedAt)) {
+    throw const AgendaValidationFailure('Kat mahal iliski kaydi gecersizdir.');
+  }
+  return ProjectFloorLocationRelation(
+    id: id,
+    projectId: projectId,
+    floorId: floorId,
+    locationId: locationId,
+    revision: revision,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    archivedAt: archivedAt,
+  );
+}
+
+ProjectFloorLocationEvent _projectFloorLocationEventFromRow(
+  Map<String, Object?> row,
+) {
+  final id = row['id']! as String;
+  final relationId = row['relation_id']! as String;
+  final projectId = row['project_id']! as String;
+  final occurredAt = row['occurred_at']! as String;
+  validateUuid(id, 'Kat mahal event kimligi');
+  validateUuid(relationId, 'Kat mahal iliski kimligi');
+  validateUuid(projectId, 'Proje kimligi');
+  validateCanonicalTimestamp(occurredAt, 'Kat mahal event zamani');
+  final sequence = row['sequence'];
+  if (sequence is! int || sequence < 1) {
+    throw const AgendaValidationFailure('Kat mahal event kaydi gecersizdir.');
+  }
+  final eventType = ProjectFloorLocationEventType.values.firstWhere(
+    (event) => event.storageValue == row['event_type'],
+    orElse: () => throw const AgendaValidationFailure(
+      'Kat mahal event turu desteklenmiyor.',
+    ),
+  );
+  return ProjectFloorLocationEvent(
+    id: id,
+    relationId: relationId,
+    projectId: projectId,
+    sequence: sequence,
     eventType: eventType,
     occurredAt: occurredAt,
     payloadJson: row['payload_json']! as String,

@@ -90,6 +90,202 @@ void main() {
   );
 
   test(
+    'schema 25 Floor-Mahal relation enforces stable same-project graph',
+    () async {
+      const blockA = '11111111-1111-4111-8111-111111111101';
+      const blockB = '11111111-1111-4111-8111-111111111102';
+      const floorA = '22222222-2222-4222-8222-222222222201';
+      const floorB = '22222222-2222-4222-8222-222222222202';
+      const locationA1 = '33333333-3333-4333-8333-333333333301';
+      const locationA2 = '33333333-3333-4333-8333-333333333302';
+      const locationB = '33333333-3333-4333-8333-333333333303';
+      const relationA1 = '44444444-4444-4444-8444-444444444401';
+      const relationA2 = '44444444-4444-4444-8444-444444444402';
+      final database = _database(databasePath);
+      await database.open();
+      final db = database.database;
+      for (final project in const [
+        (_projectA, 'Proje A'),
+        (_projectB, 'Proje B'),
+      ]) {
+        await db.insert('projects', {
+          'id': project.$1,
+          'name': project.$2,
+          'created_at': _timestamp,
+          'updated_at': _timestamp,
+          'revision': 1,
+        });
+      }
+      for (final block in const [
+        (blockA, _projectA, 'A Blok'),
+        (blockB, _projectB, 'B Blok'),
+      ]) {
+        await db.insert('inventory_blocks', {
+          'id': block.$1,
+          'project_id': block.$2,
+          'display_name': block.$3,
+          'normalized_name': block.$3.toLowerCase(),
+          'ordinal': 1,
+          'state': 'ACTIVE',
+          'revision': 1,
+          'created_at': _timestamp,
+          'updated_at': _timestamp,
+        });
+      }
+      for (final floor in const [
+        (floorA, blockA, _projectA),
+        (floorB, blockB, _projectB),
+      ]) {
+        await db.insert('inventory_floors', {
+          'id': floor.$1,
+          'block_id': floor.$2,
+          'project_id': floor.$3,
+          'display_name': '1. Kat',
+          'ordinal': 1,
+          'revision': 1,
+          'created_at': _timestamp,
+          'updated_at': _timestamp,
+        });
+      }
+      await _insertLocation(
+        db,
+        id: locationA1,
+        projectId: _projectA,
+        displayName: 'Salon',
+        normalizedName: 'salon',
+      );
+      await _insertLocation(
+        db,
+        id: locationA2,
+        projectId: _projectA,
+        displayName: 'Mutfak',
+        normalizedName: 'mutfak',
+      );
+      await _insertLocation(
+        db,
+        id: locationB,
+        projectId: _projectB,
+        displayName: 'Salon B',
+        normalizedName: 'salon b',
+      );
+      Map<String, Object?> relationRow(
+        String id,
+        String projectId,
+        String floorId,
+        String locationId,
+      ) => {
+        'id': id,
+        'project_id': projectId,
+        'floor_id': floorId,
+        'location_id': locationId,
+        'revision': 1,
+        'created_at': _timestamp,
+        'updated_at': _timestamp,
+      };
+      await db.insert(
+        'project_floor_location_relations',
+        relationRow(relationA1, _projectA, floorA, locationA1),
+      );
+      await db.insert(
+        'project_floor_location_relations',
+        relationRow(relationA2, _projectA, floorA, locationA2),
+      );
+      expect(await db.query('project_floor_location_relations'), hasLength(2));
+      for (final invalid in [
+        relationRow(
+          '44444444-4444-4444-8444-444444444403',
+          _projectA,
+          floorB,
+          locationA1,
+        ),
+        relationRow(
+          '44444444-4444-4444-8444-444444444404',
+          _projectA,
+          floorA,
+          locationB,
+        ),
+        relationRow(
+          '44444444-4444-4444-8444-444444444405',
+          _projectA,
+          floorA,
+          locationA1,
+        ),
+      ]) {
+        await expectLater(
+          db.insert('project_floor_location_relations', invalid),
+          throwsA(isA<sqflite.DatabaseException>()),
+        );
+      }
+      await db.insert('project_floor_location_relation_events', {
+        'id': '55555555-5555-4555-8555-555555555501',
+        'relation_id': relationA1,
+        'project_id': _projectA,
+        'sequence': 1,
+        'event_type': 'floor_location.assigned',
+        'occurred_at': _timestamp,
+        'payload_json': '{}',
+      });
+      await expectLater(
+        db.update(
+          'project_floor_location_relations',
+          {'location_id': locationA2, 'revision': 2, 'updated_at': _timestamp},
+          where: 'id = ?',
+          whereArgs: [relationA1],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'project_locations',
+          {'revision': 2, 'updated_at': _timestamp, 'archived_at': _timestamp},
+          where: 'id = ?',
+          whereArgs: [locationA1],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'inventory_floors',
+          {'revision': 2, 'updated_at': _timestamp, 'archived_at': _timestamp},
+          where: 'id = ?',
+          whereArgs: [floorA],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'inventory_blocks',
+          {
+            'state': 'ARCHIVED',
+            'revision': 2,
+            'updated_at': _timestamp,
+            'archived_at': _timestamp,
+          },
+          where: 'id = ?',
+          whereArgs: [blockA],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update('project_floor_location_relation_events', {
+          'payload_json': '{"changed":true}',
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.delete(
+          'project_floor_location_relations',
+          where: 'id = ?',
+          whereArgs: [relationA1],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      await database.close();
+    },
+  );
+
+  test(
     'schema 10 upgrade preserves legacy ids texts revisions events and attachments',
     () async {
       final versionTen = _database(

@@ -2137,3 +2137,101 @@ class InventoryEventRecord {
   final String payloadJson;
   final String payloadSha256;
 }
+
+enum InventoryBlockMetadataEventType {
+  created('inventory.block_metadata_created'),
+  updated('inventory.block_metadata_updated');
+
+  const InventoryBlockMetadataEventType(this.storageValue);
+
+  final String storageValue;
+
+  static InventoryBlockMetadataEventType fromStorage(String value) =>
+      values.firstWhere(
+        (event) => event.storageValue == value,
+        orElse: () =>
+            throw const InventoryFailure('inventory_block_metadata_corrupt'),
+      );
+}
+
+class InventoryBlockMetadataRecord {
+  const InventoryBlockMetadataRecord({
+    required this.blockId,
+    required this.projectId,
+    required this.basementCount,
+    required this.basementClassification,
+    required this.totalArea,
+    required this.totalAreaUnit,
+    required this.footprintArea,
+    required this.footprintAreaUnit,
+    required this.independentUnitCount,
+    required this.usageType,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final String blockId;
+  final String projectId;
+  final int? basementCount;
+  final String? basementClassification;
+  final double? totalArea;
+  final String? totalAreaUnit;
+  final double? footprintArea;
+  final String? footprintAreaUnit;
+  final int? independentUnitCount;
+  final String? usageType;
+  final int revision;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+}
+
+class SaveInventoryBlockMetadataCommand {
+  const SaveInventoryBlockMetadataCommand({
+    required this.eventId,
+    required this.projectId,
+    required this.blockId,
+    required this.expectedRevision,
+    this.basementCount,
+    this.basementClassification,
+    this.totalArea,
+    this.totalAreaUnit,
+    this.footprintArea,
+    this.footprintAreaUnit,
+    this.independentUnitCount,
+    this.usageType,
+  });
+
+  final String eventId;
+  final String projectId;
+  final String blockId;
+  final int expectedRevision;
+  final int? basementCount;
+  final String? basementClassification;
+  final double? totalArea;
+  final String? totalAreaUnit;
+  final double? footprintArea;
+  final String? footprintAreaUnit;
+  final int? independentUnitCount;
+  final String? usageType;
+}
+
+class InventoryBlockMetadataEvent {
+  const InventoryBlockMetadataEvent({
+    required this.id,
+    required this.blockId,
+    required this.projectId,
+    required this.sequence,
+    required this.eventType,
+    required this.occurredAt,
+    required this.payloadJson,
+  });
+
+  final String id;
+  final String blockId;
+  final String projectId;
+  final int sequence;
+  final InventoryBlockMetadataEventType eventType;
+  final DateTime occurredAt;
+  final String payloadJson;
+}

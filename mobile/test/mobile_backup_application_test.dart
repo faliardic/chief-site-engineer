@@ -22,6 +22,7 @@ import 'package:chief_site_engineer/domain/construction_project_graph_models.dar
 import 'package:chief_site_engineer/domain/construction_schedule_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/domain/mobile_backup_models.dart';
+import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/capabilities.dart';
 import 'package:chief_site_engineer/platform/inventory_attachment_gateway.dart';
@@ -479,6 +480,147 @@ void main() {
   );
 
   test(
+    'format 1 backup preserves schema 25 block metadata Floor-Mahal rows and events',
+    () async {
+      const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa51';
+      const blockId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb51';
+      const floorId = 'cccccccc-cccc-4ccc-8ccc-cccccccccc51';
+      const locationId = 'dddddddd-dddd-4ddd-8ddd-dddddddddd51';
+      const relationId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee51';
+      final agenda = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      await agenda.createProject(
+        const CreateProjectCommand(id: projectId, name: 'Q05 Yedek Projesi'),
+      );
+      final raw = await _openRaw(directories);
+      await raw.insert('inventory_blocks', {
+        'id': blockId,
+        'project_id': projectId,
+        'display_name': 'A Blok',
+        'normalized_name': 'a blok',
+        'ordinal': 1,
+        'state': 'ACTIVE',
+        'revision': 1,
+        'created_at': _now,
+        'updated_at': _now,
+      });
+      await raw.insert('inventory_floors', {
+        'id': floorId,
+        'block_id': blockId,
+        'project_id': projectId,
+        'display_name': '1. Kat',
+        'ordinal': 1,
+        'revision': 1,
+        'created_at': _now,
+        'updated_at': _now,
+      });
+      await raw.close();
+      final inventory = SqliteInventoryApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      await inventory.saveBlockMetadata(
+        const SaveInventoryBlockMetadataCommand(
+          eventId: 'ffffffff-ffff-4fff-8fff-ffffffff0051',
+          projectId: projectId,
+          blockId: blockId,
+          expectedRevision: 0,
+          basementCount: 2,
+          basementClassification: 'Otopark',
+          totalArea: 1400,
+          totalAreaUnit: 'm²',
+          footprintArea: 700,
+          footprintAreaUnit: 'm²',
+          independentUnitCount: 16,
+          usageType: 'Konut',
+        ),
+      );
+      await agenda.createProjectLocation(
+        const CreateProjectLocationCommand(
+          id: locationId,
+          eventId: 'ffffffff-ffff-4fff-8fff-ffffffff0052',
+          projectId: projectId,
+          displayName: 'Salon',
+        ),
+      );
+      await agenda.createProjectFloorLocation(
+        const CreateProjectFloorLocationRelationCommand(
+          id: relationId,
+          eventId: 'ffffffff-ffff-4fff-8fff-ffffffff0053',
+          projectId: projectId,
+          floorId: floorId,
+          locationId: locationId,
+        ),
+      );
+      final source = await _openRaw(directories);
+      final before = <String, List<Map<String, Object?>>>{
+        for (final table in const [
+          'inventory_block_metadata',
+          'inventory_block_metadata_events',
+          'project_floor_location_relations',
+          'project_floor_location_relation_events',
+        ])
+          table: await source.query(table, orderBy: 'rowid ASC'),
+      };
+      await source.close();
+
+      final backup = _application(directories, gateway: gateway);
+      final created = await backup.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      await inventory.saveBlockMetadata(
+        const SaveInventoryBlockMetadataCommand(
+          eventId: 'ffffffff-ffff-4fff-8fff-ffffffff0054',
+          projectId: projectId,
+          blockId: blockId,
+          expectedRevision: 1,
+          usageType: 'Sonraki değişiklik',
+        ),
+      );
+      await agenda.removeProjectFloorLocation(
+        const RemoveProjectFloorLocationRelationCommand(
+          relationId: relationId,
+          eventId: 'ffffffff-ffff-4fff-8fff-ffffffff0055',
+          projectId: projectId,
+          expectedRevision: 1,
+        ),
+      );
+      final preflight = await backup.preflightBackup(
+        created.package,
+        _password,
+      );
+      expect(preflight.manifest.formatVersion, 1);
+      expect(preflight.migratedSchemaVersion, 25);
+      final restored = await backup.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: created.package,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+      expect(restored.restoredManifest.formatVersion, 1);
+      expect(restored.activeSchemaVersion, 25);
+      final restoredRaw = await _openRaw(directories);
+      for (final entry in before.entries) {
+        expect(
+          await restoredRaw.query(entry.key, orderBy: 'rowid ASC'),
+          entry.value,
+          reason: entry.key,
+        );
+      }
+      expect(await restoredRaw.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      await restoredRaw.close();
+    },
+  );
+
+  test(
     'format 1 backup round-trips Project Profile fields order archive and events',
     () async {
       const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -655,7 +797,7 @@ void main() {
     },
   );
 
-  test('current database smoke requires every schema 24 table', () async {
+  test('current database smoke requires every schema 25 table', () async {
     final raw = await _openRaw(directories);
     await raw.execute('DROP TABLE inventory_events');
     await raw.close();
@@ -675,7 +817,7 @@ void main() {
   test(
     'format 1 backup restores populated Inventory with exact replayable truth',
     () async {
-      expect(AppDatabase.schemaVersion, 24);
+      expect(AppDatabase.schemaVersion, 25);
       final fixture = await _seedPopulatedInventory(
         directories,
         attachmentGateway: _inventoryPhotoGateway(directories),
@@ -1242,17 +1384,17 @@ void main() {
     },
   );
 
-  test('format 1 schema 23 backup migrates to schema 24', () async {
-    final legacyRoot = await Directory.systemTemp.createTemp('cse_schema23_');
+  test('format 1 schema 24 backup migrates to schema 25', () async {
+    final legacyRoot = await Directory.systemTemp.createTemp('cse_schema24_');
     addTearDown(() async {
       if (await legacyRoot.exists()) await legacyRoot.delete(recursive: true);
     });
-    final legacyFile = path.join(legacyRoot.path, 'schema23.sqlite3');
+    final legacyFile = path.join(legacyRoot.path, 'schema24.sqlite3');
     final legacy = AppDatabase(
       path: legacyFile,
       factory: databaseFactoryFfi,
       clock: () => DateTime.parse(_now),
-      migrations: AppDatabase.foundationMigrations.take(23).toList(),
+      migrations: AppDatabase.foundationMigrations.take(24).toList(),
     );
     await legacy.open();
     await SmokeRecordRepository(
@@ -1260,8 +1402,8 @@ void main() {
       clock: () => DateTime.parse(_now),
     ).ensureFoundationRecord();
     await legacy.database.insert('projects', {
-      'id': 'schema23-project',
-      'name': 'Schema 23 legacy proje',
+      'id': 'schema24-project',
+      'name': 'Schema 24 legacy proje',
       'created_at': _now,
       'updated_at': _now,
       'revision': 1,
@@ -1269,11 +1411,11 @@ void main() {
     await legacy.close();
     final databaseBytes = await File(legacyFile).readAsBytes();
     final archive = const CseBackupArchiveCodec().encode(
-      manifest: _manifest(databaseBytes, schemaVersion: 23),
+      manifest: _manifest(databaseBytes, schemaVersion: 24),
       databaseBytes: databaseBytes,
       attachments: const {},
     );
-    final package = File(path.join(legacyRoot.path, 'schema23.csebackup'));
+    final package = File(path.join(legacyRoot.path, 'schema24.csebackup'));
     await package.writeAsBytes(
       await _testEncryptionCodec().encrypt(archive, _password),
       flush: true,
@@ -1281,8 +1423,8 @@ void main() {
     final imported = await _stageIncomingPackage(directories, package);
     final application = _application(directories, gateway: gateway);
     final preflight = await application.preflightBackup(imported, _password);
-    expect(preflight.manifest.mobileSchemaVersion, 23);
-    expect(preflight.migratedSchemaVersion, 24);
+    expect(preflight.manifest.mobileSchemaVersion, 24);
+    expect(preflight.migratedSchemaVersion, 25);
     await application.restoreBackup(
       RestoreMobileBackupCommand(
         package: imported,
@@ -1293,21 +1435,25 @@ void main() {
     final restored = await _openRaw(directories);
     expect(
       Sqflite.firstIntValue(await restored.rawQuery('PRAGMA user_version')),
-      24,
+      25,
     );
     expect(
       (await restored.query(
         'projects',
         where: 'id = ?',
-        whereArgs: ['schema23-project'],
+        whereArgs: ['schema24-project'],
       )).single['name'],
-      'Schema 23 legacy proje',
+      'Schema 24 legacy proje',
     );
     for (final table in const [
       'project_metadata',
       'project_metadata_events',
       'project_party_assignments',
       'project_party_assignment_events',
+      'inventory_block_metadata',
+      'inventory_block_metadata_events',
+      'project_floor_location_relations',
+      'project_floor_location_relation_events',
     ]) {
       expect(await restored.query(table), isEmpty, reason: table);
     }
@@ -1816,7 +1962,14 @@ void main() {
       await legacyRaw.execute(
         'DROP TRIGGER agenda_phone_call_contexts_source_category_update',
       );
+      await legacyRaw.execute(
+        'DROP TRIGGER floor_location_active_location_archive_guard',
+      );
       for (final table in const [
+        'project_floor_location_relation_events',
+        'project_floor_location_relations',
+        'inventory_block_metadata_events',
+        'inventory_block_metadata',
         'project_party_assignment_events',
         'project_party_assignments',
         'project_metadata_events',
