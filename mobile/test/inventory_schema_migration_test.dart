@@ -44,6 +44,8 @@ const _inventoryTables = <String>{
   'inventory_command_receipts',
   'inventory_events',
   'inventory_asset_attachment_links',
+  'inventory_block_metadata',
+  'inventory_block_metadata_events',
 };
 
 const _plannedIndexes = <String>{
@@ -69,6 +71,8 @@ const _plannedIndexes = <String>{
   'inventory_revision_block_polygons_revision',
   'inventory_spatial_drafts_revision',
   'inventory_placements_floor_history',
+  'ix_inventory_block_metadata_project',
+  'ix_inventory_block_metadata_events_block',
 };
 
 void main() {
@@ -91,7 +95,7 @@ void main() {
   });
 
   test(
-    'fresh database creates exact schema 24 Inventory tables and indices',
+    'fresh database creates exact schema 25 Inventory tables and indices',
     () async {
       final database = _database(databasePath);
       await database.open();
@@ -147,53 +151,56 @@ void main() {
       await upgraded.open();
       final db = upgraded.database;
       final currentObjects = await _existingObjects(db);
-      const postInventoryTables = {
+      const postInventoryObjectNames = {
         'project_profile_fields',
         'project_profile_events',
+        'ix_project_profile_fields_project_order',
+        'ix_project_profile_events_project',
+        'project_profile_fields_project_immutable',
+        'project_profile_fields_identity_immutable',
+        'project_profile_fields_no_physical_delete',
+        'project_profile_events_append_only_update',
+        'project_profile_events_append_only_delete',
         'project_metadata',
         'project_metadata_events',
         'project_party_assignments',
         'project_party_assignment_events',
+        'ix_project_metadata_events_project',
+        'ux_project_party_assignments_active_role',
+        'ix_project_party_assignments_project',
+        'ix_project_party_assignment_events_assignment',
+        'project_metadata_identity_immutable',
+        'project_metadata_no_physical_delete',
+        'project_metadata_events_append_only_update',
+        'project_metadata_events_append_only_delete',
+        'project_party_assignments_identity_immutable',
+        'project_party_assignments_no_physical_delete',
+        'project_party_assignment_events_append_only_update',
+        'project_party_assignment_events_append_only_delete',
+        'project_floor_location_relations',
+        'project_floor_location_relation_events',
+        'ux_floor_location_relations_active_location',
+        'ix_floor_location_relations_project_floor',
+        'ix_floor_location_relation_events_relation',
+        'floor_location_relations_guarded_update',
+        'floor_location_relations_no_physical_delete',
+        'floor_location_relation_events_append_only_update',
+        'floor_location_relation_events_append_only_delete',
+        'floor_location_active_location_archive_guard',
       };
       final postInventoryObjects = currentObjects
-          .where((object) => postInventoryTables.contains(object['tbl_name']))
+          .where((object) => postInventoryObjectNames.contains(object['name']))
           .toList();
       final afterObjects = currentObjects
-          .where((object) => !postInventoryTables.contains(object['tbl_name']))
+          .where((object) => !postInventoryObjectNames.contains(object['name']))
           .toList();
       final afterRows = await _representativeRows(db);
 
-      // Schemas 23 and 24 add only these project objects outside Inventory. Every
-      // pre-existing object's SQL and every representative row stay exact.
+      // Schemas 23-25 add only the listed project/block-location foundations.
+      // Every pre-existing object's SQL and every representative row stay exact.
       expect(
         postInventoryObjects.map((object) => object['name']),
-        unorderedEquals(const [
-          'project_profile_fields',
-          'project_profile_events',
-          'ix_project_profile_fields_project_order',
-          'ix_project_profile_events_project',
-          'project_profile_fields_project_immutable',
-          'project_profile_fields_identity_immutable',
-          'project_profile_fields_no_physical_delete',
-          'project_profile_events_append_only_update',
-          'project_profile_events_append_only_delete',
-          'project_metadata',
-          'project_metadata_events',
-          'project_party_assignments',
-          'project_party_assignment_events',
-          'ix_project_metadata_events_project',
-          'ux_project_party_assignments_active_role',
-          'ix_project_party_assignments_project',
-          'ix_project_party_assignment_events_assignment',
-          'project_metadata_identity_immutable',
-          'project_metadata_no_physical_delete',
-          'project_metadata_events_append_only_update',
-          'project_metadata_events_append_only_delete',
-          'project_party_assignments_identity_immutable',
-          'project_party_assignments_no_physical_delete',
-          'project_party_assignment_events_append_only_update',
-          'project_party_assignment_events_append_only_delete',
-        ]),
+        unorderedEquals(postInventoryObjectNames),
       );
       expect(afterObjects, beforeObjects);
       expect(afterRows, beforeRows);
@@ -243,6 +250,8 @@ void main() {
           'inventory_floors',
           'inventory_sketch_revision_block_polygons',
           'inventory_sketch_revision_spatial_drafts',
+          'inventory_block_metadata',
+          'inventory_block_metadata_events',
         }),
       );
       expect(
@@ -351,7 +360,28 @@ void main() {
         AppDatabase.schemaVersion,
       );
       expect(await _finalInventorySnapshot(upgraded.database), rowsBefore);
-      expect(await _inventorySchemaObjects(upgraded.database), objectsBefore);
+      const schemaTwentyFiveInventoryObjects = {
+        'inventory_block_metadata',
+        'inventory_block_metadata_events',
+        'ix_inventory_block_metadata_project',
+        'ix_inventory_block_metadata_events_block',
+        'inventory_block_metadata_guarded_update',
+        'inventory_block_metadata_no_physical_delete',
+        'inventory_block_metadata_events_append_only_update',
+        'inventory_block_metadata_events_append_only_delete',
+        'floor_location_active_floor_archive_guard',
+        'floor_location_active_block_archive_guard',
+      };
+      final objectsAfter = await _inventorySchemaObjects(upgraded.database);
+      expect(
+        objectsAfter
+            .where(
+              (object) =>
+                  !schemaTwentyFiveInventoryObjects.contains(object['name']),
+            )
+            .toList(),
+        objectsBefore,
+      );
       expect(
         await upgraded.database.query('schema_versions', where: 'version = 22'),
         hasLength(1),
@@ -638,6 +668,8 @@ void main() {
           'inventory_floors',
           'inventory_sketch_revision_block_polygons',
           'inventory_sketch_revision_spatial_drafts',
+          'inventory_block_metadata',
+          'inventory_block_metadata_events',
         }),
       );
       expect(await _inventoryV20Snapshot(afterFailure), before);
@@ -646,7 +678,102 @@ void main() {
   );
 
   test(
-    'schema 24 fails closed and retains one valid populated graph',
+    'schema 25 block metadata enforces composite identity revision and append-only history',
+    () async {
+      final database = _database(databasePath);
+      await database.open();
+      final db = database.database;
+      await _seedProjects(db);
+      await _seedValidInventoryGraph(db);
+      await _fails(
+        db.insert('inventory_block_metadata', {
+          'block_id': _blockA,
+          'project_id': _projectB,
+          'revision': 1,
+          'created_at': _t1,
+          'updated_at': _t1,
+        }),
+      );
+      await db.insert('inventory_block_metadata', {
+        'block_id': _blockA,
+        'project_id': _projectA,
+        'basement_count': 2,
+        'basement_classification': 'Otopark',
+        'total_area': 1000.0,
+        'total_area_unit': 'm²',
+        'footprint_area': 500.0,
+        'footprint_area_unit': 'm²',
+        'independent_unit_count': 20,
+        'usage_type': 'Konut',
+        'revision': 1,
+        'created_at': _t1,
+        'updated_at': _t1,
+      });
+      const metadataEvent = '99999999-9999-4999-8999-999999999925';
+      await db.insert('inventory_block_metadata_events', {
+        'id': metadataEvent,
+        'block_id': _blockA,
+        'project_id': _projectA,
+        'sequence': 1,
+        'event_type': 'inventory.block_metadata_created',
+        'occurred_at': _t1,
+        'payload_json': '{}',
+      });
+      await _fails(
+        db.update(
+          'inventory_block_metadata',
+          {'revision': 2, 'updated_at': _t2, 'total_area_unit': null},
+          where: 'block_id = ?',
+          whereArgs: [_blockA],
+        ),
+      );
+      await _fails(
+        db.update(
+          'inventory_block_metadata',
+          {'revision': 2, 'updated_at': _t2},
+          where: 'block_id = ?',
+          whereArgs: [_blockA],
+        ),
+      );
+      await _fails(
+        db.update(
+          'inventory_block_metadata',
+          {'project_id': _projectB, 'revision': 2, 'updated_at': _t2},
+          where: 'block_id = ?',
+          whereArgs: [_blockA],
+        ),
+      );
+      await _fails(
+        db.update(
+          'inventory_block_metadata_events',
+          {'payload_json': '{"changed":true}'},
+          where: 'id = ?',
+          whereArgs: [metadataEvent],
+        ),
+      );
+      await _fails(
+        db.delete(
+          'inventory_block_metadata_events',
+          where: 'id = ?',
+          whereArgs: [metadataEvent],
+        ),
+      );
+      await _fails(
+        db.delete(
+          'inventory_block_metadata',
+          where: 'block_id = ?',
+          whereArgs: [_blockA],
+        ),
+      );
+      expect(await db.query('inventory_block_metadata'), hasLength(1));
+      expect(await db.query('inventory_block_metadata_events'), hasLength(1));
+      expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      await database.close();
+    },
+  );
+
+  test(
+    'schema 25 fails closed and retains one valid populated graph',
     () async {
       final database = _database(databasePath);
       await database.open();

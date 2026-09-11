@@ -84,6 +84,7 @@ void main() {
       {'version': 22, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 23, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 24, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 25, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -229,6 +230,200 @@ void main() {
       await upgraded.close();
     },
   );
+
+  test(
+    'schema 24 to 25 is additive and preserves canonical block floor location rows',
+    () async {
+      const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const blockId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+      const floorId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+      const locationId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+      final schemaTwentyFour = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(24).toList(),
+      );
+      await schemaTwentyFour.open();
+      await schemaTwentyFour.database.insert('projects', {
+        'id': projectId,
+        'name': 'Korunan Q05 projesi',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+        'revision': 1,
+      });
+      await schemaTwentyFour.database.insert('inventory_blocks', {
+        'id': blockId,
+        'project_id': projectId,
+        'display_name': 'A Blok',
+        'normalized_name': 'a blok',
+        'ordinal': 1,
+        'state': 'ACTIVE',
+        'revision': 3,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await schemaTwentyFour.database.insert('inventory_floors', {
+        'id': floorId,
+        'block_id': blockId,
+        'project_id': projectId,
+        'display_name': '1. Kat',
+        'ordinal': 1,
+        'revision': 2,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await schemaTwentyFour.database.insert('project_locations', {
+        'id': locationId,
+        'project_id': projectId,
+        'display_name': 'Salon',
+        'normalized_name': 'salon',
+        'revision': 4,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      final before = {
+        'projects': await schemaTwentyFour.database.query('projects'),
+        'inventory_blocks': await schemaTwentyFour.database.query(
+          'inventory_blocks',
+        ),
+        'inventory_floors': await schemaTwentyFour.database.query(
+          'inventory_floors',
+        ),
+        'project_locations': await schemaTwentyFour.database.query(
+          'project_locations',
+        ),
+      };
+      await schemaTwentyFour.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      for (final entry in before.entries) {
+        expect(await upgraded.database.query(entry.key), entry.value);
+      }
+      for (final table in const [
+        'inventory_block_metadata',
+        'inventory_block_metadata_events',
+        'project_floor_location_relations',
+        'project_floor_location_relation_events',
+      ]) {
+        expect(await upgraded.database.query(table), isEmpty, reason: table);
+      }
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await upgraded.database.rawQuery('PRAGMA user_version'),
+        ),
+        25,
+      );
+      expect(
+        await upgraded.database.rawQuery('PRAGMA foreign_key_check'),
+        isEmpty,
+      );
+      await upgraded.close();
+    },
+  );
+
+  test('migrated and fresh schema 25 block-location objects match', () async {
+    final old = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(24).toList(),
+    );
+    await old.open();
+    await old.close();
+    final migrated = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+    );
+    await migrated.open();
+    final fresh = AppDatabase(
+      path: '${temporaryRoot.path}${Platform.pathSeparator}fresh-v25.sqlite3',
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+    );
+    await fresh.open();
+    const sql = '''
+      SELECT type, name, tbl_name, sql
+      FROM sqlite_master
+      WHERE name LIKE 'inventory_block_metadata%'
+         OR name LIKE '%floor_location%'
+      ORDER BY type, name
+    ''';
+    expect(
+      await migrated.database.rawQuery(sql),
+      await fresh.database.rawQuery(sql),
+    );
+    expect(
+      await migrated.database.rawQuery('PRAGMA foreign_key_check'),
+      isEmpty,
+    );
+    expect(await fresh.database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+    await fresh.close();
+    await migrated.close();
+  });
+
+  test('failed schema 25 migration rolls back intact schema 24 data', () async {
+    const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    final schemaTwentyFour = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(24).toList(),
+    );
+    await schemaTwentyFour.open();
+    await schemaTwentyFour.database.insert('projects', {
+      'id': projectId,
+      'name': 'Rollback V24',
+      'created_at': '2026-07-19T08:00:00Z',
+      'updated_at': '2026-07-19T08:00:00Z',
+      'revision': 7,
+    });
+    final projectsBefore = await schemaTwentyFour.database.query('projects');
+    await schemaTwentyFour.close();
+
+    final failing = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 19, 9),
+      migrations: [
+        ...AppDatabase.foundationMigrations.take(24),
+        DatabaseMigration(
+          version: 25,
+          apply: (transaction) async {
+            await AppDatabase.foundationMigrations[24].apply(transaction);
+            throw StateError('intentional schema 25 rollback');
+          },
+        ),
+      ],
+    );
+    await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+    final raw = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: sqflite.OpenDatabaseOptions(singleInstance: false),
+    );
+    expect(
+      sqflite.Sqflite.firstIntValue(await raw.rawQuery('PRAGMA user_version')),
+      24,
+    );
+    expect(await raw.query('projects'), projectsBefore);
+    expect(
+      await raw.rawQuery(
+        "SELECT name FROM sqlite_master WHERE name IN ("
+        "'inventory_block_metadata', 'inventory_block_metadata_events', "
+        "'project_floor_location_relations', "
+        "'project_floor_location_relation_events')",
+      ),
+      isEmpty,
+    );
+    expect(await raw.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+    await raw.close();
+  });
 
   test(
     'schema 23 to 24 preserves project profile workforce and attendance rows',

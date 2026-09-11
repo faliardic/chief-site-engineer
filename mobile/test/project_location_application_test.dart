@@ -19,6 +19,15 @@ String _locationId(int value) =>
 String _eventId(int value) =>
     'eeeeeeee-eeee-4eee-8eee-${value.toString().padLeft(12, '0')}';
 
+String _blockId(int value) =>
+    'bbbbbbbb-bbbb-4bbb-8bbb-${value.toString().padLeft(12, '0')}';
+
+String _floorId(int value) =>
+    'ffffffff-ffff-4fff-8fff-${value.toString().padLeft(12, '0')}';
+
+String _relationId(int value) =>
+    'dddddddd-dddd-4ddd-8ddd-${value.toString().padLeft(12, '0')}';
+
 void main() {
   late Directory temporaryRoot;
   late String databasePath;
@@ -104,6 +113,39 @@ void main() {
       whereArgs: [projectId],
     );
   });
+
+  Future<({String blockId, String floorId})> seedFloor({
+    required int seed,
+    String projectId = _projectA,
+  }) async {
+    final blockId = _blockId(seed);
+    final floorId = _floorId(seed);
+    await withDatabase((database) async {
+      const timestamp = '2026-08-08T08:00:00Z';
+      await database.insert('inventory_blocks', {
+        'id': blockId,
+        'project_id': projectId,
+        'display_name': 'Blok $seed',
+        'normalized_name': 'blok $seed',
+        'ordinal': seed,
+        'state': 'ACTIVE',
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await database.insert('inventory_floors', {
+        'id': floorId,
+        'block_id': blockId,
+        'project_id': projectId,
+        'display_name': '$seed. Kat',
+        'ordinal': 1,
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+    });
+    return (blockId: blockId, floorId: floorId);
+  }
 
   test(
     'shares project behavior and lists active or archived locations deterministically',
@@ -668,6 +710,284 @@ void main() {
         hasLength(2),
       );
       await subscription.cancel();
+    },
+  );
+
+  test(
+    'stable Floor-Mahal relation assigns replaces removes and keeps identity through rename',
+    () async {
+      final firstFloor = await seedFloor(seed: 1);
+      final secondFloor = await seedFloor(seed: 2);
+      final firstLocation = await createLocation(
+        id: 101,
+        event: 101,
+        displayName: 'Mahal Bir',
+      );
+      final secondLocation = await createLocation(
+        id: 102,
+        event: 102,
+        displayName: 'Mahal İki',
+      );
+      final contract = application as ProjectFloorLocationApplication;
+      final create = CreateProjectFloorLocationRelationCommand(
+        id: _relationId(101),
+        eventId: _eventId(111),
+        projectId: _projectA,
+        floorId: firstFloor.floorId,
+        locationId: firstLocation.id,
+      );
+      final assigned = await contract.createProjectFloorLocation(create);
+      expect(assigned.revision, 1);
+      expect((await contract.createProjectFloorLocation(create)).revision, 1);
+      await contract.createProjectFloorLocation(
+        CreateProjectFloorLocationRelationCommand(
+          id: _relationId(102),
+          eventId: _eventId(112),
+          projectId: _projectA,
+          floorId: firstFloor.floorId,
+          locationId: secondLocation.id,
+        ),
+      );
+      expect(await contract.listProjectFloorLocations(_projectA), hasLength(2));
+
+      now = DateTime.utc(2026, 8, 8, 9);
+      await application.renameProjectLocation(
+        RenameProjectLocationCommand(
+          locationId: firstLocation.id,
+          eventId: _eventId(113),
+          expectedRevision: firstLocation.revision,
+          displayName: 'Yeni Mahal Adı',
+        ),
+      );
+      final replaced = await contract.replaceProjectFloorLocation(
+        ReplaceProjectFloorLocationRelationCommand(
+          relationId: assigned.id,
+          eventId: _eventId(114),
+          projectId: _projectA,
+          expectedRevision: assigned.revision,
+          floorId: secondFloor.floorId,
+        ),
+      );
+      expect(replaced.floorId, secondFloor.floorId);
+      expect(replaced.locationId, firstLocation.id);
+      expect(replaced.revision, 2);
+      final noOp = await contract.replaceProjectFloorLocation(
+        ReplaceProjectFloorLocationRelationCommand(
+          relationId: replaced.id,
+          eventId: _eventId(115),
+          projectId: _projectA,
+          expectedRevision: replaced.revision,
+          floorId: replaced.floorId,
+        ),
+      );
+      expect(noOp.revision, 2);
+
+      now = DateTime.utc(2026, 8, 8, 10);
+      final removed = await contract.removeProjectFloorLocation(
+        RemoveProjectFloorLocationRelationCommand(
+          relationId: replaced.id,
+          eventId: _eventId(116),
+          projectId: _projectA,
+          expectedRevision: replaced.revision,
+        ),
+      );
+      expect(removed.isArchived, isTrue);
+      expect(removed.revision, 3);
+      expect(
+        (await contract.removeProjectFloorLocation(
+          RemoveProjectFloorLocationRelationCommand(
+            relationId: removed.id,
+            eventId: _eventId(117),
+            projectId: _projectA,
+            expectedRevision: removed.revision,
+          ),
+        )).revision,
+        3,
+      );
+      expect(await contract.listProjectFloorLocations(_projectA), hasLength(1));
+      expect(
+        await contract.listProjectFloorLocations(
+          _projectA,
+          includeArchived: true,
+        ),
+        hasLength(2),
+      );
+      expect(
+        (await contract.getProjectFloorLocation(removed.id)).isArchived,
+        isTrue,
+      );
+      expect(
+        (await contract.listProjectFloorLocationEvents(
+          removed.id,
+        )).map((event) => event.eventType),
+        [
+          ProjectFloorLocationEventType.assigned,
+          ProjectFloorLocationEventType.replaced,
+          ProjectFloorLocationEventType.removed,
+        ],
+      );
+      final reassigned = await contract.createProjectFloorLocation(
+        CreateProjectFloorLocationRelationCommand(
+          id: _relationId(103),
+          eventId: _eventId(118),
+          projectId: _projectA,
+          floorId: firstFloor.floorId,
+          locationId: firstLocation.id,
+        ),
+      );
+      expect(reassigned.id, isNot(removed.id));
+    },
+  );
+
+  test(
+    'Floor-Mahal relation rejects cross-project stale duplicate and orphaning writes',
+    () async {
+      await createProjectB();
+      final floorA = await seedFloor(seed: 10);
+      final floorB = await seedFloor(seed: 20, projectId: _projectB);
+      final locationA = await createLocation(
+        id: 201,
+        event: 201,
+        displayName: 'A Mahal',
+      );
+      final locationB = await createLocation(
+        id: 202,
+        event: 202,
+        displayName: 'B Mahal',
+        projectId: _projectB,
+      );
+      final contract = application as ProjectFloorLocationApplication;
+      for (final command in [
+        CreateProjectFloorLocationRelationCommand(
+          id: _relationId(201),
+          eventId: _eventId(211),
+          projectId: _projectA,
+          floorId: floorB.floorId,
+          locationId: locationA.id,
+        ),
+        CreateProjectFloorLocationRelationCommand(
+          id: _relationId(202),
+          eventId: _eventId(212),
+          projectId: _projectA,
+          floorId: floorA.floorId,
+          locationId: locationB.id,
+        ),
+      ]) {
+        await expectLater(
+          contract.createProjectFloorLocation(command),
+          throwsA(isA<AgendaValidationFailure>()),
+        );
+      }
+      final relation = await contract.createProjectFloorLocation(
+        CreateProjectFloorLocationRelationCommand(
+          id: _relationId(203),
+          eventId: _eventId(213),
+          projectId: _projectA,
+          floorId: floorA.floorId,
+          locationId: locationA.id,
+        ),
+      );
+      await expectLater(
+        contract.createProjectFloorLocation(
+          CreateProjectFloorLocationRelationCommand(
+            id: _relationId(204),
+            eventId: _eventId(214),
+            projectId: _projectA,
+            floorId: floorA.floorId,
+            locationId: locationA.id,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      await expectLater(
+        contract.replaceProjectFloorLocation(
+          ReplaceProjectFloorLocationRelationCommand(
+            relationId: relation.id,
+            eventId: _eventId(215),
+            projectId: _projectA,
+            expectedRevision: relation.revision + 1,
+            floorId: floorA.floorId,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      now = DateTime.utc(2026, 8, 8, 11);
+      await expectLater(
+        application.mutateProjectLocationArchive(
+          MutateProjectLocationArchiveCommand(
+            locationId: locationA.id,
+            eventId: _eventId(216),
+            expectedRevision: locationA.revision,
+            archive: true,
+          ),
+        ),
+        throwsA(isA<DatabaseException>()),
+      );
+      await withDatabase((database) async {
+        await expectLater(
+          database.update(
+            'inventory_floors',
+            {
+              'revision': 2,
+              'updated_at': '2026-08-08T11:00:00Z',
+              'archived_at': '2026-08-08T11:00:00Z',
+            },
+            where: 'id = ?',
+            whereArgs: [floorA.floorId],
+          ),
+          throwsA(isA<DatabaseException>()),
+        );
+        await expectLater(
+          database.update(
+            'inventory_blocks',
+            {
+              'state': 'ARCHIVED',
+              'revision': 2,
+              'updated_at': '2026-08-08T11:00:00Z',
+              'archived_at': '2026-08-08T11:00:00Z',
+            },
+            where: 'id = ?',
+            whereArgs: [floorA.blockId],
+          ),
+          throwsA(isA<DatabaseException>()),
+        );
+        await expectLater(
+          database.update(
+            'project_floor_location_relation_events',
+            {'payload_json': '{}'},
+            where: 'relation_id = ?',
+            whereArgs: [relation.id],
+          ),
+          throwsA(isA<DatabaseException>()),
+        );
+        await expectLater(
+          database.delete(
+            'project_floor_location_relations',
+            where: 'id = ?',
+            whereArgs: [relation.id],
+          ),
+          throwsA(isA<DatabaseException>()),
+        );
+        expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      });
+      expect((await contract.getProjectFloorLocation(relation.id)).revision, 1);
+
+      await expectLater(
+        contract.createProjectFloorLocation(
+          CreateProjectFloorLocationRelationCommand(
+            id: _relationId(205),
+            eventId: _eventId(213),
+            projectId: _projectB,
+            floorId: floorB.floorId,
+            locationId: locationB.id,
+          ),
+        ),
+        throwsA(isA<DatabaseException>()),
+      );
+      await expectLater(
+        contract.getProjectFloorLocation(_relationId(205)),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
     },
   );
 

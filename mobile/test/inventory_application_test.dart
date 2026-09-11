@@ -4283,6 +4283,226 @@ void main() {
       );
     },
   );
+  test(
+    'block metadata uses stable block identity revision history and preserves project totals',
+    () async {
+      final fixture = await _Fixture.create('block_metadata_lifecycle');
+      addTearDown(fixture.close);
+      await _createFinalizedSketch(fixture, seed: 31000);
+      final block = (await fixture.app.loadPrimarySketch(
+        _projectA,
+      ))!.blocks.single;
+      await fixture.db.database.insert('project_profile_fields', {
+        'id': 'project-profile:$_projectA:total_area',
+        'project_id': _projectA,
+        'field_kind': 'builtin',
+        'builtin_key': 'total_area',
+        'label': 'Toplam alan',
+        'value': '9000 m2',
+        'sort_order': 1,
+        'revision': 1,
+        'created_at': _t0,
+        'updated_at': _t0,
+      });
+      await fixture.db.database.insert('project_profile_fields', {
+        'id': 'project-profile:$_projectA:total_floors',
+        'project_id': _projectA,
+        'field_kind': 'builtin',
+        'builtin_key': 'total_floors',
+        'label': 'Toplam kat',
+        'value': '18',
+        'sort_order': 2,
+        'revision': 1,
+        'created_at': _t0,
+        'updated_at': _t0,
+      });
+      final projectTotals = await fixture.db.database.query(
+        'project_profile_fields',
+        orderBy: 'id ASC',
+      );
+
+      final empty = await fixture.app.loadBlockMetadata(
+        projectId: _projectA,
+        blockId: block.id,
+      );
+      expect(empty.revision, 0);
+      expect(empty.blockId, block.id);
+      expect(
+        await fixture.db.database.query('inventory_block_metadata'),
+        isEmpty,
+      );
+
+      final created = await fixture.app.saveBlockMetadata(
+        SaveInventoryBlockMetadataCommand(
+          eventId: _uuid(31010),
+          projectId: _projectA,
+          blockId: block.id,
+          expectedRevision: 0,
+          basementCount: 2,
+          basementClassification: '  Otopark bodrumu  ',
+          totalArea: 1250.5,
+          totalAreaUnit: ' m² ',
+          footprintArea: 625,
+          footprintAreaUnit: 'm²',
+          independentUnitCount: 24,
+          usageType: ' Konut ',
+        ),
+      );
+      expect(created.revision, 1);
+      expect(created.basementClassification, 'Otopark bodrumu');
+      expect(created.totalAreaUnit, 'm²');
+      expect(created.usageType, 'Konut');
+      expect(
+        await fixture.db.database.query(
+          'project_profile_fields',
+          orderBy: 'id ASC',
+        ),
+        projectTotals,
+      );
+
+      final updated = await fixture.app.saveBlockMetadata(
+        SaveInventoryBlockMetadataCommand(
+          eventId: _uuid(31011),
+          projectId: _projectA,
+          blockId: block.id,
+          expectedRevision: 1,
+          basementCount: 1,
+          basementClassification: 'Tek bodrum',
+          totalArea: 1300,
+          totalAreaUnit: 'm²',
+          footprintArea: 650,
+          footprintAreaUnit: 'm²',
+          independentUnitCount: 25,
+          usageType: 'Karma',
+        ),
+      );
+      expect(updated.revision, 2);
+      final noOp = await fixture.app.saveBlockMetadata(
+        SaveInventoryBlockMetadataCommand(
+          eventId: _uuid(31012),
+          projectId: _projectA,
+          blockId: block.id,
+          expectedRevision: 2,
+          basementCount: 1,
+          basementClassification: 'Tek bodrum',
+          totalArea: 1300,
+          totalAreaUnit: 'm²',
+          footprintArea: 650,
+          footprintAreaUnit: 'm²',
+          independentUnitCount: 25,
+          usageType: 'Karma',
+        ),
+      );
+      expect(noOp.revision, 2);
+      final events = await fixture.app.listBlockMetadataEvents(
+        projectId: _projectA,
+        blockId: block.id,
+      );
+      expect(events.map((event) => event.eventType), [
+        InventoryBlockMetadataEventType.created,
+        InventoryBlockMetadataEventType.updated,
+      ]);
+      expect(events.map((event) => event.sequence), [1, 2]);
+      expect(
+        jsonDecode(events.last.payloadJson),
+        containsPair('before', isNotNull),
+      );
+      expect(
+        jsonDecode(events.last.payloadJson),
+        containsPair('after', isNotNull),
+      );
+    },
+  );
+
+  test(
+    'block metadata rejects stale invalid and cross-project writes atomically',
+    () async {
+      final fixture = await _Fixture.create('block_metadata_guards');
+      addTearDown(fixture.close);
+      await _createFinalizedSketch(fixture, seed: 31100);
+      final block = (await fixture.app.loadPrimarySketch(
+        _projectA,
+      ))!.blocks.single;
+      final created = await fixture.app.saveBlockMetadata(
+        SaveInventoryBlockMetadataCommand(
+          eventId: _uuid(31110),
+          projectId: _projectA,
+          blockId: block.id,
+          expectedRevision: 0,
+          totalArea: 100,
+          totalAreaUnit: 'm²',
+        ),
+      );
+      await expectLater(
+        fixture.app.saveBlockMetadata(
+          SaveInventoryBlockMetadataCommand(
+            eventId: _uuid(31111),
+            projectId: _projectA,
+            blockId: block.id,
+            expectedRevision: 0,
+            totalArea: 200,
+            totalAreaUnit: 'm²',
+          ),
+        ),
+        _fails('inventory_stale_revision'),
+      );
+      await expectLater(
+        fixture.app.saveBlockMetadata(
+          SaveInventoryBlockMetadataCommand(
+            eventId: _uuid(31112),
+            projectId: _projectA,
+            blockId: block.id,
+            expectedRevision: created.revision,
+            totalArea: double.infinity,
+            totalAreaUnit: 'm²',
+          ),
+        ),
+        _fails('inventory_invalid_total_area'),
+      );
+      await expectLater(
+        fixture.app.saveBlockMetadata(
+          SaveInventoryBlockMetadataCommand(
+            eventId: _uuid(31113),
+            projectId: _projectA,
+            blockId: block.id,
+            expectedRevision: created.revision,
+            footprintArea: 50,
+          ),
+        ),
+        _fails('inventory_invalid_footprint_area'),
+      );
+      await expectLater(
+        fixture.app.loadBlockMetadata(projectId: _projectB, blockId: block.id),
+        _fails('inventory_block_unavailable'),
+      );
+      await expectLater(
+        fixture.app.saveBlockMetadata(
+          SaveInventoryBlockMetadataCommand(
+            eventId: _uuid(31110),
+            projectId: _projectA,
+            blockId: block.id,
+            expectedRevision: created.revision,
+            usageType: 'Rollback',
+          ),
+        ),
+        _fails('inventory_persistence_failed'),
+      );
+      final unchanged = await fixture.app.loadBlockMetadata(
+        projectId: _projectA,
+        blockId: block.id,
+      );
+      expect(unchanged.revision, 1);
+      expect(unchanged.totalArea, 100);
+      expect(unchanged.usageType, isNull);
+      expect(
+        await fixture.app.listBlockMetadataEvents(
+          projectId: _projectA,
+          blockId: block.id,
+        ),
+        hasLength(1),
+      );
+    },
+  );
 }
 
 class _Fixture {

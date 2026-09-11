@@ -94,10 +94,27 @@ abstract interface class InventoryPhotoApplicationPort {
   );
 }
 
+abstract interface class InventoryBlockMetadataApplicationPort {
+  Future<InventoryBlockMetadataRecord> loadBlockMetadata({
+    required String projectId,
+    required String blockId,
+  });
+  Future<InventoryBlockMetadataRecord> saveBlockMetadata(
+    SaveInventoryBlockMetadataCommand command,
+  );
+  Future<List<InventoryBlockMetadataEvent>> listBlockMetadataEvents({
+    required String projectId,
+    required String blockId,
+  });
+}
+
 /// Opens the active SQLite database for one complete operation and closes it
 /// afterwards so backup/restore replacement cannot leave a stale handle.
 class SqliteInventoryApplication
-    implements InventoryApplicationPort, InventoryPhotoApplicationPort {
+    implements
+        InventoryApplicationPort,
+        InventoryPhotoApplicationPort,
+        InventoryBlockMetadataApplicationPort {
   SqliteInventoryApplication({
     required this.databasePath,
     required this.databaseFactory,
@@ -246,6 +263,28 @@ class SqliteInventoryApplication
     required String assetId,
   }) => _withApplication(
     (app) => app.listAssetHistory(projectId: projectId, assetId: assetId),
+  );
+
+  @override
+  Future<InventoryBlockMetadataRecord> loadBlockMetadata({
+    required String projectId,
+    required String blockId,
+  }) => _withApplication(
+    (app) => app.loadBlockMetadata(projectId: projectId, blockId: blockId),
+  );
+
+  @override
+  Future<InventoryBlockMetadataRecord> saveBlockMetadata(
+    SaveInventoryBlockMetadataCommand command,
+  ) => _withApplication((app) => app.saveBlockMetadata(command));
+
+  @override
+  Future<List<InventoryBlockMetadataEvent>> listBlockMetadataEvents({
+    required String projectId,
+    required String blockId,
+  }) => _withApplication(
+    (app) =>
+        app.listBlockMetadataEvents(projectId: projectId, blockId: blockId),
   );
 
   @override
@@ -398,7 +437,10 @@ class UnavailableInventoryApplication implements InventoryApplicationPort {
 }
 
 class InventoryApplication
-    implements InventoryApplicationPort, InventoryPhotoApplicationPort {
+    implements
+        InventoryApplicationPort,
+        InventoryPhotoApplicationPort,
+        InventoryBlockMetadataApplicationPort {
   InventoryApplication({
     required this.database,
     required this.clock,
@@ -412,6 +454,127 @@ class InventoryApplication
   final RecordIdFactory idFactory;
   final InventoryAttachmentGateway attachmentGateway;
   final InventoryWriteBoundaryHook? afterSourceWritesBeforeHistory;
+
+  @override
+  Future<InventoryBlockMetadataRecord> loadBlockMetadata({
+    required String projectId,
+    required String blockId,
+  }) {
+    _requireIdentity(projectId, 'inventory_invalid_project_id');
+    _requireUuid(blockId, 'inventory_invalid_block_id');
+    return _guardRead(() async {
+      final block = await _requireBlockForMetadata(
+        database.database,
+        projectId: projectId,
+        blockId: blockId,
+      );
+      return _readBlockMetadata(database.database, block);
+    });
+  }
+
+  @override
+  Future<InventoryBlockMetadataRecord> saveBlockMetadata(
+    SaveInventoryBlockMetadataCommand command,
+  ) async {
+    _requireUuid(command.eventId, 'inventory_invalid_event_id');
+    _requireIdentity(command.projectId, 'inventory_invalid_project_id');
+    _requireUuid(command.blockId, 'inventory_invalid_block_id');
+    if (command.expectedRevision < 0) {
+      throw const InventoryFailure('inventory_invalid_expected_revision');
+    }
+    final values = _validatedBlockMetadataValues(command);
+    try {
+      return await database.database.transaction((transaction) async {
+        await _requireProjectAvailable(transaction, command.projectId);
+        final block = await _requireBlockForMetadata(
+          transaction,
+          projectId: command.projectId,
+          blockId: command.blockId,
+        );
+        if (block.state == InventoryBlockState.archived ||
+            block.archivedAt != null) {
+          throw const InventoryFailure('inventory_block_unavailable');
+        }
+        final current = await _readBlockMetadata(transaction, block);
+        if (current.revision != command.expectedRevision) {
+          throw const InventoryFailure('inventory_stale_revision');
+        }
+        if (current.revision > 0 && _blockMetadataMatches(current, values)) {
+          return current;
+        }
+        final occurredAt = current.revision == 0
+            ? _canonicalNowAfter(block.updatedAt)
+            : _canonicalNowAfter(current.updatedAt);
+        final timestamp = CseTimeCodec.encodeUtc(occurredAt);
+        late final InventoryBlockMetadataEventType eventType;
+        if (current.revision == 0) {
+          await transaction.insert('inventory_block_metadata', {
+            'block_id': block.id,
+            'project_id': block.projectId,
+            ...values,
+            'revision': 1,
+            'created_at': timestamp,
+            'updated_at': timestamp,
+          });
+          eventType = InventoryBlockMetadataEventType.created;
+        } else {
+          final changed = await transaction.update(
+            'inventory_block_metadata',
+            {
+              ...values,
+              'revision': current.revision + 1,
+              'updated_at': timestamp,
+            },
+            where: 'block_id = ? AND project_id = ? AND revision = ?',
+            whereArgs: [block.id, block.projectId, current.revision],
+          );
+          if (changed != 1) {
+            throw const InventoryFailure('inventory_stale_revision');
+          }
+          eventType = InventoryBlockMetadataEventType.updated;
+        }
+        final updated = await _readBlockMetadata(transaction, block);
+        await _insertBlockMetadataEvent(
+          transaction,
+          id: command.eventId,
+          metadata: updated,
+          eventType: eventType,
+          occurredAt: timestamp,
+          before: current.revision == 0 ? null : current,
+        );
+        return updated;
+      });
+    } on InventoryFailure {
+      rethrow;
+    } on DatabaseException {
+      throw const InventoryFailure('inventory_persistence_failed');
+    } on Object {
+      throw const InventoryFailure('inventory_persistence_failed');
+    }
+  }
+
+  @override
+  Future<List<InventoryBlockMetadataEvent>> listBlockMetadataEvents({
+    required String projectId,
+    required String blockId,
+  }) {
+    _requireIdentity(projectId, 'inventory_invalid_project_id');
+    _requireUuid(blockId, 'inventory_invalid_block_id');
+    return _guardRead(() async {
+      await _requireBlockForMetadata(
+        database.database,
+        projectId: projectId,
+        blockId: blockId,
+      );
+      final rows = await database.database.query(
+        'inventory_block_metadata_events',
+        where: 'block_id = ? AND project_id = ?',
+        whereArgs: [blockId, projectId],
+        orderBy: 'sequence ASC, id ASC',
+      );
+      return rows.map(_blockMetadataEventFromRow).toList(growable: false);
+    });
+  }
 
   @override
   Future<InventoryMutationResult> createSketch(
@@ -2122,6 +2285,296 @@ class InventoryApplication
       createdAt: createdAt,
       updatedAt: updatedAt,
       archivedAt: archivedAt,
+    );
+  }
+
+  Map<String, Object?> _validatedBlockMetadataValues(
+    SaveInventoryBlockMetadataCommand command,
+  ) {
+    final basementCount = command.basementCount;
+    if (basementCount != null && (basementCount < 0 || basementCount > 1000)) {
+      throw const InventoryFailure('inventory_invalid_basement_count');
+    }
+    final independentUnitCount = command.independentUnitCount;
+    if (independentUnitCount != null &&
+        (independentUnitCount < 0 || independentUnitCount > 1000000)) {
+      throw const InventoryFailure('inventory_invalid_independent_unit_count');
+    }
+    double? validatedArea(double? value, String code) {
+      if (value == null) return null;
+      if (!value.isFinite || value <= 0) {
+        throw InventoryFailure(code);
+      }
+      return value;
+    }
+
+    final totalArea = validatedArea(
+      command.totalArea,
+      'inventory_invalid_total_area',
+    );
+    final footprintArea = validatedArea(
+      command.footprintArea,
+      'inventory_invalid_footprint_area',
+    );
+    final totalAreaUnit = _optionalBoundedText(
+      command.totalAreaUnit,
+      maximum: 20,
+      code: 'inventory_invalid_total_area_unit',
+    );
+    final footprintAreaUnit = _optionalBoundedText(
+      command.footprintAreaUnit,
+      maximum: 20,
+      code: 'inventory_invalid_footprint_area_unit',
+    );
+    if ((totalArea == null) != (totalAreaUnit == null)) {
+      throw const InventoryFailure('inventory_invalid_total_area');
+    }
+    if ((footprintArea == null) != (footprintAreaUnit == null)) {
+      throw const InventoryFailure('inventory_invalid_footprint_area');
+    }
+    return {
+      'basement_count': command.basementCount,
+      'basement_classification': _optionalBoundedText(
+        command.basementClassification,
+        maximum: 80,
+        code: 'inventory_invalid_basement_classification',
+      ),
+      'total_area': totalArea,
+      'total_area_unit': totalAreaUnit,
+      'footprint_area': footprintArea,
+      'footprint_area_unit': footprintAreaUnit,
+      'independent_unit_count': command.independentUnitCount,
+      'usage_type': _optionalBoundedText(
+        command.usageType,
+        maximum: 120,
+        code: 'inventory_invalid_usage_type',
+      ),
+    };
+  }
+
+  Future<InventoryBlockRecord> _requireBlockForMetadata(
+    DatabaseExecutor executor, {
+    required String projectId,
+    required String blockId,
+  }) async {
+    final rows = await executor.query(
+      'inventory_blocks',
+      where: 'id = ? AND project_id = ?',
+      whereArgs: [blockId, projectId],
+      limit: 2,
+    );
+    if (rows.length != 1) {
+      throw const InventoryFailure('inventory_block_unavailable');
+    }
+    return _blockFromRow(rows.single);
+  }
+
+  Future<InventoryBlockMetadataRecord> _readBlockMetadata(
+    DatabaseExecutor executor,
+    InventoryBlockRecord block,
+  ) async {
+    final rows = await executor.query(
+      'inventory_block_metadata',
+      where: 'block_id = ? AND project_id = ?',
+      whereArgs: [block.id, block.projectId],
+      limit: 2,
+    );
+    if (rows.isEmpty) {
+      return InventoryBlockMetadataRecord(
+        blockId: block.id,
+        projectId: block.projectId,
+        basementCount: null,
+        basementClassification: null,
+        totalArea: null,
+        totalAreaUnit: null,
+        footprintArea: null,
+        footprintAreaUnit: null,
+        independentUnitCount: null,
+        usageType: null,
+        revision: 0,
+        createdAt: block.createdAt,
+        updatedAt: block.updatedAt,
+      );
+    }
+    if (rows.length != 1) {
+      throw const InventoryFailure('inventory_block_metadata_corrupt');
+    }
+    return _blockMetadataFromRow(rows.single);
+  }
+
+  InventoryBlockMetadataRecord _blockMetadataFromRow(Map<String, Object?> row) {
+    double? optionalPositiveArea(String key) {
+      final value = row[key];
+      if (value == null) return null;
+      if (value is! num || !value.toDouble().isFinite || value <= 0) {
+        throw const InventoryFailure('inventory_block_metadata_corrupt');
+      }
+      return value.toDouble();
+    }
+
+    int? optionalCount(String key, int maximum) {
+      final value = row[key];
+      if (value == null) return null;
+      if (value is! int || value < 0 || value > maximum) {
+        throw const InventoryFailure('inventory_block_metadata_corrupt');
+      }
+      return value;
+    }
+
+    String? optionalText(String key, int maximum) {
+      final value = row[key];
+      if (value == null) return null;
+      if (value is! String ||
+          value.isEmpty ||
+          value != value.trim() ||
+          value.runes.length > maximum) {
+        throw const InventoryFailure('inventory_block_metadata_corrupt');
+      }
+      return value;
+    }
+
+    final totalArea = optionalPositiveArea('total_area');
+    final totalAreaUnit = optionalText('total_area_unit', 20);
+    final footprintArea = optionalPositiveArea('footprint_area');
+    final footprintAreaUnit = optionalText('footprint_area_unit', 20);
+    if ((totalArea == null) != (totalAreaUnit == null) ||
+        (footprintArea == null) != (footprintAreaUnit == null)) {
+      throw const InventoryFailure('inventory_block_metadata_corrupt');
+    }
+    final createdAt = _storedTimestamp(row, 'created_at');
+    final updatedAt = _storedTimestamp(row, 'updated_at');
+    if (updatedAt.isBefore(createdAt)) {
+      throw const InventoryFailure('inventory_block_metadata_corrupt');
+    }
+    return InventoryBlockMetadataRecord(
+      blockId: _requiredStoredUuid(
+        row,
+        'block_id',
+        corruptCode: 'inventory_block_metadata_corrupt',
+      ),
+      projectId: _requiredStoredString(
+        row,
+        'project_id',
+        corruptCode: 'inventory_block_metadata_corrupt',
+      ),
+      basementCount: optionalCount('basement_count', 1000),
+      basementClassification: optionalText('basement_classification', 80),
+      totalArea: totalArea,
+      totalAreaUnit: totalAreaUnit,
+      footprintArea: footprintArea,
+      footprintAreaUnit: footprintAreaUnit,
+      independentUnitCount: optionalCount('independent_unit_count', 1000000),
+      usageType: optionalText('usage_type', 120),
+      revision: _requiredPositiveStoredInt(
+        row,
+        'revision',
+        corruptCode: 'inventory_block_metadata_corrupt',
+      ),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+
+  bool _blockMetadataMatches(
+    InventoryBlockMetadataRecord metadata,
+    Map<String, Object?> values,
+  ) =>
+      metadata.basementCount == values['basement_count'] &&
+      metadata.basementClassification == values['basement_classification'] &&
+      metadata.totalArea == values['total_area'] &&
+      metadata.totalAreaUnit == values['total_area_unit'] &&
+      metadata.footprintArea == values['footprint_area'] &&
+      metadata.footprintAreaUnit == values['footprint_area_unit'] &&
+      metadata.independentUnitCount == values['independent_unit_count'] &&
+      metadata.usageType == values['usage_type'];
+
+  Map<String, Object?> _blockMetadataPayload(
+    InventoryBlockMetadataRecord metadata,
+  ) => {
+    'basement_count': metadata.basementCount,
+    'basement_classification': metadata.basementClassification,
+    'total_area': metadata.totalArea,
+    'total_area_unit': metadata.totalAreaUnit,
+    'footprint_area': metadata.footprintArea,
+    'footprint_area_unit': metadata.footprintAreaUnit,
+    'independent_unit_count': metadata.independentUnitCount,
+    'usage_type': metadata.usageType,
+    'revision': metadata.revision,
+  };
+
+  Future<void> _insertBlockMetadataEvent(
+    DatabaseExecutor executor, {
+    required String id,
+    required InventoryBlockMetadataRecord metadata,
+    required InventoryBlockMetadataEventType eventType,
+    required String occurredAt,
+    required InventoryBlockMetadataRecord? before,
+  }) async {
+    final sequence =
+        Sqflite.firstIntValue(
+          await executor.rawQuery(
+            'SELECT COALESCE(MAX(sequence), 0) + 1 '
+            'FROM inventory_block_metadata_events WHERE block_id = ?',
+            [metadata.blockId],
+          ),
+        ) ??
+        1;
+    await executor.insert('inventory_block_metadata_events', {
+      'id': id,
+      'block_id': metadata.blockId,
+      'project_id': metadata.projectId,
+      'sequence': sequence,
+      'event_type': eventType.storageValue,
+      'occurred_at': occurredAt,
+      'payload_json': jsonEncode({
+        'before': before == null ? null : _blockMetadataPayload(before),
+        'after': _blockMetadataPayload(metadata),
+      }),
+    });
+  }
+
+  InventoryBlockMetadataEvent _blockMetadataEventFromRow(
+    Map<String, Object?> row,
+  ) {
+    final occurredAt = _storedTimestamp(row, 'occurred_at');
+    final payloadJson = _requiredStoredString(
+      row,
+      'payload_json',
+      corruptCode: 'inventory_block_metadata_corrupt',
+    );
+    if (jsonDecode(payloadJson) is! Map<String, Object?>) {
+      throw const InventoryFailure('inventory_block_metadata_corrupt');
+    }
+    return InventoryBlockMetadataEvent(
+      id: _requiredStoredUuid(
+        row,
+        'id',
+        corruptCode: 'inventory_block_metadata_corrupt',
+      ),
+      blockId: _requiredStoredUuid(
+        row,
+        'block_id',
+        corruptCode: 'inventory_block_metadata_corrupt',
+      ),
+      projectId: _requiredStoredString(
+        row,
+        'project_id',
+        corruptCode: 'inventory_block_metadata_corrupt',
+      ),
+      sequence: _requiredPositiveStoredInt(
+        row,
+        'sequence',
+        corruptCode: 'inventory_block_metadata_corrupt',
+      ),
+      eventType: InventoryBlockMetadataEventType.fromStorage(
+        _requiredStoredString(
+          row,
+          'event_type',
+          corruptCode: 'inventory_block_metadata_corrupt',
+        ),
+      ),
+      occurredAt: occurredAt,
+      payloadJson: payloadJson,
     );
   }
 

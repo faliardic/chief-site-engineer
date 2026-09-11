@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 24;
+  static const schemaVersion = 25;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2908,6 +2908,10 @@ class AppDatabase {
     ),
     DatabaseMigration(version: 23, apply: _applyProjectProfileMigration),
     DatabaseMigration(version: 24, apply: _applyProjectFoundationMigration),
+    DatabaseMigration(
+      version: 25,
+      apply: _applyBlockLocationFoundationMigration,
+    ),
   ];
 
   final String path;
@@ -3314,6 +3318,272 @@ Future<void> _applyProjectFoundationMigration(Transaction transaction) async {
     BEFORE DELETE ON project_party_assignment_events
     BEGIN
       SELECT RAISE(ABORT, 'append-only event history');
+    END
+  ''');
+}
+
+Future<void> _applyBlockLocationFoundationMigration(
+  Transaction transaction,
+) async {
+  await transaction.execute('''
+    CREATE TABLE inventory_block_metadata (
+      block_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      basement_count INTEGER CHECK (
+        basement_count IS NULL OR basement_count BETWEEN 0 AND 1000
+      ),
+      basement_classification TEXT CHECK (
+        basement_classification IS NULL OR (
+          length(basement_classification) BETWEEN 1 AND 80
+          AND basement_classification = trim(basement_classification)
+        )
+      ),
+      total_area REAL CHECK (total_area IS NULL OR total_area > 0),
+      total_area_unit TEXT CHECK (
+        total_area_unit IS NULL OR (
+          length(total_area_unit) BETWEEN 1 AND 20
+          AND total_area_unit = trim(total_area_unit)
+        )
+      ),
+      footprint_area REAL CHECK (
+        footprint_area IS NULL OR footprint_area > 0
+      ),
+      footprint_area_unit TEXT CHECK (
+        footprint_area_unit IS NULL OR (
+          length(footprint_area_unit) BETWEEN 1 AND 20
+          AND footprint_area_unit = trim(footprint_area_unit)
+        )
+      ),
+      independent_unit_count INTEGER CHECK (
+        independent_unit_count IS NULL
+        OR independent_unit_count BETWEEN 0 AND 1000000
+      ),
+      usage_type TEXT CHECK (
+        usage_type IS NULL OR (
+          length(usage_type) BETWEEN 1 AND 120
+          AND usage_type = trim(usage_type)
+        )
+      ),
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (block_id, project_id),
+      FOREIGN KEY (block_id, project_id)
+        REFERENCES inventory_blocks(id, project_id),
+      CHECK ((total_area IS NULL) = (total_area_unit IS NULL)),
+      CHECK ((footprint_area IS NULL) = (footprint_area_unit IS NULL)),
+      CHECK (updated_at >= created_at)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE inventory_block_metadata_events (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      block_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (event_type IN (
+        'inventory.block_metadata_created',
+        'inventory.block_metadata_updated'
+      )),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
+      UNIQUE (block_id, sequence),
+      FOREIGN KEY (block_id, project_id)
+        REFERENCES inventory_block_metadata(block_id, project_id)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_floor_location_relations (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      floor_id TEXT NOT NULL,
+      location_id TEXT NOT NULL,
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE (id, project_id),
+      FOREIGN KEY (floor_id, project_id)
+        REFERENCES inventory_floors(id, project_id),
+      FOREIGN KEY (location_id, project_id)
+        REFERENCES project_locations(id, project_id),
+      CHECK (updated_at >= created_at),
+      CHECK (archived_at IS NULL OR archived_at = updated_at)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_floor_location_relation_events (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      relation_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (event_type IN (
+        'floor_location.assigned',
+        'floor_location.replaced',
+        'floor_location.removed'
+      )),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
+      UNIQUE (relation_id, sequence),
+      FOREIGN KEY (relation_id, project_id)
+        REFERENCES project_floor_location_relations(id, project_id)
+    )
+  ''');
+
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_block_metadata_project
+    ON inventory_block_metadata(project_id, block_id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_block_metadata_events_block
+    ON inventory_block_metadata_events(block_id, sequence, id)
+  ''');
+  await transaction.execute('''
+    CREATE UNIQUE INDEX ux_floor_location_relations_active_location
+    ON project_floor_location_relations(project_id, location_id)
+    WHERE archived_at IS NULL
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_floor_location_relations_project_floor
+    ON project_floor_location_relations(
+      project_id, floor_id, archived_at, location_id, id
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_floor_location_relation_events_relation
+    ON project_floor_location_relation_events(relation_id, sequence, id)
+  ''');
+
+  await transaction.execute('''
+    CREATE TRIGGER inventory_block_metadata_guarded_update
+    BEFORE UPDATE ON inventory_block_metadata
+    BEGIN
+      SELECT CASE
+        WHEN NEW.block_id != OLD.block_id OR NEW.project_id != OLD.project_id
+          OR NEW.created_at != OLD.created_at
+        THEN RAISE(ABORT, 'inventory block metadata identity is immutable')
+      END;
+      SELECT CASE
+        WHEN NEW.revision != OLD.revision + 1
+          OR NEW.updated_at < OLD.updated_at
+        THEN RAISE(ABORT, 'inventory block metadata revision mismatch')
+      END;
+      SELECT CASE
+        WHEN NEW.basement_count IS OLD.basement_count
+          AND NEW.basement_classification IS OLD.basement_classification
+          AND NEW.total_area IS OLD.total_area
+          AND NEW.total_area_unit IS OLD.total_area_unit
+          AND NEW.footprint_area IS OLD.footprint_area
+          AND NEW.footprint_area_unit IS OLD.footprint_area_unit
+          AND NEW.independent_unit_count IS OLD.independent_unit_count
+          AND NEW.usage_type IS OLD.usage_type
+        THEN RAISE(ABORT, 'inventory block metadata no-op update')
+      END;
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_block_metadata_no_physical_delete
+    BEFORE DELETE ON inventory_block_metadata
+    BEGIN
+      SELECT RAISE(ABORT, 'physical delete is not allowed');
+    END
+  ''');
+  for (final operation in const ['update', 'delete']) {
+    await transaction.execute('''
+      CREATE TRIGGER inventory_block_metadata_events_append_only_$operation
+      BEFORE ${operation.toUpperCase()} ON inventory_block_metadata_events
+      BEGIN
+        SELECT RAISE(ABORT, 'append-only event history');
+      END
+    ''');
+  }
+  await transaction.execute('''
+    CREATE TRIGGER floor_location_relations_guarded_update
+    BEFORE UPDATE ON project_floor_location_relations
+    BEGIN
+      SELECT CASE
+        WHEN NEW.id != OLD.id OR NEW.project_id != OLD.project_id
+          OR NEW.location_id != OLD.location_id
+          OR NEW.created_at != OLD.created_at
+        THEN RAISE(ABORT, 'floor location relation identity is immutable')
+      END;
+      SELECT CASE
+        WHEN NEW.revision != OLD.revision + 1
+          OR NEW.updated_at < OLD.updated_at
+        THEN RAISE(ABORT, 'floor location relation revision mismatch')
+      END;
+      SELECT CASE
+        WHEN OLD.archived_at IS NOT NULL AND NEW.archived_at IS NULL
+        THEN RAISE(ABORT, 'removed floor location relation is terminal')
+      END;
+      SELECT CASE
+        WHEN NEW.floor_id = OLD.floor_id
+          AND NEW.archived_at IS OLD.archived_at
+        THEN RAISE(ABORT, 'floor location relation no-op update')
+      END;
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER floor_location_relations_no_physical_delete
+    BEFORE DELETE ON project_floor_location_relations
+    BEGIN
+      SELECT RAISE(ABORT, 'physical delete is not allowed');
+    END
+  ''');
+  for (final operation in const ['update', 'delete']) {
+    await transaction.execute('''
+      CREATE TRIGGER floor_location_relation_events_append_only_$operation
+      BEFORE ${operation.toUpperCase()}
+      ON project_floor_location_relation_events
+      BEGIN
+        SELECT RAISE(ABORT, 'append-only event history');
+      END
+    ''');
+  }
+  await transaction.execute('''
+    CREATE TRIGGER floor_location_active_location_archive_guard
+    BEFORE UPDATE OF archived_at ON project_locations
+    WHEN OLD.archived_at IS NULL AND NEW.archived_at IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM project_floor_location_relations relation
+        WHERE relation.project_id = OLD.project_id
+          AND relation.location_id = OLD.id
+          AND relation.archived_at IS NULL
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'active floor location relation must be removed');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER floor_location_active_floor_archive_guard
+    BEFORE UPDATE OF archived_at ON inventory_floors
+    WHEN OLD.archived_at IS NULL AND NEW.archived_at IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM project_floor_location_relations relation
+        WHERE relation.project_id = OLD.project_id
+          AND relation.floor_id = OLD.id
+          AND relation.archived_at IS NULL
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'active floor location relation must be removed');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER floor_location_active_block_archive_guard
+    BEFORE UPDATE OF state ON inventory_blocks
+    WHEN OLD.state != 'ARCHIVED' AND NEW.state = 'ARCHIVED'
+      AND EXISTS (
+        SELECT 1
+        FROM project_floor_location_relations relation
+        JOIN inventory_floors floor
+          ON floor.id = relation.floor_id
+          AND floor.project_id = relation.project_id
+        WHERE floor.block_id = OLD.id
+          AND relation.project_id = OLD.project_id
+          AND relation.archived_at IS NULL
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'active floor location relation must be removed');
     END
   ''');
 }

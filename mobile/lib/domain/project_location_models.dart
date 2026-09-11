@@ -121,3 +121,111 @@ class ProjectLocationEvent {
   final String occurredAt;
   final String payloadJson;
 }
+
+enum ProjectFloorLocationEventType {
+  assigned('floor_location.assigned'),
+  replaced('floor_location.replaced'),
+  removed('floor_location.removed');
+
+  const ProjectFloorLocationEventType(this.storageValue);
+
+  final String storageValue;
+
+  static ProjectFloorLocationEventType fromStorage(String value) =>
+      values.firstWhere(
+        (event) => event.storageValue == value,
+        orElse: () => throw StateError(
+          'project floor location event type is unsupported',
+        ),
+      );
+}
+
+class ProjectFloorLocationRelation {
+  const ProjectFloorLocationRelation({
+    required this.id,
+    required this.projectId,
+    required this.floorId,
+    required this.locationId,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.archivedAt,
+  });
+
+  final String id;
+  final String projectId;
+  final String floorId;
+  final String locationId;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+  final String? archivedAt;
+
+  bool get isArchived => archivedAt != null;
+}
+
+class CreateProjectFloorLocationRelationCommand {
+  const CreateProjectFloorLocationRelationCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.floorId,
+    required this.locationId,
+  });
+
+  final String id;
+  final String eventId;
+  final String projectId;
+  final String floorId;
+  final String locationId;
+}
+
+class ReplaceProjectFloorLocationRelationCommand {
+  const ReplaceProjectFloorLocationRelationCommand({
+    required this.relationId,
+    required this.eventId,
+    required this.projectId,
+    required this.expectedRevision,
+    required this.floorId,
+  });
+
+  final String relationId;
+  final String eventId;
+  final String projectId;
+  final int expectedRevision;
+  final String floorId;
+}
+
+class RemoveProjectFloorLocationRelationCommand {
+  const RemoveProjectFloorLocationRelationCommand({
+    required this.relationId,
+    required this.eventId,
+    required this.projectId,
+    required this.expectedRevision,
+  });
+
+  final String relationId;
+  final String eventId;
+  final String projectId;
+  final int expectedRevision;
+}
+
+class ProjectFloorLocationEvent {
+  const ProjectFloorLocationEvent({
+    required this.id,
+    required this.relationId,
+    required this.projectId,
+    required this.sequence,
+    required this.eventType,
+    required this.occurredAt,
+    required this.payloadJson,
+  });
+
+  final String id;
+  final String relationId;
+  final String projectId;
+  final int sequence;
+  final ProjectFloorLocationEventType eventType;
+  final String occurredAt;
+  final String payloadJson;
+}
