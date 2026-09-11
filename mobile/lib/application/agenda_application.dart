@@ -279,6 +279,39 @@ abstract interface class ProjectProfileApplication {
   Future<List<ProjectProfileEvent>> listProjectProfileEvents(String projectId);
 }
 
+abstract interface class ProjectMetadataApplication {
+  Future<ProjectMetadata> getProjectMetadata(String projectId);
+
+  Future<ProjectMetadata> saveProjectMetadata(
+    SaveProjectMetadataCommand command,
+  );
+
+  Future<List<ProjectMetadataEvent>> listProjectMetadataEvents(
+    String projectId,
+  );
+}
+
+abstract interface class ProjectPartyApplication {
+  Future<List<ProjectPartyAssignment>> listProjectPartyAssignments(
+    String projectId, {
+    bool includeArchived = false,
+  });
+
+  Future<ProjectPartyAssignment> createProjectPartyAssignment(
+    CreateProjectPartyAssignmentCommand command,
+  );
+
+  Future<ProjectPartyAssignment> replaceProjectPartyAssignment(
+    ReplaceProjectPartyAssignmentCommand command,
+  );
+
+  Future<ProjectPartyAssignment> removeProjectPartyAssignment(
+    RemoveProjectPartyAssignmentCommand command,
+  );
+
+  Future<List<ProjectPartyEvent>> listProjectPartyEvents(String assignmentId);
+}
+
 abstract interface class ReminderSourceAgendaMediaApplication {
   Future<ReminderSourceAgendaMedia> getReminderSourceAgendaMedia(
     String sourceLogId,
@@ -311,6 +344,8 @@ class SqliteAgendaApplication
         AgendaPhotoExportApplication,
         ProjectLifecycleApplication,
         ProjectProfileApplication,
+        ProjectMetadataApplication,
+        ProjectPartyApplication,
         ProjectLocationApplication,
         AttachmentCatalogHost,
         AgendaExistingAttachmentApplication,
@@ -1058,6 +1093,457 @@ class SqliteAgendaApplication
         orderBy: 'sequence ASC, id ASC',
       );
       return rows.map(_projectProfileEventFromRow).toList(growable: false);
+    });
+  }
+
+  @override
+  Future<ProjectMetadata> getProjectMetadata(String projectId) async {
+    validateUuid(projectId, 'Proje kimligi');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      final project = await _requireProjectRecord(database, projectId);
+      _requireActiveProjectRecord(project);
+      return _readProjectMetadata(database, project);
+    });
+  }
+
+  @override
+  Future<ProjectMetadata> saveProjectMetadata(
+    SaveProjectMetadataCommand command,
+  ) async {
+    validateUuid(command.eventId, 'Proje metadata event kimligi');
+    validateUuid(command.projectId, 'Proje kimligi');
+    if (command.expectedRevision < 0) {
+      throw const AgendaValidationFailure(
+        'Beklenen metadata revision degeri gecersizdir.',
+      );
+    }
+    final address = optionalTrimmed(command.address, 'Adres', maxLength: 1000);
+    final permitNumber = optionalTrimmed(
+      command.permitNumber,
+      'Ruhsat numarasi',
+      maxLength: 120,
+    );
+    final permitDate = _optionalProjectDay(command.permitDate);
+    final cadastralBlock = optionalTrimmed(
+      command.cadastralBlock,
+      'Ada',
+      maxLength: 80,
+    );
+    final cadastralParcel = optionalTrimmed(
+      command.cadastralParcel,
+      'Parsel',
+      maxLength: 80,
+    );
+    final projectStartDate = _optionalProjectDay(command.projectStartDate);
+    final targetFinishDate = _optionalProjectDay(command.targetFinishDate);
+    if (projectStartDate != null &&
+        targetFinishDate != null &&
+        targetFinishDate.compareTo(projectStartDate) < 0) {
+      throw const AgendaValidationFailure(
+        'Hedef bitis tarihi proje baslangicindan once olamaz.',
+      );
+    }
+    final usageType = optionalTrimmed(
+      command.usageType,
+      'Kullanim amaci',
+      maxLength: 160,
+    );
+    final structuralSystem = optionalTrimmed(
+      command.structuralSystem,
+      'Tasiyici sistem',
+      maxLength: 160,
+    );
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final project = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(project);
+        final current = await _readProjectMetadata(transaction, project);
+        if (current.revision != command.expectedRevision) {
+          throw const AgendaValidationFailure(
+            'Proje metadata kaydi baska bir islem tarafindan degistirilmis.',
+          );
+        }
+        final values = <String, Object?>{
+          'address': address,
+          'permit_number': permitNumber,
+          'permit_date': permitDate,
+          'cadastral_block': cadastralBlock,
+          'cadastral_parcel': cadastralParcel,
+          'project_start_date': projectStartDate,
+          'target_finish_date': targetFinishDate,
+          'usage_type': usageType,
+          'structural_system': structuralSystem,
+        };
+        if (_projectMetadataMatches(current, values)) {
+          return (metadata: current, changed: false);
+        }
+        final nextRevision = current.revision + 1;
+        if (current.revision == 0) {
+          await transaction.insert('project_metadata', {
+            'project_id': project.id,
+            ...values,
+            'revision': nextRevision,
+            'created_at': occurredAt,
+            'updated_at': occurredAt,
+          });
+        } else {
+          final changed = await transaction.update(
+            'project_metadata',
+            {...values, 'revision': nextRevision, 'updated_at': occurredAt},
+            where: 'project_id = ? AND revision = ?',
+            whereArgs: [project.id, current.revision],
+          );
+          if (changed != 1) {
+            throw const AgendaValidationFailure(
+              'Proje metadata kaydi baska bir islem tarafindan degistirilmis.',
+            );
+          }
+        }
+        final updated = await _readProjectMetadata(transaction, project);
+        await _insertProjectMetadataEvent(
+          transaction,
+          id: command.eventId,
+          projectId: project.id,
+          eventType: current.revision == 0
+              ? ProjectMetadataEventType.created
+              : ProjectMetadataEventType.updated,
+          occurredAt: occurredAt,
+          payload: {
+            'old': _projectMetadataPayload(current),
+            'new': _projectMetadataPayload(updated),
+            'revision_before': current.revision,
+            'revision_after': updated.revision,
+          },
+        );
+        return (metadata: updated, changed: true);
+      });
+    });
+    if (result.changed) _projectChanges.add(null);
+    return result.metadata;
+  }
+
+  @override
+  Future<List<ProjectMetadataEvent>> listProjectMetadataEvents(
+    String projectId,
+  ) async {
+    validateUuid(projectId, 'Proje kimligi');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      await _requireProjectRecord(database, projectId);
+      final rows = await database.query(
+        'project_metadata_events',
+        where: 'project_id = ?',
+        whereArgs: [projectId],
+        orderBy: 'sequence ASC, id ASC',
+      );
+      return rows.map(_projectMetadataEventFromRow).toList(growable: false);
+    });
+  }
+
+  @override
+  Future<List<ProjectPartyAssignment>> listProjectPartyAssignments(
+    String projectId, {
+    bool includeArchived = false,
+  }) async {
+    validateUuid(projectId, 'Proje kimligi');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      await _requireProjectRecord(database, projectId);
+      final rows = await database.query(
+        'project_party_assignments',
+        where:
+            'project_id = ?${includeArchived ? '' : ' AND archived_at IS NULL'}',
+        whereArgs: [projectId],
+        orderBy: 'role ASC, id ASC',
+      );
+      return rows.map(_projectPartyAssignmentFromRow).toList(growable: false);
+    });
+  }
+
+  @override
+  Future<ProjectPartyAssignment> createProjectPartyAssignment(
+    CreateProjectPartyAssignmentCommand command,
+  ) async {
+    validateUuid(command.id, 'Proje taraf atama kimligi');
+    validateUuid(command.eventId, 'Proje taraf event kimligi');
+    validateUuid(command.projectId, 'Proje kimligi');
+    _validateProjectPartyTargetIds(
+      role: command.role,
+      subcontractorId: command.subcontractorId,
+      workforceMemberId: command.workforceMemberId,
+    );
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final project = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(project);
+        await _requireActiveProjectPartyTarget(
+          transaction,
+          projectId: project.id,
+          role: command.role,
+          subcontractorId: command.subcontractorId,
+          workforceMemberId: command.workforceMemberId,
+        );
+        final existingRows = await transaction.query(
+          'project_party_assignments',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        if (existingRows.isNotEmpty) {
+          final existing = _projectPartyAssignmentFromRow(existingRows.single);
+          if (!existing.isArchived &&
+              existing.projectId == project.id &&
+              existing.role == command.role &&
+              existing.subcontractorId == command.subcontractorId &&
+              existing.workforceMemberId == command.workforceMemberId) {
+            return (assignment: existing, changed: false);
+          }
+          throw const AgendaValidationFailure(
+            'Proje taraf atama kimligi baska bir kayit tarafindan kullaniliyor.',
+          );
+        }
+        final activeRole = await transaction.query(
+          'project_party_assignments',
+          columns: ['id'],
+          where: 'project_id = ? AND role = ? AND archived_at IS NULL',
+          whereArgs: [project.id, command.role.storageValue],
+          limit: 1,
+        );
+        if (activeRole.isNotEmpty) {
+          throw const AgendaValidationFailure(
+            'Bu proje taraf rolu icin aktif atama zaten var.',
+          );
+        }
+        await transaction.insert('project_party_assignments', {
+          'id': command.id,
+          'project_id': project.id,
+          'role': command.role.storageValue,
+          'subcontractor_id': command.subcontractorId,
+          'workforce_member_id': command.workforceMemberId,
+          'revision': 1,
+          'created_at': occurredAt,
+          'updated_at': occurredAt,
+          'archived_at': null,
+        });
+        final assignment = await _requireProjectPartyAssignment(
+          transaction,
+          projectId: project.id,
+          assignmentId: command.id,
+        );
+        await _insertProjectPartyEvent(
+          transaction,
+          id: command.eventId,
+          assignment: assignment,
+          eventType: ProjectPartyEventType.assigned,
+          occurredAt: occurredAt,
+          payload: {
+            'role': assignment.role.storageValue,
+            'subcontractor_id': assignment.subcontractorId,
+            'workforce_member_id': assignment.workforceMemberId,
+            'revision_after': assignment.revision,
+          },
+        );
+        return (assignment: assignment, changed: true);
+      });
+    });
+    if (result.changed) _projectChanges.add(null);
+    return result.assignment;
+  }
+
+  @override
+  Future<ProjectPartyAssignment> replaceProjectPartyAssignment(
+    ReplaceProjectPartyAssignmentCommand command,
+  ) async {
+    validateUuid(command.assignmentId, 'Proje taraf atama kimligi');
+    validateUuid(command.eventId, 'Proje taraf event kimligi');
+    validateUuid(command.projectId, 'Proje kimligi');
+    _validateProjectPartyRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final project = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(project);
+        final current = await _requireProjectPartyAssignment(
+          transaction,
+          projectId: project.id,
+          assignmentId: command.assignmentId,
+          includeArchived: true,
+        );
+        if (current.revision != command.expectedRevision) {
+          throw const AgendaValidationFailure(
+            'Proje taraf atamasi baska bir islem tarafindan degistirilmis.',
+          );
+        }
+        if (current.isArchived) {
+          throw const AgendaValidationFailure(
+            'Kaldirilmis proje taraf atamasi degistirilemez.',
+          );
+        }
+        _validateProjectPartyTargetIds(
+          role: current.role,
+          subcontractorId: command.subcontractorId,
+          workforceMemberId: command.workforceMemberId,
+        );
+        await _requireActiveProjectPartyTarget(
+          transaction,
+          projectId: project.id,
+          role: current.role,
+          subcontractorId: command.subcontractorId,
+          workforceMemberId: command.workforceMemberId,
+        );
+        if (current.subcontractorId == command.subcontractorId &&
+            current.workforceMemberId == command.workforceMemberId) {
+          return (assignment: current, changed: false);
+        }
+        final changed = await transaction.update(
+          'project_party_assignments',
+          {
+            'subcontractor_id': command.subcontractorId,
+            'workforce_member_id': command.workforceMemberId,
+            'revision': current.revision + 1,
+            'updated_at': occurredAt,
+          },
+          where:
+              'id = ? AND project_id = ? AND revision = ? '
+              'AND archived_at IS NULL',
+          whereArgs: [current.id, project.id, current.revision],
+        );
+        if (changed != 1) {
+          throw const AgendaValidationFailure(
+            'Proje taraf atamasi baska bir islem tarafindan degistirilmis.',
+          );
+        }
+        final updated = await _requireProjectPartyAssignment(
+          transaction,
+          projectId: project.id,
+          assignmentId: current.id,
+        );
+        await _insertProjectPartyEvent(
+          transaction,
+          id: command.eventId,
+          assignment: updated,
+          eventType: ProjectPartyEventType.replaced,
+          occurredAt: occurredAt,
+          payload: {
+            'old_subcontractor_id': current.subcontractorId,
+            'new_subcontractor_id': updated.subcontractorId,
+            'old_workforce_member_id': current.workforceMemberId,
+            'new_workforce_member_id': updated.workforceMemberId,
+            'revision_before': current.revision,
+            'revision_after': updated.revision,
+          },
+        );
+        return (assignment: updated, changed: true);
+      });
+    });
+    if (result.changed) _projectChanges.add(null);
+    return result.assignment;
+  }
+
+  @override
+  Future<ProjectPartyAssignment> removeProjectPartyAssignment(
+    RemoveProjectPartyAssignmentCommand command,
+  ) async {
+    validateUuid(command.assignmentId, 'Proje taraf atama kimligi');
+    validateUuid(command.eventId, 'Proje taraf event kimligi');
+    validateUuid(command.projectId, 'Proje kimligi');
+    _validateProjectPartyRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final project = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(project);
+        final current = await _requireProjectPartyAssignment(
+          transaction,
+          projectId: project.id,
+          assignmentId: command.assignmentId,
+          includeArchived: true,
+        );
+        if (current.revision != command.expectedRevision) {
+          throw const AgendaValidationFailure(
+            'Proje taraf atamasi baska bir islem tarafindan degistirilmis.',
+          );
+        }
+        if (current.isArchived) {
+          return (assignment: current, changed: false);
+        }
+        final changed = await transaction.update(
+          'project_party_assignments',
+          {
+            'archived_at': occurredAt,
+            'updated_at': occurredAt,
+            'revision': current.revision + 1,
+          },
+          where:
+              'id = ? AND project_id = ? AND revision = ? '
+              'AND archived_at IS NULL',
+          whereArgs: [current.id, project.id, current.revision],
+        );
+        if (changed != 1) {
+          throw const AgendaValidationFailure(
+            'Proje taraf atamasi baska bir islem tarafindan degistirilmis.',
+          );
+        }
+        final updated = await _requireProjectPartyAssignment(
+          transaction,
+          projectId: project.id,
+          assignmentId: current.id,
+          includeArchived: true,
+        );
+        await _insertProjectPartyEvent(
+          transaction,
+          id: command.eventId,
+          assignment: updated,
+          eventType: ProjectPartyEventType.removed,
+          occurredAt: occurredAt,
+          payload: {
+            'subcontractor_id': current.subcontractorId,
+            'workforce_member_id': current.workforceMemberId,
+            'revision_before': current.revision,
+            'revision_after': updated.revision,
+          },
+        );
+        return (assignment: updated, changed: true);
+      });
+    });
+    if (result.changed) _projectChanges.add(null);
+    return result.assignment;
+  }
+
+  @override
+  Future<List<ProjectPartyEvent>> listProjectPartyEvents(
+    String assignmentId,
+  ) async {
+    validateUuid(assignmentId, 'Proje taraf atama kimligi');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      await _requireProjectPartyAssignmentById(database, assignmentId);
+      final rows = await database.query(
+        'project_party_assignment_events',
+        where: 'assignment_id = ?',
+        whereArgs: [assignmentId],
+        orderBy: 'sequence ASC, id ASC',
+      );
+      return rows.map(_projectPartyEventFromRow).toList(growable: false);
     });
   }
 
@@ -5605,6 +6091,225 @@ Future<void> _insertProjectEvent(
   });
 }
 
+String? _optionalProjectDay(String? value) {
+  final normalized = optionalTrimmed(value, 'Proje tarihi', maxLength: 10);
+  if (normalized == null) return null;
+  try {
+    return CseTimeCodec.validateIstanbulDay(normalized);
+  } on TimeContractViolation {
+    throw const AgendaValidationFailure(
+      'Proje tarihi YYYY-MM-DD biciminde gecerli bir gun olmalidir.',
+    );
+  }
+}
+
+Future<ProjectMetadata> _readProjectMetadata(
+  DatabaseExecutor database,
+  MobileProject project,
+) async {
+  final rows = await database.query(
+    'project_metadata',
+    where: 'project_id = ?',
+    whereArgs: [project.id],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    return ProjectMetadata(
+      projectId: project.id,
+      revision: 0,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+    );
+  }
+  return _projectMetadataFromRow(rows.single);
+}
+
+bool _projectMetadataMatches(
+  ProjectMetadata metadata,
+  Map<String, Object?> values,
+) =>
+    metadata.address == values['address'] &&
+    metadata.permitNumber == values['permit_number'] &&
+    metadata.permitDate == values['permit_date'] &&
+    metadata.cadastralBlock == values['cadastral_block'] &&
+    metadata.cadastralParcel == values['cadastral_parcel'] &&
+    metadata.projectStartDate == values['project_start_date'] &&
+    metadata.targetFinishDate == values['target_finish_date'] &&
+    metadata.usageType == values['usage_type'] &&
+    metadata.structuralSystem == values['structural_system'];
+
+Map<String, Object?> _projectMetadataPayload(ProjectMetadata metadata) => {
+  'address': metadata.address,
+  'permit_number': metadata.permitNumber,
+  'permit_date': metadata.permitDate,
+  'cadastral_block': metadata.cadastralBlock,
+  'cadastral_parcel': metadata.cadastralParcel,
+  'project_start_date': metadata.projectStartDate,
+  'target_finish_date': metadata.targetFinishDate,
+  'usage_type': metadata.usageType,
+  'structural_system': metadata.structuralSystem,
+};
+
+Future<void> _insertProjectMetadataEvent(
+  DatabaseExecutor database, {
+  required String id,
+  required String projectId,
+  required ProjectMetadataEventType eventType,
+  required String occurredAt,
+  required Map<String, Object?> payload,
+}) async {
+  final sequence =
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          '''
+            SELECT COALESCE(MAX(sequence), 0) + 1
+            FROM project_metadata_events
+            WHERE project_id = ?
+          ''',
+          [projectId],
+        ),
+      ) ??
+      1;
+  await database.insert('project_metadata_events', {
+    'id': id,
+    'project_id': projectId,
+    'sequence': sequence,
+    'event_type': eventType.storageValue,
+    'occurred_at': occurredAt,
+    'payload_json': jsonEncode(payload),
+  });
+}
+
+void _validateProjectPartyTargetIds({
+  required ProjectPartyRole role,
+  required String? subcontractorId,
+  required String? workforceMemberId,
+}) {
+  if (role.usesCompany) {
+    if (subcontractorId == null || workforceMemberId != null) {
+      throw const AgendaValidationFailure(
+        'Firma rolu yalniz bir firma kimligi gerektirir.',
+      );
+    }
+    validateUuid(subcontractorId, 'Firma kimligi');
+    return;
+  }
+  if (workforceMemberId == null || subcontractorId != null) {
+    throw const AgendaValidationFailure(
+      'Santiye sefi rolu yalniz bir personel kimligi gerektirir.',
+    );
+  }
+  validateUuid(workforceMemberId, 'Personel kimligi');
+}
+
+Future<void> _requireActiveProjectPartyTarget(
+  DatabaseExecutor database, {
+  required String projectId,
+  required ProjectPartyRole role,
+  required String? subcontractorId,
+  required String? workforceMemberId,
+}) async {
+  final rows = role.usesCompany
+      ? await database.query(
+          'subcontractors',
+          columns: ['id'],
+          where:
+              'id = ? AND project_id = ? AND status = ? '
+              'AND archived_at IS NULL',
+          whereArgs: [subcontractorId, projectId, 'active'],
+          limit: 1,
+        )
+      : await database.query(
+          'workforce_members',
+          columns: ['id'],
+          where:
+              'id = ? AND project_id = ? AND is_active = 1 '
+              'AND archived_at IS NULL',
+          whereArgs: [workforceMemberId, projectId],
+          limit: 1,
+        );
+  if (rows.isEmpty) {
+    throw const AgendaValidationFailure(
+      'Proje tarafi hedefi aktif ve ayni projeye ait olmalidir.',
+    );
+  }
+}
+
+void _validateProjectPartyRevision(int revision) {
+  if (revision < 1) {
+    throw const AgendaValidationFailure(
+      'Beklenen proje taraf revision degeri gecersizdir.',
+    );
+  }
+}
+
+Future<ProjectPartyAssignment> _requireProjectPartyAssignment(
+  DatabaseExecutor database, {
+  required String projectId,
+  required String assignmentId,
+  bool includeArchived = false,
+}) async {
+  final rows = await database.query(
+    'project_party_assignments',
+    where:
+        'id = ? AND project_id = ?'
+        '${includeArchived ? '' : ' AND archived_at IS NULL'}',
+    whereArgs: [assignmentId, projectId],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    throw const AgendaValidationFailure('Proje taraf atamasi bulunamadi.');
+  }
+  return _projectPartyAssignmentFromRow(rows.single);
+}
+
+Future<ProjectPartyAssignment> _requireProjectPartyAssignmentById(
+  DatabaseExecutor database,
+  String assignmentId,
+) async {
+  final rows = await database.query(
+    'project_party_assignments',
+    where: 'id = ?',
+    whereArgs: [assignmentId],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    throw const AgendaValidationFailure('Proje taraf atamasi bulunamadi.');
+  }
+  return _projectPartyAssignmentFromRow(rows.single);
+}
+
+Future<void> _insertProjectPartyEvent(
+  DatabaseExecutor database, {
+  required String id,
+  required ProjectPartyAssignment assignment,
+  required ProjectPartyEventType eventType,
+  required String occurredAt,
+  required Map<String, Object?> payload,
+}) async {
+  final sequence =
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          '''
+            SELECT COALESCE(MAX(sequence), 0) + 1
+            FROM project_party_assignment_events
+            WHERE assignment_id = ?
+          ''',
+          [assignment.id],
+        ),
+      ) ??
+      1;
+  await database.insert('project_party_assignment_events', {
+    'id': id,
+    'assignment_id': assignment.id,
+    'project_id': assignment.projectId,
+    'sequence': sequence,
+    'event_type': eventType.storageValue,
+    'occurred_at': occurredAt,
+    'payload_json': jsonEncode(payload),
+  });
+}
+
 String _projectProfileValue(String value) {
   final normalized = value.trim();
   if (normalized.length > 4000) {
@@ -6145,6 +6850,91 @@ MobileProject _projectFromRow(Map<String, Object?> row) {
     updatedAt: updatedAt,
     revision: revision,
     archivedAt: archivedAt,
+  );
+}
+
+ProjectMetadata _projectMetadataFromRow(Map<String, Object?> row) {
+  final createdAt = row['created_at']! as String;
+  final updatedAt = row['updated_at']! as String;
+  validateCanonicalTimestamp(createdAt, 'Proje metadata olusturma zamani');
+  validateCanonicalTimestamp(updatedAt, 'Proje metadata guncelleme zamani');
+  return ProjectMetadata(
+    projectId: row['project_id']! as String,
+    address: row['address'] as String?,
+    permitNumber: row['permit_number'] as String?,
+    permitDate: row['permit_date'] as String?,
+    cadastralBlock: row['cadastral_block'] as String?,
+    cadastralParcel: row['cadastral_parcel'] as String?,
+    projectStartDate: row['project_start_date'] as String?,
+    targetFinishDate: row['target_finish_date'] as String?,
+    usageType: row['usage_type'] as String?,
+    structuralSystem: row['structural_system'] as String?,
+    revision: row['revision']! as int,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
+}
+
+ProjectMetadataEvent _projectMetadataEventFromRow(Map<String, Object?> row) {
+  final occurredAt = row['occurred_at']! as String;
+  validateCanonicalTimestamp(occurredAt, 'Proje metadata event zamani');
+  final eventType = ProjectMetadataEventType.values.firstWhere(
+    (event) => event.storageValue == row['event_type'],
+    orElse: () => throw const AgendaValidationFailure(
+      'Proje metadata event turu desteklenmiyor.',
+    ),
+  );
+  return ProjectMetadataEvent(
+    id: row['id']! as String,
+    projectId: row['project_id']! as String,
+    sequence: row['sequence']! as int,
+    eventType: eventType,
+    occurredAt: occurredAt,
+    payloadJson: row['payload_json']! as String,
+  );
+}
+
+ProjectPartyAssignment _projectPartyAssignmentFromRow(
+  Map<String, Object?> row,
+) {
+  final createdAt = row['created_at']! as String;
+  final updatedAt = row['updated_at']! as String;
+  final archivedAt = row['archived_at'] as String?;
+  validateCanonicalTimestamp(createdAt, 'Proje taraf olusturma zamani');
+  validateCanonicalTimestamp(updatedAt, 'Proje taraf guncelleme zamani');
+  if (archivedAt != null) {
+    validateCanonicalTimestamp(archivedAt, 'Proje taraf kaldirma zamani');
+  }
+  return ProjectPartyAssignment(
+    id: row['id']! as String,
+    projectId: row['project_id']! as String,
+    role: ProjectPartyRole.fromStorage(row['role']! as String),
+    subcontractorId: row['subcontractor_id'] as String?,
+    workforceMemberId: row['workforce_member_id'] as String?,
+    revision: row['revision']! as int,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    archivedAt: archivedAt,
+  );
+}
+
+ProjectPartyEvent _projectPartyEventFromRow(Map<String, Object?> row) {
+  final occurredAt = row['occurred_at']! as String;
+  validateCanonicalTimestamp(occurredAt, 'Proje taraf event zamani');
+  final eventType = ProjectPartyEventType.values.firstWhere(
+    (event) => event.storageValue == row['event_type'],
+    orElse: () => throw const AgendaValidationFailure(
+      'Proje taraf event turu desteklenmiyor.',
+    ),
+  );
+  return ProjectPartyEvent(
+    id: row['id']! as String,
+    assignmentId: row['assignment_id']! as String,
+    projectId: row['project_id']! as String,
+    sequence: row['sequence']! as int,
+    eventType: eventType,
+    occurredAt: occurredAt,
+    payloadJson: row['payload_json']! as String,
   );
 }
 

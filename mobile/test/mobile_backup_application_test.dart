@@ -373,6 +373,46 @@ void main() {
       );
       final technicalId = workforceTechnicalTeamId(project, firm);
       expect(member.teamId, technicalId);
+      await agenda.saveProjectMetadata(
+        const SaveProjectMetadataCommand(
+          eventId: 'dddddddd-dddd-4ddd-8ddd-dddddddd0101',
+          projectId: project,
+          expectedRevision: 0,
+          address: 'Ankara Caddesi 1',
+          permitNumber: 'R-2026-1',
+          projectStartDate: '2026-07-01',
+          targetFinishDate: '2027-07-01',
+        ),
+      );
+      await agenda.createProjectPartyAssignment(
+        const CreateProjectPartyAssignmentCommand(
+          id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0101',
+          eventId: 'dddddddd-dddd-4ddd-8ddd-dddddddd0102',
+          projectId: project,
+          role: ProjectPartyRole.employer,
+          subcontractorId: firm,
+        ),
+      );
+      await agenda.createProjectPartyAssignment(
+        CreateProjectPartyAssignmentCommand(
+          id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeee0102',
+          eventId: 'dddddddd-dddd-4ddd-8ddd-dddddddd0103',
+          projectId: project,
+          role: ProjectPartyRole.siteChief,
+          workforceMemberId: member.id,
+        ),
+      );
+      final foundationSource = await _openRaw(directories);
+      final foundationBefore = <String, List<Map<String, Object?>>>{
+        for (final table in const [
+          'project_metadata',
+          'project_metadata_events',
+          'project_party_assignments',
+          'project_party_assignment_events',
+        ])
+          table: await foundationSource.query(table, orderBy: 'rowid ASC'),
+      };
+      await foundationSource.close();
 
       final backup = _application(directories, gateway: gateway);
       final created = await backup.createBackup(
@@ -408,6 +448,13 @@ void main() {
       expect(restoredMembers.single.teamId, technicalId);
       expect(await attendance.listTeams(project), isEmpty);
       final raw = await _openRaw(directories);
+      for (final entry in foundationBefore.entries) {
+        expect(
+          await raw.query(entry.key, orderBy: 'rowid ASC'),
+          entry.value,
+          reason: entry.key,
+        );
+      }
       expect(await raw.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       expect(
         Sqflite.firstIntValue(
@@ -608,7 +655,7 @@ void main() {
     },
   );
 
-  test('current database smoke requires every schema 23 table', () async {
+  test('current database smoke requires every schema 24 table', () async {
     final raw = await _openRaw(directories);
     await raw.execute('DROP TABLE inventory_events');
     await raw.close();
@@ -628,7 +675,7 @@ void main() {
   test(
     'format 1 backup restores populated Inventory with exact replayable truth',
     () async {
-      expect(AppDatabase.schemaVersion, 23);
+      expect(AppDatabase.schemaVersion, 24);
       final fixture = await _seedPopulatedInventory(
         directories,
         attachmentGateway: _inventoryPhotoGateway(directories),
@@ -1195,6 +1242,79 @@ void main() {
     },
   );
 
+  test('format 1 schema 23 backup migrates to schema 24', () async {
+    final legacyRoot = await Directory.systemTemp.createTemp('cse_schema23_');
+    addTearDown(() async {
+      if (await legacyRoot.exists()) await legacyRoot.delete(recursive: true);
+    });
+    final legacyFile = path.join(legacyRoot.path, 'schema23.sqlite3');
+    final legacy = AppDatabase(
+      path: legacyFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.parse(_now),
+      migrations: AppDatabase.foundationMigrations.take(23).toList(),
+    );
+    await legacy.open();
+    await SmokeRecordRepository(
+      database: legacy,
+      clock: () => DateTime.parse(_now),
+    ).ensureFoundationRecord();
+    await legacy.database.insert('projects', {
+      'id': 'schema23-project',
+      'name': 'Schema 23 legacy proje',
+      'created_at': _now,
+      'updated_at': _now,
+      'revision': 1,
+    });
+    await legacy.close();
+    final databaseBytes = await File(legacyFile).readAsBytes();
+    final archive = const CseBackupArchiveCodec().encode(
+      manifest: _manifest(databaseBytes, schemaVersion: 23),
+      databaseBytes: databaseBytes,
+      attachments: const {},
+    );
+    final package = File(path.join(legacyRoot.path, 'schema23.csebackup'));
+    await package.writeAsBytes(
+      await _testEncryptionCodec().encrypt(archive, _password),
+      flush: true,
+    );
+    final imported = await _stageIncomingPackage(directories, package);
+    final application = _application(directories, gateway: gateway);
+    final preflight = await application.preflightBackup(imported, _password);
+    expect(preflight.manifest.mobileSchemaVersion, 23);
+    expect(preflight.migratedSchemaVersion, 24);
+    await application.restoreBackup(
+      RestoreMobileBackupCommand(
+        package: imported,
+        password: _password,
+        expectedPackageSha256: preflight.packageSha256,
+      ),
+    );
+    final restored = await _openRaw(directories);
+    expect(
+      Sqflite.firstIntValue(await restored.rawQuery('PRAGMA user_version')),
+      24,
+    );
+    expect(
+      (await restored.query(
+        'projects',
+        where: 'id = ?',
+        whereArgs: ['schema23-project'],
+      )).single['name'],
+      'Schema 23 legacy proje',
+    );
+    for (final table in const [
+      'project_metadata',
+      'project_metadata_events',
+      'project_party_assignments',
+      'project_party_assignment_events',
+    ]) {
+      expect(await restored.query(table), isEmpty, reason: table);
+    }
+    expect(await restored.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+    await restored.close();
+  });
+
   test(
     'format 1 current schema backup restores dependency graph progress history receipt and origin',
     () async {
@@ -1697,6 +1817,10 @@ void main() {
         'DROP TRIGGER agenda_phone_call_contexts_source_category_update',
       );
       for (final table in const [
+        'project_party_assignment_events',
+        'project_party_assignments',
+        'project_metadata_events',
+        'project_metadata',
         'project_profile_events',
         'project_profile_fields',
         'inventory_sketch_revision_spatial_drafts',

@@ -91,7 +91,7 @@ void main() {
   });
 
   test(
-    'fresh database creates exact schema 23 Inventory tables and indices',
+    'fresh database creates exact schema 24 Inventory tables and indices',
     () async {
       final database = _database(databasePath);
       await database.open();
@@ -99,7 +99,7 @@ void main() {
 
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        23,
+        AppDatabase.schemaVersion,
       );
       expect(
         (await db.query(
@@ -107,7 +107,7 @@ void main() {
           columns: ['version'],
           orderBy: 'version ASC',
         )).map((row) => row['version']),
-        List.generate(23, (index) => index + 1),
+        List.generate(AppDatabase.schemaVersion, (index) => index + 1),
       );
       expect(
         await _objectNames(db, type: 'table', prefix: 'inventory_'),
@@ -147,22 +147,26 @@ void main() {
       await upgraded.open();
       final db = upgraded.database;
       final currentObjects = await _existingObjects(db);
-      const profileTables = {
+      const postInventoryTables = {
         'project_profile_fields',
         'project_profile_events',
+        'project_metadata',
+        'project_metadata_events',
+        'project_party_assignments',
+        'project_party_assignment_events',
       };
-      final profileObjects = currentObjects
-          .where((object) => profileTables.contains(object['tbl_name']))
+      final postInventoryObjects = currentObjects
+          .where((object) => postInventoryTables.contains(object['tbl_name']))
           .toList();
       final afterObjects = currentObjects
-          .where((object) => !profileTables.contains(object['tbl_name']))
+          .where((object) => !postInventoryTables.contains(object['tbl_name']))
           .toList();
       final afterRows = await _representativeRows(db);
 
-      // Schema 23 adds only these profile objects outside Inventory. Every
+      // Schemas 23 and 24 add only these project objects outside Inventory. Every
       // pre-existing object's SQL and every representative row stay exact.
       expect(
-        profileObjects.map((object) => object['name']),
+        postInventoryObjects.map((object) => object['name']),
         unorderedEquals(const [
           'project_profile_fields',
           'project_profile_events',
@@ -173,13 +177,29 @@ void main() {
           'project_profile_fields_no_physical_delete',
           'project_profile_events_append_only_update',
           'project_profile_events_append_only_delete',
+          'project_metadata',
+          'project_metadata_events',
+          'project_party_assignments',
+          'project_party_assignment_events',
+          'ix_project_metadata_events_project',
+          'ux_project_party_assignments_active_role',
+          'ix_project_party_assignments_project',
+          'ix_project_party_assignment_events_assignment',
+          'project_metadata_identity_immutable',
+          'project_metadata_no_physical_delete',
+          'project_metadata_events_append_only_update',
+          'project_metadata_events_append_only_delete',
+          'project_party_assignments_identity_immutable',
+          'project_party_assignments_no_physical_delete',
+          'project_party_assignment_events_append_only_update',
+          'project_party_assignment_events_append_only_delete',
         ]),
       );
       expect(afterObjects, beforeObjects);
       expect(afterRows, beforeRows);
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        23,
+        AppDatabase.schemaVersion,
       );
       for (final table in _inventoryTables) {
         expect(await db.query(table), isEmpty, reason: table);
@@ -248,7 +268,7 @@ void main() {
       expect(await _inventoryV20Snapshot(db), before);
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        23,
+        AppDatabase.schemaVersion,
       );
       final blocks = await db.query('inventory_blocks');
       final floors = await db.query('inventory_floors');
@@ -328,7 +348,7 @@ void main() {
         sqflite.Sqflite.firstIntValue(
           await upgraded.database.rawQuery('PRAGMA user_version'),
         ),
-        23,
+        AppDatabase.schemaVersion,
       );
       expect(await _finalInventorySnapshot(upgraded.database), rowsBefore);
       expect(await _inventorySchemaObjects(upgraded.database), objectsBefore);
@@ -374,7 +394,7 @@ void main() {
       final db = upgraded.database;
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        23,
+        AppDatabase.schemaVersion,
       );
       expect(await _supersededPreservedSnapshot(db), preservedBefore);
       expect(
@@ -626,7 +646,7 @@ void main() {
   );
 
   test(
-    'schema 23 fails closed and retains one valid populated graph',
+    'schema 24 fails closed and retains one valid populated graph',
     () async {
       final database = _database(databasePath);
       await database.open();
