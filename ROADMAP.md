@@ -494,9 +494,11 @@ Mevcut değerler edit sırasında korunur; kapalı `Diğer` bölümü existing d
 ### Q05 — Ana Sayfa / Proje Profili genişletme
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi — `Ana Sayfa / Proje Profili` başlığı  
-**Durum:** `QUEUED`
+**Durum:** `OWNER-DEFERRED — FUTURE OWNER PRODUCT/UX DECISION REQUIRED`
 
 Amaç; Ana Sayfa'yı menü veya dar özet olmaktan çıkarıp aktif projenin okunabilir profili ve günlük saha kontrol yüzeyi haline getirmektir. Uygulama tek büyük PR olarak yapılmaz; aşağıdaki AP dilimleri current model audit'i ve risk düzeyine göre ayrı child'lara bölünebilir.
+
+**Güncel disposition:** Birleşmiş #766/#767 proje metadata + party-role ve #768/#769 blok metadata + Floor↔Mahal relation çalışmaları tamamlanmış kanonik Q05 temelleri olarak korunur. Buna karşılık #770, owner'ın mevcut Dashboard/Profile UI yönünü kabul etmemesi nedeniyle `not_planned` kapatılmıştır; yayımlanmamış yerel #770 snapshot'ı kanonik ürün gerçeği değildir. Aşağıdaki Dashboard/Profile UI tamamlama işi, gelecekte açık bir owner ürün kararı ve yeniden tasarım yetkisi verilene kadar yeniden başlatılamaz ve ilk pilot öncesinde aktif blocker sayılmaz.
 
 #### AP-01 — Mevcut proje veri modelini denetle
 
@@ -602,9 +604,9 @@ Dashboard hâlâ canlı proje kontrol merkezi olmalı; bakım/form yoğunluğu g
 - ilk proje oluşturma onlarca zorunlu alana dönüşmez;
 - schema/stable identity/persistence değişikliği gerekiyorsa ayrı CRITICAL yetki olmadan yapılmaz.
 
-#### Q04 + Q05 sonrası ilk multi-feature pilot sıra kapısı
+#### Q05 owner disposition sonrası ilk multi-feature pilot geçişi
 
-Q04 ve Q05 current GitHub gerçeğine göre disposition edilip gerekli kapıları kapanmadan ilk gerçek `MULTI_FEATURE_PARALLEL` pilotu aktive edilmez. Bu gate sonrasında owner-approved ilk pilot roster'ı ve parent ilişki sınıfları şöyledir:
+Q04'ün tamamlanmış current GitHub disposition'ı ve Q05 Dashboard/Profile UI'ın yukarıdaki owner-deferred disposition'ı sonrasında, bu ROADMAP truth-sync'i merge edildiğinde sıradaki yürütülebilir geçiş Issue #760 altındaki ilk gerçek `MULTI_FEATURE_PARALLEL` pilotunun ayrı aktivasyonudur. Owner-approved ilk pilot roster'ı ve parent ilişki sınıfları şöyledir:
 
 | Queue maddesi | Parent ilişkisi |
 | --- | --- |
@@ -612,7 +614,7 @@ Q04 ve Q05 current GitHub gerçeğine göre disposition edilip gerekli kapılar�
 | Q07 — KKD hızlı seçim | `COORDINATION_REQUIRED` |
 | Q09 — Malzemeler ortak UI/UX sistem uyumu | `INDEPENDENT` |
 
-Parent coordination authority Issue #760'tır. Bu ROADMAP kaydı yalnız kanonik yürütme sırasını gösterir; parent lock, feature roster durumu veya çalışma kanıtı tutmaz ve kendi başına pilotu aktive etmez. Q08, bu üçlü pilotin ardından yürütülür.
+Parent coordination authority Issue #760'tır. Bu ROADMAP kaydı yalnız kanonik yürütme sırasını gösterir; parent lock, feature roster durumu veya çalışma kanıtı tutmaz ve kendi başına pilotu ya da production child'ları aktive etmez. Truth-sync merge'inden sonra current master yeniden okunur ve exact parent/feature lock'ları ayrı yetkiyle oluşturulur. Q08, bu üçlü pilotin ardından yürütülür.
 
 ### Q06 — Envanter / Kroki hedefli interaction refinement
 
