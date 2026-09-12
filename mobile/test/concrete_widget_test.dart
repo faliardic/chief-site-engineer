@@ -916,6 +916,181 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'pour edit preserves immutable snapshots and round-trips every field once',
+    (tester) async {
+      final concrete = _FakeConcrete(delayFieldUpdate: true);
+      final pour = _editablePour();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ConcretePourFormPage(concrete: concrete, initialPour: pour),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(pour.projectName), findsOneWidget);
+      expect(find.text(pour.pourCode), findsOneWidget);
+      expect(find.text(pour.concreteClass), findsOneWidget);
+      expect(find.text('19.07.2026 12:00'), findsOneWidget);
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: find.byKey(const Key('concrete-pour-code')),
+                matching: find.byType(EditableText),
+              ),
+            )
+            .readOnly,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: find.byKey(const Key('concrete-class-read-only')),
+                matching: find.byType(EditableText),
+              ),
+            )
+            .readOnly,
+        isTrue,
+      );
+
+      final save = find.widgetWithText(FilledButton, 'Beton paketini kaydet');
+      final formScrollable = find
+          .descendant(
+            of: find.byType(ListView).first,
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(save, 500, scrollable: formScrollable);
+      final onPressed = tester.widget<FilledButton>(save).onPressed!;
+      onPressed();
+      onPressed();
+      await tester.pump();
+      expect(concrete.fieldUpdateCalls, 1);
+      concrete.completeFieldUpdate();
+      await tester.pumpAndSettle();
+
+      final command = concrete.lastUpdateCommand!;
+      expect(command.id, pour.id);
+      expect(command.expectedRevision, 7);
+      expect(command.elementLocation, pour.elementLocation);
+      expect(command.locationId, pour.locationId);
+      expect(command.plannedAt, pour.plannedAt);
+      expect(command.concreteClass, pour.concreteClass);
+      expect(command.plannedVolumeM3, pour.plannedVolumeM3);
+      expect(command.orderedVolumeM3, pour.orderedVolumeM3);
+      expect(command.blockName, pour.blockName);
+      expect(command.floorName, pour.floorName);
+      expect(command.axisName, pour.axisName);
+      expect(command.targetSlump, pour.targetSlump);
+      expect(command.plantName, pour.plantName);
+      expect(command.plantBranch, pour.plantBranch);
+      expect(command.plantContact, pour.plantContact);
+      expect(command.plantAppointmentReference, pour.plantAppointmentReference);
+      expect(command.pumpEquipment, pour.pumpEquipment);
+      expect(command.laboratoryName, pour.laboratoryName);
+      expect(command.laboratoryContact, pour.laboratoryContact);
+      expect(command.laboratoryAppointment, pour.laboratoryAppointment);
+      expect(command.inspectionNotifiedAt, pour.inspectionNotifiedAt);
+      expect(command.inspectionNotifiedPerson, pour.inspectionNotifiedPerson);
+      expect(command.generalNote, pour.generalNote);
+      expect(command.sampleExceptionReason, pour.sampleExceptionReason);
+      expect(command.varianceNote, pour.varianceNote);
+      expect(command.eventId, isNotEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'sample edit keeps identity, reopens failed draft, and installs result',
+    (tester) async {
+      final concrete = _FakeConcrete(
+        sampleSet: editableSample,
+        failNextSampleSave: true,
+        attachmentIntegrity: ConcreteAttachmentIntegrity.missing,
+      );
+      await _pumpDetail(tester, concrete);
+      final sampleTile = find.byKey(const Key('concrete-sample-$sampleId'));
+      await tester.scrollUntilVisible(sampleTile, 500);
+      await tester.tap(sampleTile);
+      await tester.pumpAndSettle();
+
+      expect(find.text('NUM-780'), findsOneWidget);
+      expect(find.text('Küp A, Küp B'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('concrete-sample-code')))
+            .readOnly,
+        isTrue,
+      );
+      await tester.tap(find.byKey(const Key('concrete-sample-status')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(ConcreteSampleStatus.delivered.label).last);
+      await tester.pumpAndSettle();
+
+      final firstSave = tester
+          .widget<FilledButton>(find.byKey(const Key('save-concrete-sample')))
+          .onPressed!;
+      firstSave();
+      firstSave();
+      await tester.pumpAndSettle();
+      expect(concrete.saveSampleCalls, 1);
+      expect(
+        find.byKey(const Key('reopen-concrete-sample-draft')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('reopen-concrete-sample-draft')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<DropdownButtonFormField<ConcreteSampleStatus>>(
+              find.byKey(const Key('concrete-sample-status')),
+            )
+            .initialValue,
+        ConcreteSampleStatus.delivered,
+      );
+      await tester.tap(find.byKey(const Key('save-concrete-sample')));
+      await tester.pumpAndSettle();
+
+      expect(concrete.saveSampleCalls, 2);
+      expect(concrete.sampleEventIds.toSet(), hasLength(1));
+      final command = concrete.lastSampleCommand!;
+      expect(command.id, editableSample.id);
+      expect(command.pourId, editableSample.pourId);
+      expect(command.sourceTruckId, editableSample.sourceTruckId);
+      expect(command.sampleCode, editableSample.sampleCode);
+      expect(command.expectedPourRevision, 1);
+      expect(command.expectedSampleRevision, editableSample.revision);
+      expect(command.sampleCount, editableSample.sampleCount);
+      expect(command.sampleLabels, editableSample.sampleLabels);
+      expect(command.sampledAt, editableSample.sampledAt);
+      expect(command.sampledBy, editableSample.sampledBy);
+      expect(
+        command.laboratoryAppointmentAt,
+        editableSample.laboratoryAppointmentAt,
+      );
+      expect(command.deliveredAt, isNotNull);
+      expect(command.deliveredTo, editableSample.deliveredTo);
+      expect(command.expectedResultDates, editableSample.expectedResultDates);
+      expect(command.status, ConcreteSampleStatus.delivered);
+      expect(command.note, editableSample.note);
+      expect(concrete.revision, 2);
+      expect(concrete.detailCalls, 2);
+      expect(find.textContaining('Revizyon 5'), findsOneWidget);
+      expect(find.textContaining('Beklenen sonuç tarihleri'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.textContaining('Dosya eksik'),
+        -500,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.textContaining('Dosya eksik'), findsOneWidget);
+      expect(find.textContaining('Dosya doğrulandı'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Future<void> _pumpDetail(WidgetTester tester, _FakeConcrete concrete) async {
@@ -1006,6 +1181,68 @@ ConcretePour _navigationPour(int index, {String? pourCode}) => ConcretePour(
   cancelledAt: null,
 );
 
+ConcretePour _editablePour() => const ConcretePour(
+  id: pourId,
+  projectId: projectId,
+  projectName: 'Arşivlenmiş Proje Anlık Görüntüsü',
+  pourCode: 'BT-780',
+  elementLocation: 'PERDE P7',
+  locationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa77',
+  stableLocationName: 'Eski Batı Blok',
+  stableLocationArchivedAt: '2026-07-20T07:00:00Z',
+  blockName: 'B',
+  floorName: '12',
+  axisName: 'P/7',
+  plannedAt: '2026-07-19T09:00:37Z',
+  actualStartedAt: null,
+  actualEndedAt: null,
+  concreteClass: 'C35/45 ARŞİV',
+  targetSlump: 'S4',
+  plannedVolumeM3: 18.5,
+  orderedVolumeM3: 20.25,
+  plantName: 'Güven Beton',
+  plantBranch: 'Avrupa',
+  plantContact: '0212 000 00 00',
+  plantAppointmentReference: 'REF-780',
+  pumpEquipment: 'POMPA-7',
+  laboratoryName: 'CSE Lab',
+  laboratoryContact: '0532 000 00 00',
+  laboratoryAppointment: '2026-07-19T08:00:41Z',
+  inspectionNotifiedAt: '2026-07-19T07:30:52Z',
+  inspectionNotifiedPerson: 'Denetçi Ada',
+  status: ConcretePourStatus.draft,
+  generalNote: 'Genel not korunur',
+  sampleExceptionReason: 'İstisna notu korunur',
+  varianceNote: 'Sapma notu korunur',
+  revision: 7,
+  createdAt: '2026-07-19T07:00:00Z',
+  updatedAt: '2026-07-19T07:00:00Z',
+  closedAt: null,
+  cancelledAt: null,
+);
+
+const sampleId = 'ffffffff-ffff-4fff-8fff-fffffffffff5';
+const editableSample = ConcreteSampleSet(
+  id: sampleId,
+  pourId: pourId,
+  sourceTruckId: truckId,
+  sampleCode: 'NUM-780',
+  sampleCount: 2,
+  sampleLabels: ['Küp A', 'Küp B'],
+  sampledAt: '2026-07-19T09:20:00Z',
+  sampledBy: 'Usta Ali',
+  laboratoryAppointmentAt: '2026-07-20T06:00:00Z',
+  deliveredAt: null,
+  deliveredTo: 'Lab Kabul',
+  expectedResultDates: ['2026-07-26T09:20:00Z', '2026-08-16T09:20:00Z'],
+  status: ConcreteSampleStatus.sampled,
+  note: 'Numune notu korunur',
+  reason: null,
+  revision: 4,
+  createdAt: '2026-07-19T09:20:00Z',
+  updatedAt: '2026-07-19T09:20:00Z',
+);
+
 class _ConcretePushCountingObserver extends NavigatorObserver {
   int pushes = 0;
 
@@ -1036,11 +1273,14 @@ class _FakeConcrete implements ConcreteApplication {
   _FakeConcrete({
     this.delayCreate = false,
     this.failNextTruckSave = false,
+    this.failNextSampleSave = false,
     this.delayBulkComplete = false,
     this.delayFieldUpdate = false,
     this.started = false,
     this.ended = false,
     this.navigationPours,
+    this.sampleSet,
+    this.attachmentIntegrity = ConcreteAttachmentIntegrity.ok,
     bool checklistReady = false,
     ConcretePourStatus? status,
     this.agendaLinked = false,
@@ -1058,6 +1298,7 @@ class _FakeConcrete implements ConcreteApplication {
   final bool delayBulkComplete;
   final bool delayFieldUpdate;
   bool failNextTruckSave;
+  bool failNextSampleSave;
   bool started;
   bool ended;
   bool manualCompleted;
@@ -1065,35 +1306,50 @@ class _FakeConcrete implements ConcreteApplication {
   bool inspectionComplete;
   ConcretePourStatus status;
   final bool agendaLinked;
+  final ConcreteAttachmentIntegrity attachmentIntegrity;
   List<ConcretePour>? navigationPours;
+  ConcreteSampleSet? sampleSet;
   Completer<List<ConcretePour>>? delayedListReload;
   final _completer = Completer<ConcretePourDetail>();
   Completer<void>? _bulkCompleter;
   Completer<void>? _fieldCompleter;
   int revision = 1;
+  int detailCalls = 0;
   int createCalls = 0;
   int listCalls = 0;
   int createClassCalls = 0;
   int saveTruckCalls = 0;
+  int saveSampleCalls = 0;
   int bulkCompleteCalls = 0;
   int fieldUpdateCalls = 0;
   CreateConcretePourCommand? lastCreateCommand;
   CreateProjectConcreteClassCommand? lastCreateClassCommand;
   SaveConcreteTruckCommand? lastTruckCommand;
+  SaveConcreteSampleSetCommand? lastSampleCommand;
+  UpdateConcretePourCommand? lastUpdateCommand;
   TransitionConcretePourCommand? lastTransitionCommand;
   ConcretePourQuery? lastListQuery;
+  final sampleEventIds = <String>[];
 
-  ConcretePourDetail get _currentDetail => _detail(
-    lastTruckCommand,
-    started: started,
-    ended: ended,
-    status: status,
-    agendaLinked: agendaLinked,
-    revision: revision,
-    manualCompleted: manualCompleted,
-    laboratoryComplete: laboratoryComplete,
-    inspectionComplete: inspectionComplete,
-  );
+  ConcretePourDetail get _currentDetail => _detailFor(attachmentIntegrity);
+
+  ConcretePourDetail get _rawMutationDetail =>
+      _detailFor(ConcreteAttachmentIntegrity.ok);
+
+  ConcretePourDetail _detailFor(ConcreteAttachmentIntegrity integrity) =>
+      _detail(
+        lastTruckCommand,
+        sampleSet: sampleSet,
+        started: started,
+        ended: ended,
+        status: status,
+        agendaLinked: agendaLinked,
+        revision: revision,
+        manualCompleted: manualCompleted,
+        laboratoryComplete: laboratoryComplete,
+        inspectionComplete: inspectionComplete,
+        attachmentIntegrity: integrity,
+      );
 
   void completeCreate() {
     if (!_completer.isCompleted) _completer.complete(_currentDetail);
@@ -1153,8 +1409,10 @@ class _FakeConcrete implements ConcreteApplication {
   ) => throw UnimplementedError();
 
   @override
-  Future<ConcretePourDetail> getPourDetail(String pourId) async =>
-      _currentDetail;
+  Future<ConcretePourDetail> getPourDetail(String pourId) async {
+    detailCalls += 1;
+    return _currentDetail;
+  }
 
   @override
   Future<List<ConcretePour>> listPours(ConcretePourQuery query) async {
@@ -1207,7 +1465,40 @@ class _FakeConcrete implements ConcreteApplication {
   @override
   Future<ConcretePourDetail> saveSampleSet(
     SaveConcreteSampleSetCommand command,
-  ) => throw UnimplementedError();
+  ) async {
+    saveSampleCalls += 1;
+    lastSampleCommand = command;
+    sampleEventIds.add(command.eventId);
+    if (failNextSampleSave) {
+      failNextSampleSave = false;
+      throw const AgendaValidationFailure(
+        'Numune revision değişti; girdiyi yeniden kontrol edin.',
+      );
+    }
+    sampleSet = ConcreteSampleSet(
+      id: command.id,
+      pourId: command.pourId,
+      sourceTruckId: command.sourceTruckId,
+      sampleCode: command.sampleCode ?? '',
+      sampleCount: command.sampleCount,
+      sampleLabels: command.sampleLabels,
+      sampledAt: command.sampledAt,
+      sampledBy: command.sampledBy,
+      laboratoryAppointmentAt: command.laboratoryAppointmentAt,
+      deliveredAt: command.deliveredAt,
+      deliveredTo: command.deliveredTo,
+      expectedResultDates: command.expectedResultDates,
+      status: command.status,
+      note: command.note,
+      reason: command.reason,
+      revision: command.expectedSampleRevision + 1,
+      createdAt: '2026-07-19T09:20:00Z',
+      updatedAt: '2026-07-20T09:20:00Z',
+    );
+    revision += 1;
+    return _rawMutationDetail;
+  }
+
   @override
   Future<ConcretePourDetail> saveTruck(SaveConcreteTruckCommand command) async {
     saveTruckCalls += 1;
@@ -1261,6 +1552,7 @@ class _FakeConcrete implements ConcreteApplication {
     UpdateConcretePourCommand command,
   ) async {
     fieldUpdateCalls += 1;
+    lastUpdateCommand = command;
     if (delayFieldUpdate) {
       _fieldCompleter ??= Completer<void>();
       await _fieldCompleter!.future;
@@ -1271,7 +1563,7 @@ class _FakeConcrete implements ConcreteApplication {
         command.inspectionNotifiedAt != null ||
         (command.inspectionNotifiedPerson?.trim().isNotEmpty ?? false);
     revision += 1;
-    return _currentDetail;
+    return _rawMutationDetail;
   }
 }
 
@@ -1312,6 +1604,8 @@ class _FakeAgenda implements AgendaApplication {
 
 ConcretePourDetail _detail(
   SaveConcreteTruckCommand? savedTruck, {
+  ConcreteSampleSet? sampleSet,
+  required ConcreteAttachmentIntegrity attachmentIntegrity,
   bool started = false,
   bool ended = false,
   ConcretePourStatus? status,
@@ -1479,7 +1773,7 @@ ConcretePourDetail _detail(
       : savedTruckRecord.id == truck.id
       ? [savedTruckRecord]
       : [truck, savedTruckRecord];
-  const attachment = ConcreteAttachment(
+  final attachment = ConcreteAttachment(
     id: attachmentId,
     pourId: pourId,
     truckId: truckId,
@@ -1494,7 +1788,7 @@ ConcretePourDetail _detail(
     capturedAt: '2026-07-19T09:11:00Z',
     description: 'İrsaliye taraması',
     createdAt: '2026-07-19T09:11:00Z',
-    integrity: ConcreteAttachmentIntegrity.ok,
+    integrity: attachmentIntegrity,
   );
   const event = ConcretePourEvent(
     id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
@@ -1514,9 +1808,9 @@ ConcretePourDetail _detail(
     agendaLogId: agendaLinked ? agendaLogId : null,
     checks: checks,
     trucks: trucks,
-    sampleSets: const [],
+    sampleSets: sampleSet == null ? const [] : [sampleSet],
     followUps: [follow],
-    attachments: const [attachment],
+    attachments: [attachment],
     events: const [event],
     linkedReminders: const [],
     metrics: ConcreteMetrics(
@@ -1538,8 +1832,8 @@ ConcretePourDetail _detail(
       firstTruckAt: null,
       lastTruckAt: null,
       pourDurationMinutes: ended ? 30 : null,
-      sampleSetCount: 0,
-      sampleCount: 0,
+      sampleSetCount: sampleSet == null ? 0 : 1,
+      sampleCount: sampleSet?.sampleCount ?? 0,
       pendingCheckCount: pendingRequiredConcreteChecks(checks).length,
       missingEvidenceTruckCount: 0,
       openFollowUpCount: 1,
