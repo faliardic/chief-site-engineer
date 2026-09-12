@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/application/agenda_application.dart';
@@ -483,11 +484,119 @@ void main() {
     );
     expect(find.byKey(const Key('dashboard-memory-backup')), findsNothing);
     expect(find.byKey(const Key('dashboard-attachment-health')), findsNothing);
-    expect(find.byKey(const Key('dashboard-project-album')), findsOneWidget);
     await tester.tap(find.byKey(const Key('dashboard-open-plan')));
     await tester.pumpAndSettle();
     expect(openedProject, project.id);
   });
+
+  for (final width in [320.0, 390.0, 600.0, 840.0]) {
+    testWidgets(
+      'project files group stays accessible and exact at $width width',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 700);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final semantics = tester.ensureSemantics();
+        final project = _project(
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          'Kuzey',
+        );
+        final fixture = _Fixture(projects: [project]);
+        addTearDown(fixture.dispose);
+        String? albumProjectId;
+        String? catalogProjectId;
+
+        try {
+          await tester.pumpWidget(
+            fixture.app(
+              textScale: 1.6,
+              onOpenProjectAlbum: (projectId) => albumProjectId = projectId,
+              onOpenCatalog: (projectId) => catalogProjectId = projectId,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.byKey(const Key('project-profile-tools')));
+          await tester.pumpAndSettle();
+          final sheet = find.byKey(const Key('project-profile-tools-sheet'));
+          final scrollable = find.descendant(
+            of: sheet,
+            matching: find.byType(Scrollable),
+          );
+          expect(sheet, findsOneWidget);
+          expect(
+            find.byKey(const Key('dashboard-memory-backup')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const Key('dashboard-attachment-health')),
+            findsNothing,
+          );
+
+          final section = find.byKey(
+            const Key('dashboard-project-files-section'),
+          );
+          await tester.scrollUntilVisible(section, 300, scrollable: scrollable);
+          expect(find.text('Proje dosyaları'), findsOneWidget);
+          final sectionData = tester
+              .getSemantics(find.bySemanticsLabel('Proje dosyaları'))
+              .getSemanticsData();
+          expect(sectionData.flagsCollection.isHeader, isTrue);
+
+          final album = find.byKey(const Key('dashboard-project-album'));
+          await tester.scrollUntilVisible(album, 200, scrollable: scrollable);
+          await Scrollable.ensureVisible(
+            tester.element(album),
+            alignment: 0.5,
+            duration: Duration.zero,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.text('Proje medyası ve kaynak kayıtları'),
+            findsOneWidget,
+          );
+          _expectAccessibleTool(tester, album);
+          await tester.tap(album);
+          await tester.pumpAndSettle();
+          expect(albumProjectId, project.id);
+
+          await tester.tap(find.byKey(const Key('project-profile-tools')));
+          await tester.pumpAndSettle();
+          final reopenedSheet = find.byKey(
+            const Key('project-profile-tools-sheet'),
+          );
+          final reopenedScrollable = find.descendant(
+            of: reopenedSheet,
+            matching: find.byType(Scrollable),
+          );
+          final catalog = find.byKey(const Key('dashboard-attachment-catalog'));
+          await tester.scrollUntilVisible(
+            catalog,
+            300,
+            scrollable: reopenedScrollable,
+          );
+          await Scrollable.ensureVisible(
+            tester.element(catalog),
+            alignment: 0.5,
+            duration: Duration.zero,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.text('Ek metadata, bağlantı ve bütünlük bilgileri'),
+            findsOneWidget,
+          );
+          _expectAccessibleTool(tester, catalog);
+          await tester.tap(catalog);
+          await tester.pumpAndSettle();
+          expect(catalogProjectId, project.id);
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
 
   testWidgets('active project switch rejects stale profile result', (
     tester,
@@ -536,6 +645,8 @@ class _Fixture {
   Widget app({
     VoidCallback? onCreateProject,
     DashboardProjectAction? onOpenPlan,
+    DashboardProjectAction? onOpenProjectAlbum,
+    DashboardProjectAction? onOpenCatalog,
     double textScale = 1,
   }) => MaterialApp(
     builder: (context, child) => MediaQuery(
@@ -554,12 +665,26 @@ class _Fixture {
         session: session,
         onCreateProject: onCreateProject ?? () {},
         onOpenPlan: onOpenPlan,
+        onOpenProjectAlbum: onOpenProjectAlbum,
+        onOpenCatalog: onOpenCatalog,
         clock: () => DateTime.utc(2026, 9, 4, 9),
       ),
     ),
   );
 
   void dispose() => session.dispose();
+}
+
+void _expectAccessibleTool(WidgetTester tester, Finder finder) {
+  expect(finder.hitTestable(), findsOneWidget);
+  expect(tester.getSize(finder).width, greaterThanOrEqualTo(48));
+  expect(tester.getSize(finder).height, greaterThanOrEqualTo(48));
+  final semantics = tester.getSemantics(finder);
+  final data = semantics.getSemanticsData();
+  expect(data.flagsCollection.isButton, isTrue);
+  expect(data.hasAction(SemanticsAction.tap), isTrue);
+  expect(semantics.rect.width, greaterThanOrEqualTo(48));
+  expect(semantics.rect.height, greaterThanOrEqualTo(48));
 }
 
 Future<void> _renameVisibleProject(WidgetTester tester, String name) async {
