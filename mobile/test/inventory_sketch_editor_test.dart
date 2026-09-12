@@ -17,6 +17,84 @@ final _time = DateTime.utc(2026, 8, 28, 6);
 
 void main() {
   test(
+    'Q06 new block nudge preserves block floor identity through save and recovery',
+    () async {
+      final originalBlock = _blockDrafts().single;
+      final fake = _FakeInventoryApplication.withDraft(
+        _rectangleGeometry(),
+        draftNewBlocks: [originalBlock],
+      );
+      final controller = _controller(fake);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+      final viewport = InventoryViewport.fit(const Size(800, 600));
+      controller.setMode(InventorySketchEditorMode.select);
+      final segmentTarget = viewport.virtualToView(_point(128, 64));
+      controller
+        ..selectAt(segmentTarget, viewport)
+        ..selectAt(segmentTarget, viewport);
+
+      expect(controller.editor!.selection?.wholePolyline, isTrue);
+      final before = controller.editor!.geometry.polylines.single.points;
+      expect(
+        controller.nudgeSelection(InventorySketchNudgeDirection.down),
+        isTrue,
+      );
+      expect(controller.editor!.geometry.polylines.single.points, [
+        for (final point in before)
+          InventorySketchPoint(
+            x: point.x,
+            y: point.y + InventoryGeometryContract.sketchGridStep,
+          ),
+      ]);
+      expect(controller.newBlocks, hasLength(1));
+      _expectSameBlockIdentity(
+        controller.newBlocks.single,
+        originalBlock,
+        polygonIndex: 0,
+      );
+      expect(await controller.forceSave(), isTrue);
+      expect(fake.saveCalls.single.newBlocks, hasLength(1));
+      _expectSameBlockIdentity(
+        fake.saveCalls.single.newBlocks.single,
+        originalBlock,
+        polygonIndex: 0,
+      );
+
+      final recovered = _controller(fake);
+      addTearDown(recovered.dispose);
+      await recovered.initialize();
+      expect(recovered.newBlocks, hasLength(1));
+      _expectSameBlockIdentity(
+        recovered.newBlocks.single,
+        originalBlock,
+        polygonIndex: 0,
+      );
+      expect(
+        recovered.editor!.geometry.canonicalJson,
+        controller.editor!.geometry.canonicalJson,
+      );
+      expect(recovered.isFinalizeEnabled, isTrue);
+
+      final rawFake = _FakeInventoryApplication.withDraft(_openGeometry());
+      final raw = _controller(rawFake);
+      addTearDown(raw.dispose);
+      await raw.initialize();
+      raw.setMode(InventorySketchEditorMode.select);
+      final rawTarget = viewport.virtualToView(_point(64, 0));
+      raw.selectAt(rawTarget, viewport);
+      final rawGeometry = raw.editor!.geometry.canonicalJson;
+      expect(raw.nudgeSelection(InventorySketchNudgeDirection.down), isFalse);
+      expect(
+        raw.lastErrorCode,
+        InventorySketchEditorController.lockedBaseGeometryCode,
+      );
+      expect(raw.editor!.geometry.canonicalJson, rawGeometry);
+      expect(rawFake.saveCalls, isEmpty);
+    },
+  );
+
+  test(
     'AT-602 identical open suffix uses legacy and block indexes on recovery and discard',
     () async {
       final legacy = _openGeometry().polylines.single;
@@ -221,7 +299,7 @@ void main() {
           reason: 'The touch must reach the canvas rather than an overlay.',
         );
         await tester.tapAt(target);
-        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
       }
 
       Future<void> tapControl(String key) async {
@@ -333,7 +411,7 @@ void main() {
           reason: 'The touch must reach the canvas rather than an overlay.',
         );
         await tester.tapAt(target);
-        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
       }
 
       final points = [_point(640, 512), _point(1664, 512), _point(1664, 1536)];
@@ -1319,7 +1397,7 @@ void main() {
       await tester.tap(
         find.byKey(const Key('inventory-sketch-canvas-gesture')),
       );
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       expect(drawCount, 1);
 
       final drawPanBefore = canvasKey.currentState!.viewport!.pan;
@@ -1340,6 +1418,7 @@ void main() {
       await tester.tap(
         find.byKey(const Key('inventory-sketch-canvas-gesture')),
       );
+      await tester.pump(const Duration(milliseconds: 400));
       expect(drawCount, 1);
     });
   });
@@ -2383,7 +2462,7 @@ void main() {
   });
 
   testWidgets(
-    'explicit close dialog persists orthogonal block metadata and recovers',
+    'snap-to-first closure persists orthogonal block metadata and recovers',
     (tester) async {
       final fake = _FakeInventoryApplication.withDraft(
         InventoryGeometry.emptyDraft(),
@@ -2406,11 +2485,11 @@ void main() {
         find.byKey(const Key('inventory-editor-edge-preview')),
         findsOneWidget,
       );
-      final closeBlock = find.byKey(const Key('inventory-editor-close-block'));
-      await tester.ensureVisible(closeBlock);
-      await tester.pump();
-      await tester.tap(closeBlock);
-      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('inventory-editor-close-block')),
+        findsNothing,
+      );
+      await _triggerSketchCanvasTap(tester, _point(0, 0));
       expect(
         find.byKey(const Key('inventory-block-metadata-dialog')),
         findsOneWidget,
@@ -2451,9 +2530,7 @@ void main() {
         controller.drawPoint(point);
       }
       await tester.pump();
-      await tester.ensureVisible(closeBlock);
-      await tester.tap(closeBlock);
-      await tester.pumpAndSettle();
+      await _triggerSketchCanvasTap(tester, _point(512, 0));
       expect(find.text('Alanı ekle'), findsOneWidget);
       await tester.enterText(
         find.byKey(const Key('inventory-block-name')),
@@ -2608,16 +2685,11 @@ void main() {
         );
         expect(controller.lastErrorCode, isNull);
 
-        final closeBlock = find.byKey(
-          const Key('inventory-editor-close-block'),
+        expect(
+          find.byKey(const Key('inventory-editor-close-block')),
+          findsNothing,
         );
-        await tester.ensureVisible(closeBlock);
-        final closeIconButton = tester.widget<IconButton>(
-          find.descendant(of: closeBlock, matching: find.byType(IconButton)),
-        );
-        expect(closeIconButton.onPressed, isNotNull, reason: testCase.label);
-        await tester.tap(closeBlock);
-        await tester.pumpAndSettle();
+        await _triggerSketchCanvasTap(tester, testCase.points.first);
         await tester.pump(const Duration(milliseconds: 600));
 
         expect(
@@ -2654,7 +2726,7 @@ void main() {
   testWidgets(
     'smart alignment guide is visible and Serbest uzunluk resets after one edge',
     (tester) async {
-      // Keep the existing virtual points clear of the two-row toolbar.
+      // Keep the existing virtual points clear of the compact toolbar.
       tester.view.physicalSize = const Size(800, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -2944,10 +3016,11 @@ void main() {
       }
       await tester.pump();
 
-      final close = find.byKey(const Key('inventory-editor-close-block'));
-      await tester.ensureVisible(close);
-      await tester.tap(close);
-      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('inventory-editor-close-block')),
+        findsNothing,
+      );
+      await _triggerSketchCanvasTap(tester, _point(64, 64));
       await tester.enterText(
         find.byKey(const Key('inventory-block-name')),
         'I   BLOK',
@@ -3067,10 +3140,10 @@ void main() {
           reason: 'The selection touch must reach the canvas.',
         );
         await tester.tapAt(target);
-        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
         expect(controller.editor!.selection?.wholePolyline, isFalse);
         await tester.tapAt(target);
-        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
         expect(controller.editor!.selection?.wholePolyline, isTrue);
         expect(wheel, findsOneWidget);
       }
@@ -3268,7 +3341,7 @@ void main() {
           );
           expect(
             canvasRect.bottom - wheelRect.bottom,
-            size.height == 320 ? 16 : 80,
+            size.height == 320 ? 64 : 80,
           );
           expect(wheelRect.overlaps(tester.getRect(toolbar)), isFalse);
           final saveStatus = find.byKey(
@@ -3370,7 +3443,7 @@ void main() {
           expect(fake.saveCalls, isEmpty);
           expect(fake.finalizeCalls, 0);
 
-          for (final mode in ['pan', 'draw']) {
+          for (final mode in ['draw']) {
             controller.selectAt(
               viewport.virtualToView(_point(1664, 512)),
               viewport,
@@ -3405,11 +3478,12 @@ void main() {
 
   for (final size in [
     const Size(320, 800),
+    const Size(384, 832),
     const Size(390, 844),
     const Size(320, 320),
     const Size(390, 320),
   ]) {
-    testWidgets('two-row top toolbar stays accessible at $size / text 2', (
+    testWidgets('compact top toolbar stays accessible at $size / text 2', (
       tester,
     ) async {
       tester.view.physicalSize = size;
@@ -3458,19 +3532,13 @@ void main() {
         );
         expect(
           toolbarRect.left,
-          closeTo(tester.getRect(workspace).left + 8, 0.01),
+          closeTo(tester.getRect(workspace).left + 48, 0.01),
         );
-        expect(toolbarRect.height, 96);
-        final rows = find.descendant(of: toolbar, matching: find.byType(Row));
-        expect(rows, findsNWidgets(2));
-        final row1 = find.byKey(const Key('inventory-editor-toolbar-row-1'));
-        final row2 = find.byKey(const Key('inventory-editor-toolbar-row-2'));
-        expect(row1, findsOneWidget);
-        expect(row2, findsOneWidget);
-        expect(tester.getRect(row1).top, toolbarRect.top);
-        expect(tester.getRect(row2).top, toolbarRect.top + 48);
-        expect(tester.getSize(row1).height, 48);
-        expect(tester.getSize(row2).height, 48);
+        expect(toolbarRect.height, 48);
+        final modes = find.byKey(const Key('inventory-editor-modes'));
+        expect(modes, findsOneWidget);
+        expect(tester.getRect(modes).top, toolbarRect.top);
+        expect(tester.getSize(modes).height, 48);
         final scrollView = find.descendant(
           of: toolbar,
           matching: find.byType(SingleChildScrollView),
@@ -3482,58 +3550,63 @@ void main() {
         );
         expect(
           tester.getRect(toolbar).right,
-          closeTo(tester.getRect(workspace).right - 8, 0.1),
+          closeTo(tester.getRect(workspace).right, 0.1),
         );
         expect(
           find.descendant(of: toolbar, matching: find.byType(Text)),
           findsNothing,
         );
 
+        final topNavigation = find.byKey(
+          const Key('inventory-editor-top-navigation'),
+        );
+        final back = find.byKey(const Key('inventory-editor-back'));
+        expect(topNavigation, findsOneWidget);
+        expect(back, findsOneWidget);
+        expect(tester.getRect(topNavigation).left, canvasRect.left);
+        expect(tester.getRect(topNavigation).top, canvasRect.top + 8);
+        expect(tester.getSize(back), const Size(48, 48));
+        expect(tester.getRect(back).overlaps(toolbarRect), isFalse);
+
         final controls = <Key, String>{
-          Key('inventory-editor-back'): 'Geri',
           Key('inventory-editor-mode-draw'): 'Çiz',
           Key('inventory-editor-mode-select'): 'Seç',
-          Key('inventory-editor-mode-pan'): 'Taşı',
           Key('inventory-editor-undo'): 'Geri al',
           Key('inventory-editor-redo'): 'İleri al',
-          Key('inventory-editor-finish-line'): 'Çizgiyi bitir',
-          Key('inventory-editor-close-block'): 'Alanı kapat',
           Key('inventory-editor-free-length'): 'Serbest uzunluk',
           Key('inventory-editor-delete'): 'Seçileni sil',
-          Key('inventory-editor-zoom-out'): 'Uzaklaştır',
-          Key('inventory-editor-zoom-in'): 'Yakınlaştır',
-          Key('inventory-editor-fit'): 'Tamamını göster',
           Key('inventory-editor-finalize'): 'Krokiyi yayınla',
         };
         final disabled = {
           const Key('inventory-editor-undo'),
           const Key('inventory-editor-redo'),
-          const Key('inventory-editor-finish-line'),
-          const Key('inventory-editor-close-block'),
           const Key('inventory-editor-free-length'),
           const Key('inventory-editor-delete'),
         };
         final orderedKeys = controls.keys.toList();
-        for (var row = 0; row < 2; row++) {
-          var previousX = double.negativeInfinity;
-          final rowFinder = row == 0 ? row1 : row2;
+        expect(
+          find.descendant(of: modes, matching: find.byType(IconButton)),
+          findsNWidgets(orderedKeys.length),
+        );
+        var previousX = double.negativeInfinity;
+        for (final key in orderedKeys) {
           expect(
-            find.descendant(of: rowFinder, matching: find.byType(IconButton)),
-            findsNWidgets(7),
+            find.descendant(of: modes, matching: find.byKey(key)),
+            findsOneWidget,
           );
-          for (final key in orderedKeys.skip(row * 7).take(7)) {
-            expect(
-              find.descendant(of: rowFinder, matching: find.byKey(key)),
-              findsOneWidget,
-            );
-            final center = tester.getCenter(find.byKey(key));
-            expect(center.dx, greaterThan(previousX));
-            expect(center.dy, closeTo(toolbarRect.top + row * 48 + 24, 0.01));
-            previousX = center.dx;
+          final center = tester.getCenter(find.byKey(key));
+          expect(center.dx, greaterThan(previousX));
+          expect(center.dy, closeTo(toolbarRect.top + 24, 0.01));
+          previousX = center.dx;
+        }
+        if (size.width >= 384) {
+          for (final key in orderedKeys) {
+            final controlRect = tester.getRect(find.byKey(key));
+            expect(controlRect.left, greaterThanOrEqualTo(toolbarRect.left));
+            expect(controlRect.right, lessThanOrEqualTo(toolbarRect.right));
+            expect(find.byKey(key).hitTestable(), findsOneWidget);
           }
         }
-        final row1Start = tester.getRect(row1).left;
-        final row2Start = tester.getRect(row2).left;
         for (final entry in controls.entries) {
           final control = find.byKey(entry.key);
           expect(control, findsOneWidget);
@@ -3580,11 +3653,33 @@ void main() {
             contains(entry.value),
           );
         }
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('inventory-editor-free-length')),
+            matching: find.byIcon(Icons.alt_route_rounded),
+          ),
+          findsOneWidget,
+        );
+        expect(find.byIcon(Icons.straighten_rounded), findsNothing);
+        for (final removedKey in const [
+          Key('inventory-editor-mode-pan'),
+          Key('inventory-editor-close-block'),
+          Key('inventory-editor-zoom-out'),
+          Key('inventory-editor-zoom-in'),
+          Key('inventory-editor-fit'),
+        ]) {
+          expect(find.byKey(removedKey), findsNothing);
+        }
+        expect(
+          find.byKey(const Key('inventory-editor-finish-line')),
+          findsNothing,
+        );
         final scrollState = tester.state<ScrollableState>(
           find.descendant(of: toolbar, matching: find.byType(Scrollable)),
         );
-        final expectedScrollExtent = (7 * 48 + 2 * 8 + 8 - toolbarRect.width)
-            .clamp(0.0, double.infinity);
+        final expectedScrollExtent = size.width >= 384
+            ? 0.0
+            : (7 * 48 - toolbarRect.width).clamp(0.0, double.infinity);
         expect(
           scrollState.position.maxScrollExtent,
           closeTo(expectedScrollExtent, 0.01),
@@ -3594,14 +3689,6 @@ void main() {
         } else {
           expect(scrollState.position.pixels, 0);
         }
-        expect(
-          row1Start - tester.getRect(row1).left,
-          closeTo(scrollState.position.pixels, 0.01),
-        );
-        expect(
-          row2Start - tester.getRect(row2).left,
-          closeTo(scrollState.position.pixels, 0.01),
-        );
         expect(tester.getRect(canvas), canvasRect);
         final afterScrollViewport = tester
             .state<InventorySketchCanvasState>(
@@ -3649,17 +3736,16 @@ void main() {
           find.byType(InventorySketchCanvas),
         );
         final zoomBefore = canvasState.viewport!.zoom;
-        final zoomIn = find.byKey(const Key('inventory-editor-zoom-in'));
-        await tester.ensureVisible(zoomIn);
-        await tester.pump();
-        expect(zoomIn.hitTestable(), findsOneWidget);
-        await tester.tap(zoomIn);
+        canvasState
+          ..zoomIn()
+          ..zoomIn();
         await tester.pump();
         expect(canvasState.viewport!.zoom, greaterThan(zoomBefore));
-        final fit = find.byKey(const Key('inventory-editor-fit'));
-        await tester.ensureVisible(fit);
-        await tester.pump();
-        await tester.tap(fit);
+        tester
+            .widget<GestureDetector>(
+              find.byKey(const Key('inventory-sketch-canvas-gesture')),
+            )
+            .onDoubleTap!();
         await tester.pump();
         expect(canvasState.viewport!.zoom, zoomBefore);
         pageKey.currentState!.controller.recordHandledError(
@@ -4273,6 +4359,24 @@ Future<void> _openEditor(
   } else {
     await tester.pump();
   }
+}
+
+Future<void> _triggerSketchCanvasTap(
+  WidgetTester tester,
+  InventorySketchPoint point,
+) async {
+  final canvas = find.byType(InventorySketchCanvas);
+  final state = tester.state<InventorySketchCanvasState>(canvas);
+  final gesture = tester.widget<GestureDetector>(
+    find.byKey(const Key('inventory-sketch-canvas-gesture')),
+  );
+  gesture.onTapUp!(
+    TapUpDetails(
+      localPosition: state.viewport!.virtualToView(point),
+      kind: PointerDeviceKind.touch,
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 InventorySketchPoint _point(int x, int y) => InventorySketchPoint(x: x, y: y);

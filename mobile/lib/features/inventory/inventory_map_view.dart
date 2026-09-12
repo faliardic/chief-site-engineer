@@ -8,6 +8,9 @@ import 'package:flutter/material.dart';
 
 enum InventoryMapLoadStatus { idle, loading, ready, failed }
 
+typedef InventoryCreateAtExistingPlacement =
+    void Function(InventoryPlacementTarget target, String floorId);
+
 InventoryPlacementTarget? captureInventoryPlacementTarget(
   Offset viewPoint,
   InventoryViewport viewport,
@@ -449,6 +452,7 @@ class InventoryMapView extends StatefulWidget {
     required this.controller,
     required this.onCreateTarget,
     required this.onOpenAsset,
+    this.onCreateAtExistingPlacement,
     this.onSelectTarget,
     this.onInteractionChanged,
     this.autoLoad = true,
@@ -458,6 +462,7 @@ class InventoryMapView extends StatefulWidget {
   final InventoryMapController controller;
   final ValueChanged<InventoryPlacementTarget> onCreateTarget;
   final ValueChanged<String> onOpenAsset;
+  final InventoryCreateAtExistingPlacement? onCreateAtExistingPlacement;
   final ValueChanged<InventoryPlacementTarget>? onSelectTarget;
   final ValueChanged<bool>? onInteractionChanged;
   final bool autoLoad;
@@ -525,6 +530,8 @@ class InventoryMapViewState extends State<InventoryMapView> {
     if (current != null) setState(() => _viewport = current.reset());
   }
 
+  void _handleDoubleTap() => fitCanvas();
+
   bool focusAsset(
     String assetId, {
     Duration highlightDuration = const Duration(seconds: 2),
@@ -587,6 +594,11 @@ class InventoryMapViewState extends State<InventoryMapView> {
     if (selectTarget != null) {
       final target = captureInventoryPlacementTarget(group.center, viewport);
       if (target != null) selectTarget(target);
+      return;
+    }
+    if (widget.onCreateAtExistingPlacement != null &&
+        _hasExactDuplicatePoint(group)) {
+      unawaited(_openClusterChooser(group));
       return;
     }
     if (viewport.zoom < InventoryViewport.maximumZoom) {
@@ -708,6 +720,7 @@ class InventoryMapViewState extends State<InventoryMapView> {
                     key: const Key('inventory-map-gesture'),
                     behavior: HitTestBehavior.opaque,
                     onTapUp: _handleTap,
+                    onDoubleTap: _handleDoubleTap,
                     onScaleStart: _handleScaleStart,
                     onScaleUpdate: _handleScaleUpdate,
                     onScaleEnd: _handleScaleEnd,
@@ -749,6 +762,10 @@ class InventoryMapViewState extends State<InventoryMapView> {
                           );
                           return;
                         }
+                        if (widget.onCreateAtExistingPlacement != null) {
+                          unawaited(_openClusterChooser(group));
+                          return;
+                        }
                         widget.onOpenAsset(projection.asset.id);
                       },
                     ),
@@ -769,7 +786,10 @@ class InventoryMapViewState extends State<InventoryMapView> {
   }
 
   Future<void> _openClusterChooser(InventoryMarkerGroup group) async {
-    final selected = await showModalBottomSheet<String>(
+    final exactPoints = _exactPointsForGroup(group);
+    final canAddAtPoint =
+        exactPoints.isNotEmpty && widget.onCreateAtExistingPlacement != null;
+    final selected = await showModalBottomSheet<Object>(
       context: context,
       builder: (sheetContext) => SafeArea(
         child: ConstrainedBox(
@@ -782,9 +802,25 @@ class InventoryMapViewState extends State<InventoryMapView> {
                 leading: const Icon(Icons.group_work_outlined),
                 title: Text('${group.projections.length} envanter kaydı'),
                 subtitle: const Text(
-                  'Ayrıntısını açmak istediğiniz kaydı seçin.',
+                  'Ayrıntısını açın veya aynı noktaya yeni kayıt ekleyin.',
                 ),
               ),
+              if (canAddAtPoint)
+                for (var index = 0; index < exactPoints.length; index += 1)
+                  ListTile(
+                    key: index == 0
+                        ? const Key('inventory-cluster-add-at-point')
+                        : Key('inventory-cluster-add-at-point-$index'),
+                    leading: const Icon(Icons.add_location_alt_outlined),
+                    title: const Text('Bu noktaya kayıt ekle'),
+                    subtitle: Text(
+                      'Kroki konumu: '
+                      '${exactPoints[index].target.x}, '
+                      '${exactPoints[index].target.y}',
+                    ),
+                    onTap: () =>
+                        Navigator.pop(sheetContext, exactPoints[index]),
+                  ),
               for (final projection in group.projections)
                 ListTile(
                   key: Key('inventory-cluster-item-${projection.asset.id}'),
@@ -801,8 +837,61 @@ class InventoryMapViewState extends State<InventoryMapView> {
         ),
       ),
     );
-    if (selected != null && mounted) widget.onOpenAsset(selected);
+    if (!mounted || selected == null) return;
+    if (selected case final String assetId) {
+      widget.onOpenAsset(assetId);
+      return;
+    }
+    if (selected case final _InventoryAddAtPointAction exactPoint) {
+      widget.onCreateAtExistingPlacement!(
+        exactPoint.target,
+        exactPoint.floorId,
+      );
+    }
   }
+
+  bool _hasExactDuplicatePoint(InventoryMarkerGroup group) {
+    final counts = <(String, int, int), int>{};
+    for (final projection in group.projections) {
+      final placement = projection.activePlacement;
+      if (placement == null) continue;
+      final key = (placement.floorId, placement.x, placement.y);
+      final count = (counts[key] ?? 0) + 1;
+      if (count > 1) return true;
+      counts[key] = count;
+    }
+    return false;
+  }
+
+  List<_InventoryAddAtPointAction> _exactPointsForGroup(
+    InventoryMarkerGroup group,
+  ) {
+    final actions = <_InventoryAddAtPointAction>[];
+    final seen = <(String, int, int)>{};
+    for (final projection in group.projections) {
+      final placement = projection.activePlacement;
+      if (placement == null) continue;
+      final key = (placement.floorId, placement.x, placement.y);
+      if (!seen.add(key)) continue;
+      actions.add(
+        _InventoryAddAtPointAction(
+          target: InventoryPlacementTarget(x: placement.x, y: placement.y),
+          floorId: placement.floorId,
+        ),
+      );
+    }
+    return List<_InventoryAddAtPointAction>.unmodifiable(actions);
+  }
+}
+
+class _InventoryAddAtPointAction {
+  const _InventoryAddAtPointAction({
+    required this.target,
+    required this.floorId,
+  });
+
+  final InventoryPlacementTarget target;
+  final String floorId;
 }
 
 class _InventoryClusterFocusIndicator extends StatelessWidget {

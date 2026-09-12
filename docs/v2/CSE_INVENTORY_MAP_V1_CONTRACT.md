@@ -29,7 +29,8 @@ V1 MUST include:
 - durable asset/lot records with category, positive integer quantity, status,
   optional note and optional photo boundary;
 - history-preserving placement, move, status and archive behavior;
-- two projections, `Kroki` and `Liste`, over the same canonical records;
+- three projections, `Kroki`, `Katlar` and `Liste`, over the same canonical
+  records;
 - offline persistence and format-1 backup/restore adoption.
 
 V1 MUST NOT implement:
@@ -102,9 +103,9 @@ copy MUST be `Bu projede henüz şematik kroki yok.` and the primary action MUST
 be `Kroki ekle`.
 
 Normal Inventory viewing MUST remain portrait-capable. Only the drawing editor
-route is portrait-scoped (Issue #586). `Kroki` and `Liste` MUST be sibling projections in
-the same Envanter destination and MUST share the same selected project,
-filters and canonical asset/placement query result.
+route is portrait-scoped (Issue #586). `Kroki`, `Katlar` and `Liste` MUST be
+sibling projections in the same Envanter destination and MUST share the same
+selected project, filters and canonical asset/placement query result.
 
 ## 3. Virtual geometry contract
 
@@ -360,10 +361,10 @@ uzunluk` disables only this prior-vertex length alignment for the next committed
 edge; that edge remains orthogonal and smart alignment then restores
 automatically. Preserved legacy/finalized geometry MAY remain diagonal and MUST
 remain readable; this drawing rule MUST NOT become a schema/domain-wide legacy
-rejection. The editor MUST also provide bounded snap-to-first closure plus
-explicit `Alanı kapat`, and request the block name and positive bounded floor
-count before closing the polygon. Validation MUST fail before draft/final source
-mutation.
+rejection. Bounded snap-to-first is the primary block-closure interaction and
+MUST request the block name and positive bounded floor count before committing
+the closed polygon. A permanent `Alanı kapat` control MUST NOT occupy the primary
+toolbox. Validation MUST fail before draft/final source mutation.
 
 Schema20 migration MUST first validate source relationships, then create one
 deterministic `Varsayılan Alan` / `1. Kat` pair for every project with Inventory
@@ -868,29 +869,36 @@ MUST reassert the standard set. Orientation calls MUST NOT change Android/iOS
 manifest or permission files unless a later Issue separately proves necessity.
 
 The ready editor MUST use the portrait route as a full-screen canvas without a
-large AppBar or horizontal text toolbar. A compact icon-only toolbar MUST stay
-on the right; every control MUST expose both a tooltip and an accessibility
-label. Selected modes and one-shot state MUST include a non-color-only
-indicator. Draft acknowledgement MAY appear as a compact overlay and MUST NOT
-reduce the canonical canvas work area.
+large AppBar or horizontal text toolbar. `Geri` MUST be a distinct, easily
+discovered top navigation action with a real hit target of at least `48 x 48`
+logical pixels; it MUST NOT appear inside the drawing toolbox. A compact,
+bounded icon-only toolbox MAY share the top edge. Every control MUST expose both
+a tooltip and an accessibility label. Selected modes and one-shot state MUST
+include a non-color-only indicator. Draft acknowledgement MAY appear as a
+compact overlay and MUST NOT reduce the canonical canvas work area.
 
 Issue #586 supersedes the original landscape presentation only. Entry and
 resume use `portraitUp`; the standard shell restoration and #537 durable
 autosave/finalize contracts remain unchanged. At 320 logical pixels and text
-scale 1.6, back, save acknowledgement, drawing/selection, undo/redo, zoom/fit
-and publish remain reachable through the bounded, scrollable editor rail.
+scale 1.6, back, save acknowledgement, drawing/selection, undo/redo,
+gesture-based viewport recovery and publish remain reachable through bounded,
+adaptive controls.
 
-Inventory uses a left icon rail ordered `Kroki`, `Katlar`, `Liste`, with exactly
-one selected view, and a separately grouped right context/filter rail. Search,
-block, floor, category/status/archive values remain visible in bounded textual
-panels; opening or closing a panel alone does not change them. Floor selection
-is disabled without a valid selected block. Compact indicators and descriptive
+Inventory uses one bottom-screen control ordered `Kroki`, `Katlar`, `Liste`,
+with exactly one selected view and safe-inset-aware `48 x 48` minimum targets.
+Moving this route-local control MUST NOT reset the selected active project,
+view, filter or spatial context. Search, block, floor,
+category/status/archive values remain visible in bounded textual panels;
+opening or closing a panel alone does not change them. Floor selection is
+disabled without a valid selected block. Compact indicators and descriptive
 tooltips expose active context without a permanent horizontal text toolbar.
-Map zoom/fit actions are a separate right-rail group visible only in Kroki.
+Dedicated map zoom in/out and fit actions MUST NOT occupy the primary toolbox;
+pinch and the non-conflicting viewport-recovery gesture provide those
+presentation-only capabilities.
 The bottom-right edit icon retains `inventory-update-sketch` and exact
 `editActive` intent, and is absent from other views and target-selection mode.
 Every icon has tooltip, Semantics label and a real hit target of at least
-40 by 40 logical pixels. Only actual state controls expose selected semantics;
+`48 x 48` logical pixels. Only actual state controls expose selected semantics;
 destructive confirmation actions retain visible text.
 
 During map pan/pinch the view/tool rails and edit icon fade out and immediately
@@ -902,7 +910,8 @@ target-selection cancellation remain outside auto-hide.
 
 ### 8.2 Tap-to-connect editor state machine
 
-The editor has exact modes `DRAW`, `SELECT` and `PAN`.
+The editor state model retains `DRAW`, `SELECT` and legacy/internal `PAN`
+compatibility, but the primary toolbox exposes only `DRAW` and `SELECT`.
 
 In `DRAW`:
 
@@ -920,7 +929,9 @@ In `DRAW`:
    step 4 but not steps 2–3, and resets only after a valid segment commits;
 6. tapping the first point after at least three distinct points closes and ends
    the polyline only when the required orthogonal axis can reach it;
-7. `Çizgiyi bitir` ends an open polyline with at least two points;
+7. a contextual, explicitly invoked `Çizgiyi bitir` action ends an open
+   polyline with at least two points and MUST be absent while no open polyline
+   exists;
 8. ending a one-point polyline removes that incomplete point as one undoable
    editor command;
 9. a duplicate consecutive point, invalid point or limit-exceeding point is
@@ -958,14 +969,20 @@ and finalize normally.
 ### 8.3 Gesture separation and viewport
 
 - One-finger taps draw only in `DRAW`.
-- One-finger drag pans only in `PAN`.
-- Two-finger pan/pinch MAY navigate in every mode but MUST never add/delete a
-  point.
+- One-finger taps/select gestures retain their exact source behavior in `DRAW`
+  and `SELECT`; removing the dedicated `PAN` button MUST NOT reinterpret them as
+  viewport gestures.
+- Two-finger pan/pinch MUST navigate in `DRAW` and `SELECT` and MUST never
+  add/delete a point or mutate source geometry.
 - Zoom MUST be presentation-only and bounded to `0.5x..4.0x` relative to
   fit-to-canvas.
 - Panning SHOULD keep at least `15%` of the canvas visible.
+- A non-conflicting recovery gesture MUST restore fit-to-canvas without source
+  mutation after the dedicated fit control is removed.
 - Switching mode MUST end no polyline implicitly; the owner must use
-  `Çizgiyi bitir`, close it or undo it.
+  the contextual `Çizgiyi bitir`, snap-to-first closure or undo. Completing an
+  open line or closing a block MUST keep `DRAW` sticky until the owner explicitly
+  changes mode.
 
 The dotted grid, polylines and placement markers MUST share one virtual-to-view
 transform, while source values remain integer virtual coordinates.
@@ -1001,8 +1018,11 @@ sketch or choose another revision automatically.
 ### 8.5 Map capture, markers, list and detail
 
 On a valid active sketch, tapping empty map space in normal `Kroki` view MUST
-quantize one placement coordinate and open the quick form. Tapping a marker or
-cluster MUST NOT open create.
+quantize one placement coordinate and open the quick form. Tapping an existing
+same-coordinate marker/cluster MUST expose the existing records plus an explicit
+`Bu noktaya kayıt ekle` action. That action MUST pass the exact active
+`floor_id`, `x` and `y` to the unchanged quick-create flow; it MUST NOT infer a
+different floor or offset a source coordinate.
 
 Create success MUST add the same canonical asset/placement result to both map
 and list. Marker semantics MUST include asset name, quantity and status text;
@@ -1012,14 +1032,18 @@ have at least a `48 x 48` logical-pixel target.
 Basic overlap MUST use viewport presentation buckets of `48 x 48` logical
 pixels anchored to the current viewport origin. Two or more marker centers in
 one bucket render as a count cluster, ordered internally by normalized asset
-name then stable asset ID. Cluster tap zooms one step and centers the bucket; at
-`4.0x`, it opens the deterministic item list. Bucketing MUST NOT mutate source
-coordinates.
+name then stable asset ID. A cluster whose records share exact floor/x/y MUST
+open its deterministic item/action list directly; other presentation-only
+clusters MAY zoom one step and center the bucket before opening the list at
+`4.0x`. Every colocated record MUST remain individually reachable. Bucketing
+MUST NOT mutate source coordinates.
 
-Marker tap MUST open exact asset detail with status, quantity, note, category,
-photo boundary and ordered event history. `Taşı` MUST show a target preview and
-require explicit `Konumu güncelle` confirmation before the section 5 move
-transaction. Cancel or same coordinate is a no-op.
+Selecting a marker-list item MUST open exact asset detail with status, quantity,
+note, category, photo boundary and ordered event history. Distinct assets MAY
+share exact floor/x/y while v1 continues to allow exactly one active placement
+per asset. `Taşı` MUST show a target preview and require explicit `Konumu
+güncelle` confirmation before the section 5 move transaction. Cancel or same
+coordinate is a no-op.
 
 Asset detail history MUST combine the asset's own events, every placement-key
 event belonging to that asset and every Inventory photo-link event belonging to
@@ -1091,7 +1115,9 @@ remains `0.1.0+1`.
 
 In `SELECT`, selecting the same segment again MUST promote the selection to its
 whole mapped polygon. Four icon actions with tooltips and semantic labels MUST
-nudge a whole polygon exactly one sketch-grid step left, right, up or down. A
+nudge a whole polygon exactly one sketch-grid step left, right, up or down. This
+includes a valid newly closed block during `createOrRecover`; an incomplete raw
+polyline and immutable legacy/base geometry MUST remain non-movable. A
 selected horizontal or vertical edge MUST move parallel exactly one sketch-grid
 step in its perpendicular direction while its adjacent edges remain connected.
 A persisted legacy diagonal polygon MAY be whole-translated, but an individual

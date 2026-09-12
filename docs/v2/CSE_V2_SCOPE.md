@@ -545,7 +545,7 @@ birlikte yönetir. UXF-002..018 tamamlanmış ve korunmuş temeldir. Sıradaki d
 yön Project Profile/Home görsel dönüşümü; ardından ortak görsel dil ve genel
 sağ ekran-tool rail, sonra yüksek sürtünmeli form/ekran dilimleridir. Inventory
 genel sağ rail dilinin açık istisnasıdır: sağ rail yerine kompakt üst araç
-alanı kullanır, soldaki Kroki/Katlar/Liste rail'i korunur. Kalan Step 10/11,
+alanı kullanır, Kroki/Katlar/Liste geçişi ekranın altında korunur. Kalan Step 10/11,
 adaptive/accessibility ve recovery borcu görsel dalgadan sonra release kapısı
 olarak geri döner. Issue #479'da ve ilgili ürün kayıtlarında görünür kalan
 manuel kabul borcu ile backup, arama, onboarding, telemetry, privacy/KVKK ve

@@ -1189,6 +1189,7 @@ class InventoryPageState extends State<InventoryPage> {
 
   Widget _ready() {
     final visible = controller.visibleAssets;
+    final viewSwitchExtent = 72 + MediaQuery.paddingOf(context).bottom;
     return Column(
       children: [
         if (controller.lastDiagnosticCode case final code?)
@@ -1207,28 +1208,22 @@ class InventoryPageState extends State<InventoryPage> {
           child: LayoutBuilder(
             builder: (context, constraints) => Stack(
               children: [
-                Positioned.fill(
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  right: 0,
+                  bottom: viewSwitchExtent,
                   child: switch (controller.view) {
                     InventoryPageView.map => _map(),
-                    InventoryPageView.floors => Padding(
-                      padding: const EdgeInsets.only(left: 64),
-                      child: _floors(),
-                    ),
-                    InventoryPageView.list => Padding(
-                      padding: const EdgeInsets.only(left: 64),
-                      child: _list(visible),
-                    ),
+                    InventoryPageView.floors => _floors(),
+                    InventoryPageView.list => _list(visible),
                   },
                 ),
                 Positioned(
-                  left: 8,
-                  top: 8,
-                  bottom: _targetSelectionRequest == null
-                      ? 64
-                      : constraints.maxHeight / 2,
-                  child: _gestureAwareControl(
-                    SingleChildScrollView(child: _viewRail()),
-                  ),
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _gestureAwareControl(_bottomViewSwitch()),
                 ),
                 if (controller.view == InventoryPageView.map &&
                     controller.sketch != null &&
@@ -1236,7 +1231,7 @@ class InventoryPageState extends State<InventoryPage> {
                     _targetSelectionRequest == null)
                   Positioned(
                     right: 8,
-                    bottom: 8,
+                    bottom: viewSwitchExtent + 8,
                     child: _gestureAwareControl(
                       _edgeButton(
                         key: const Key('inventory-update-sketch'),
@@ -1298,27 +1293,36 @@ class InventoryPageState extends State<InventoryPage> {
     ),
   );
 
-  Widget _viewRail() => Column(
-    key: const Key('inventory-view-switch'),
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      for (final view in InventoryPageView.values)
-        _edgeButton(
-          key: ValueKey('inventory-view-${view.name}'),
-          label: switch (view) {
-            InventoryPageView.map => 'Kroki',
-            InventoryPageView.floors => 'Katlar',
-            InventoryPageView.list => 'Liste',
-          },
-          icon: switch (view) {
-            InventoryPageView.map => Icons.map_outlined,
-            InventoryPageView.floors => Icons.layers_outlined,
-            InventoryPageView.list => Icons.view_list_outlined,
-          },
-          selected: controller.view == view,
-          onPressed: () => controller.setView(view),
-        ),
-    ],
+  Widget _bottomViewSwitch() => SafeArea(
+    top: false,
+    minimum: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: NavigationBar(
+        key: const Key('inventory-view-switch'),
+        height: 64,
+        selectedIndex: controller.view.index,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        onDestinationSelected: (index) =>
+            controller.setView(InventoryPageView.values[index]),
+        destinations: [
+          for (final view in InventoryPageView.values)
+            NavigationDestination(
+              key: ValueKey('inventory-view-${view.name}'),
+              icon: Icon(switch (view) {
+                InventoryPageView.map => Icons.map_outlined,
+                InventoryPageView.floors => Icons.layers_outlined,
+                InventoryPageView.list => Icons.view_list_outlined,
+              }),
+              label: switch (view) {
+                InventoryPageView.map => 'Kroki',
+                InventoryPageView.floors => 'Katlar',
+                InventoryPageView.list => 'Liste',
+              },
+            ),
+        ],
+      ),
+    ),
   );
 
   Widget _topTools() {
@@ -1378,32 +1382,6 @@ class InventoryPageState extends State<InventoryPage> {
               ),
             ],
           ),
-          if (controller.view == InventoryPageView.map) ...[
-            const SizedBox(width: 16),
-            Row(
-              key: const Key('inventory-map-tools'),
-              children: [
-                _edgeButton(
-                  key: const Key('inventory-map-zoom-in'),
-                  label: 'Yaklaştır',
-                  icon: Icons.add,
-                  onPressed: () => _mapKey.currentState?.zoomIn(),
-                ),
-                _edgeButton(
-                  key: const Key('inventory-map-zoom-out'),
-                  label: 'Uzaklaştır',
-                  icon: Icons.remove,
-                  onPressed: () => _mapKey.currentState?.zoomOut(),
-                ),
-                _edgeButton(
-                  key: const Key('inventory-map-fit'),
-                  label: 'Tamamını göster',
-                  icon: Icons.fit_screen,
-                  onPressed: () => _mapKey.currentState?.fitCanvas(),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
@@ -1652,6 +1630,7 @@ class InventoryPageState extends State<InventoryPage> {
             controller: map,
             autoLoad: false,
             onCreateTarget: _openQuickCreate,
+            onCreateAtExistingPlacement: _openQuickCreateAtExistingPlacement,
             onOpenAsset: _openAssetDetail,
             onInteractionChanged: _onMapInteraction,
             onSelectTarget: _targetSelectionRequest == null
@@ -1909,6 +1888,36 @@ class InventoryPageState extends State<InventoryPage> {
     }
     _mapController?.clearCreateTarget();
     if (createdId != null) await _openAssetDetail(createdId);
+  }
+
+  Future<void> _openQuickCreateAtExistingPlacement(
+    InventoryPlacementTarget target,
+    String floorId,
+  ) async {
+    final floor = controller.activeFloors
+        .where((candidate) => candidate.id == floorId)
+        .toList(growable: false);
+    if (floor.length != 1) {
+      controller.recordPresentationFailure(
+        'inventory_projection_integrity_failed',
+      );
+      return;
+    }
+    final block = controller.activeBlocks
+        .where((candidate) => candidate.id == floor.single.blockId)
+        .toList(growable: false);
+    if (block.length != 1) {
+      controller.recordPresentationFailure(
+        'inventory_projection_integrity_failed',
+      );
+      return;
+    }
+    await _openQuickCreate(
+      target,
+      floorId: floorId,
+      spatialContextLabel:
+          '${block.single.displayName} · ${floor.single.displayName}',
+    );
   }
 
   Future<void> _openFloorQuickCreate(String blockId, String floorId) async {
