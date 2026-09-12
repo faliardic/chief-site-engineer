@@ -3,6 +3,7 @@ import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_compliance_summary.dart';
+import 'package:chief_site_engineer/features/attendance/workforce_ppe_quick_selection.dart';
 import 'package:flutter/material.dart';
 
 class WorkforcePersonDetailPage extends StatefulWidget {
@@ -339,109 +340,15 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
   }
 
   Future<void> _savePpe([WorkforcePpeAssignment? current]) async {
-    final type = TextEditingController(text: current?.ppeType);
-    final brand = TextEditingController(text: current?.brandModel);
-    final size = TextEditingController(text: current?.size);
-    final serial = TextEditingController(text: current?.serialTag);
-    final quantity = TextEditingController(text: '${current?.quantity ?? 1}');
-    final assigned = TextEditingController(
-      text:
-          current?.assignedDate ??
-          DateTime.now().toIso8601String().substring(0, 10),
-    );
-    final returned = TextEditingController(text: current?.returnedDate);
-    final note = TextEditingController(text: current?.note);
-    var status = current?.status ?? PpeAssignmentStatus.assigned;
-    final input = await showDialog<_PpeInput>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            current == null ? 'KKD zimmeti ekle' : 'KKD zimmetini güncelle',
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _field(type, 'KKD türü *'),
-                _gap,
-                _field(brand, 'Marka/model'),
-                _gap,
-                _field(size, 'Beden'),
-                _gap,
-                _field(serial, 'Seri/etiket'),
-                _gap,
-                _field(quantity, 'Adet *'),
-                _gap,
-                _field(assigned, 'Zimmet tarihi (YYYY-AA-GG) *'),
-                _gap,
-                DropdownButtonFormField<PpeAssignmentStatus>(
-                  initialValue: status,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Durum'),
-                  items: PpeAssignmentStatus.values
-                      .map(
-                        (item) => DropdownMenuItem(
-                          value: item,
-                          child: Text(item.label),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) =>
-                      setDialogState(() => status = value ?? status),
-                ),
-                _gap,
-                _field(returned, 'İade tarihi (YYYY-AA-GG)'),
-                _gap,
-                _field(note, 'Not', maxLines: 3),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Vazgeç'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(
-                context,
-                _PpeInput(
-                  type.text,
-                  brand.text,
-                  size.text,
-                  serial.text,
-                  int.tryParse(quantity.text) ?? 0,
-                  assigned.text,
-                  status,
-                  returned.text,
-                  note.text,
-                ),
-              ),
-              child: const Text('Kaydet'),
-            ),
-          ],
-        ),
-      ),
-    );
-    await Future<void>.delayed(kThemeAnimationDuration);
-    for (final controller in [
-      type,
-      brand,
-      size,
-      serial,
-      quantity,
-      assigned,
-      returned,
-      note,
-    ]) {
-      controller.dispose();
-    }
-    if (input == null) return;
-    try {
-      await widget.attendance.savePpeAssignment(
+    final id = current?.id ?? RecordId.randomUuid();
+    final eventId = RecordId.randomUuid();
+    final saved = await showPpeQuickAssignmentSheet(
+      context,
+      current: current,
+      onSave: (input) => widget.attendance.savePpeAssignment(
         SavePpeAssignmentCommand(
-          id: current?.id ?? RecordId.randomUuid(),
-          eventId: RecordId.randomUuid(),
+          id: id,
+          eventId: eventId,
           memberId: widget.memberId,
           expectedRevision: current?.revision ?? 0,
           ppeType: input.type,
@@ -454,13 +361,9 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
           returnedDate: input.returned,
           note: input.note,
         ),
-      );
-      await _load();
-    } on Object catch (error) {
-      if (mounted) {
-        setState(() => _error = _message(error, 'KKD zimmeti kaydedilemedi.'));
-      }
-    }
+      ),
+    );
+    if (saved == true && mounted) await _load();
   }
 
   @override
@@ -811,25 +714,79 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
   );
 
   Widget _ppe(WorkforcePersonDetail detail) => ListView(
+    key: const PageStorageKey('workforce-person-ppe'),
     padding: const EdgeInsets.all(12),
     children: [
-      FilledButton.icon(
-        key: const Key('add-ppe-assignment'),
-        onPressed: _savePpe,
-        icon: const Icon(Icons.health_and_safety_outlined),
-        label: const Text('KKD zimmeti ekle'),
-      ),
-      const SizedBox(height: 8),
-      for (final item in detail.ppeAssignments)
+      if (detail.ppeAssignments.isEmpty)
         Card(
-          key: Key('ppe-${item.id}'),
-          child: ListTile(
-            onTap: () => _savePpe(item),
-            title: Text('${item.ppeType} • ${item.quantity} adet'),
-            subtitle: Text('${item.status.label} • ${item.assignedDate}'),
-            trailing: const Icon(Icons.chevron_right),
+          key: const Key('ppe-empty-state'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Henüz KKD zimmeti yok.',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Baret, yelek ve diğer koruyucu ekipmanları buradan personele zimmetleyebilirsiniz.',
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  key: const Key('add-ppe-assignment'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                  ),
+                  onPressed: _savePpe,
+                  icon: const Icon(Icons.health_and_safety_outlined),
+                  label: const Text('KKD zimmeti ekle'),
+                ),
+              ],
+            ),
           ),
+        )
+      else ...[
+        FilledButton.icon(
+          key: const Key('add-ppe-assignment'),
+          style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+          onPressed: _savePpe,
+          icon: const Icon(Icons.health_and_safety_outlined),
+          label: const Text('KKD zimmeti ekle'),
         ),
+        const SizedBox(height: 8),
+        for (final item in detail.ppeAssignments)
+          Card(
+            key: Key('ppe-${item.id}'),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '${item.ppeType} • ${item.quantity} adet',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text('${item.status.label} • ${item.assignedDate}'),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: TextButton.icon(
+                      key: Key('edit-ppe-${item.id}'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                      ),
+                      onPressed: () => _savePpe(item),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Düzenle'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     ],
   );
 
@@ -1183,29 +1140,6 @@ class _ComplianceInput {
   final String expiry;
   final String note;
   final String reason;
-}
-
-class _PpeInput {
-  const _PpeInput(
-    this.type,
-    this.brand,
-    this.size,
-    this.serial,
-    this.quantity,
-    this.assigned,
-    this.status,
-    this.returned,
-    this.note,
-  );
-  final String type;
-  final String brand;
-  final String size;
-  final String serial;
-  final int quantity;
-  final String assigned;
-  final PpeAssignmentStatus status;
-  final String returned;
-  final String note;
 }
 
 String _message(Object error, String fallback) =>
