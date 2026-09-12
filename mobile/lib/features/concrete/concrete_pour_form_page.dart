@@ -12,16 +12,18 @@ import 'package:flutter/material.dart';
 class ConcretePourFormPage extends StatefulWidget {
   const ConcretePourFormPage({
     required this.concrete,
-    required this.projects,
+    this.projects = const [],
     this.projectLocations,
     this.initialProject,
+    this.initialPour,
     super.key,
-  });
+  }) : assert(initialPour != null || projects.length > 0);
 
   final ConcreteApplication concrete;
   final List<MobileProject> projects;
   final ProjectLocationApplication? projectLocations;
   final MobileProject? initialProject;
+  final ConcretePour? initialPour;
 
   @override
   State<ConcretePourFormPage> createState() => _ConcretePourFormPageState();
@@ -32,19 +34,25 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
   final _code = TextEditingController();
   final _location = TextEditingController();
   final _volume = TextEditingController();
+  final _orderedVolume = TextEditingController();
   final _block = TextEditingController();
   final _floor = TextEditingController();
   final _axis = TextEditingController();
   final _plant = TextEditingController();
+  final _plantBranch = TextEditingController();
+  final _plantContact = TextEditingController();
   final _slump = TextEditingController();
   final _plantReference = TextEditingController();
   final _laboratory = TextEditingController();
+  final _laboratoryContact = TextEditingController();
   final _pump = TextEditingController();
   final _inspectionPerson = TextEditingController();
   final _note = TextEditingController();
+  final _sampleException = TextEditingController();
+  final _varianceNote = TextEditingController();
   late final String _id = RecordId.randomUuid();
   late final String _eventId = RecordId.randomUuid();
-  late MobileProject _project;
+  MobileProject? _project;
   late DateTime _planned;
   DateTime? _laboratoryAppointment;
   DateTime? _inspectionNotifiedAt;
@@ -58,12 +66,52 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
   bool _saving = false;
   String? _error;
 
+  bool get _isEditing => widget.initialPour != null;
+  String get _projectId => widget.initialPour?.projectId ?? _project!.id;
+
   @override
   void initState() {
     super.initState();
-    _project = widget.initialProject ?? widget.projects.first;
-    _planned = DateTime.now().add(const Duration(hours: 1));
-    _loadClasses();
+    final pour = widget.initialPour;
+    _project = widget.initialProject;
+    if (_project == null && pour != null) {
+      for (final project in widget.projects) {
+        if (project.id == pour.projectId) {
+          _project = project;
+          break;
+        }
+      }
+    }
+    if (pour == null) {
+      _project ??= widget.projects.first;
+      _planned = DateTime.now().add(const Duration(hours: 1));
+      _loadClasses();
+    } else {
+      _planned = CseTimeCodec.toIstanbul(pour.plannedAt);
+      _laboratoryAppointment = _toIstanbulOptional(pour.laboratoryAppointment);
+      _inspectionNotifiedAt = _toIstanbulOptional(pour.inspectionNotifiedAt);
+      _code.text = pour.pourCode;
+      _location.text = pour.elementLocation;
+      _locationId = pour.locationId;
+      _volume.text = _decimalText(pour.plannedVolumeM3);
+      _orderedVolume.text = _decimalText(pour.orderedVolumeM3);
+      _block.text = pour.blockName ?? '';
+      _floor.text = pour.floorName ?? '';
+      _axis.text = pour.axisName ?? '';
+      _plant.text = pour.plantName ?? '';
+      _plantBranch.text = pour.plantBranch ?? '';
+      _plantContact.text = pour.plantContact ?? '';
+      _slump.text = pour.targetSlump ?? '';
+      _plantReference.text = pour.plantAppointmentReference ?? '';
+      _laboratory.text = pour.laboratoryName ?? '';
+      _laboratoryContact.text = pour.laboratoryContact ?? '';
+      _pump.text = pour.pumpEquipment ?? '';
+      _inspectionPerson.text = pour.inspectionNotifiedPerson ?? '';
+      _note.text = pour.generalNote ?? '';
+      _sampleException.text = pour.sampleExceptionReason ?? '';
+      _varianceNote.text = pour.varianceNote ?? '';
+      _loadingClasses = false;
+    }
     _loadLocations();
   }
 
@@ -73,16 +121,22 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
       _code,
       _location,
       _volume,
+      _orderedVolume,
       _block,
       _floor,
       _axis,
       _plant,
+      _plantBranch,
+      _plantContact,
       _slump,
       _plantReference,
       _laboratory,
+      _laboratoryContact,
       _pump,
       _inspectionPerson,
       _note,
+      _sampleException,
+      _varianceNote,
     ]) {
       controller.dispose();
     }
@@ -92,11 +146,11 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
   Future<void> _loadClasses() async {
     setState(() => _loadingClasses = true);
     try {
-      final values = await widget.concrete.listConcreteClasses(_project.id);
+      final values = await widget.concrete.listConcreteClasses(_projectId);
       if (!mounted) return;
       setState(() {
         _classes = values;
-        if (_selectedClass?.projectId != _project.id ||
+        if (_selectedClass?.projectId != _projectId ||
             !values.any((item) => item.id == _selectedClass?.id)) {
           _selectedClass = null;
         }
@@ -133,12 +187,14 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
     });
     try {
       final values = await application.listProjectLocations(
-        ProjectLocationQuery(projectId: _project.id),
+        ProjectLocationQuery(projectId: _projectId),
       );
       if (!mounted) return;
       setState(() {
         _locations = values;
-        if (!values.any((item) => item.id == _locationId)) _locationId = null;
+        if (!_isEditing && !values.any((item) => item.id == _locationId)) {
+          _locationId = null;
+        }
         _loadingLocations = false;
       });
     } on Object {
@@ -158,7 +214,7 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
       MaterialPageRoute(
         builder: (_) => ProjectLocationCatalogPage(
           application: application,
-          initialProjectId: _project.id,
+          initialProjectId: _projectId,
         ),
       ),
     );
@@ -182,7 +238,7 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
         CreateProjectConcreteClassCommand(
           id: RecordId.randomUuid(),
           eventId: RecordId.randomUuid(),
-          projectId: _project.id,
+          projectId: _projectId,
           displayName: name,
         ),
       );
@@ -233,7 +289,7 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
   Future<void> _save() async {
     if (_saving || !_form.currentState!.validate()) return;
     final selectedClass = _selectedClass;
-    if (selectedClass == null) return;
+    if (!_isEditing && selectedClass == null) return;
     setState(() {
       _saving = true;
       _error = null;
@@ -245,40 +301,78 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
         day: _planned.day,
         hour: _planned.hour,
         minute: _planned.minute,
+        second: _planned.second,
       );
-      await widget.concrete.createPour(
-        CreateConcretePourCommand(
-          id: _id,
-          eventId: _eventId,
-          projectId: _project.id,
-          pourCode: _code.text.trim().isEmpty
-              ? 'DOKUM-${_id.substring(0, 8).toUpperCase()}'
-              : _code.text,
-          elementLocation: _location.text,
-          locationId: _locationId,
-          plannedAt: canonical,
-          concreteClassId: selectedClass.id,
-          plannedVolumeM3: double.parse(_volume.text.replaceAll(',', '.')),
-          blockName: _block.text,
-          floorName: _floor.text,
-          axisName: _axis.text,
-          plantName: _plant.text,
-          targetSlump: _slump.text,
-          plantAppointmentReference: _plantReference.text,
-          laboratoryName: _laboratory.text,
-          laboratoryAppointment: _canonicalOptional(_laboratoryAppointment),
-          pumpEquipment: _pump.text,
-          inspectionNotifiedAt: _canonicalOptional(_inspectionNotifiedAt),
-          inspectionNotifiedPerson: _inspectionPerson.text,
-          generalNote: _note.text,
-        ),
-      );
-      if (mounted) Navigator.of(context).pop(_id);
+      if (_isEditing) {
+        final pour = widget.initialPour!;
+        final detail = await widget.concrete.updatePour(
+          UpdateConcretePourCommand(
+            id: pour.id,
+            eventId: _eventId,
+            expectedRevision: pour.revision,
+            elementLocation: _location.text,
+            locationId: _locationId,
+            plannedAt: canonical,
+            concreteClass: pour.concreteClass,
+            plannedVolumeM3: double.parse(_volume.text.replaceAll(',', '.')),
+            orderedVolumeM3: _optionalDecimal(_orderedVolume.text),
+            blockName: _block.text,
+            floorName: _floor.text,
+            axisName: _axis.text,
+            targetSlump: _slump.text,
+            plantName: _plant.text,
+            plantBranch: _plantBranch.text,
+            plantContact: _plantContact.text,
+            plantAppointmentReference: _plantReference.text,
+            pumpEquipment: _pump.text,
+            laboratoryName: _laboratory.text,
+            laboratoryContact: _laboratoryContact.text,
+            laboratoryAppointment: _canonicalOptional(_laboratoryAppointment),
+            inspectionNotifiedAt: _canonicalOptional(_inspectionNotifiedAt),
+            inspectionNotifiedPerson: _inspectionPerson.text,
+            generalNote: _note.text,
+            sampleExceptionReason: _sampleException.text,
+            varianceNote: _varianceNote.text,
+          ),
+        );
+        if (mounted) Navigator.of(context).pop(detail);
+      } else {
+        await widget.concrete.createPour(
+          CreateConcretePourCommand(
+            id: _id,
+            eventId: _eventId,
+            projectId: _projectId,
+            pourCode: _code.text.trim().isEmpty
+                ? 'DOKUM-${_id.substring(0, 8).toUpperCase()}'
+                : _code.text,
+            elementLocation: _location.text,
+            locationId: _locationId,
+            plannedAt: canonical,
+            concreteClassId: selectedClass!.id,
+            plannedVolumeM3: double.parse(_volume.text.replaceAll(',', '.')),
+            blockName: _block.text,
+            floorName: _floor.text,
+            axisName: _axis.text,
+            plantName: _plant.text,
+            targetSlump: _slump.text,
+            plantAppointmentReference: _plantReference.text,
+            laboratoryName: _laboratory.text,
+            laboratoryAppointment: _canonicalOptional(_laboratoryAppointment),
+            pumpEquipment: _pump.text,
+            inspectionNotifiedAt: _canonicalOptional(_inspectionNotifiedAt),
+            inspectionNotifiedPerson: _inspectionPerson.text,
+            generalNote: _note.text,
+          ),
+        );
+        if (mounted) Navigator.of(context).pop(_id);
+      }
     } on Object catch (error) {
       if (mounted) {
         setState(
           () => _error = error is AgendaValidationFailure
               ? error.message
+              : _isEditing
+              ? 'Beton paketi güncellenemedi.'
               : 'Beton paketi oluşturulamadı.',
         );
       }
@@ -290,33 +384,53 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Yeni Beton paketi')),
+      appBar: AppBar(
+        title: Text(
+          _isEditing ? 'Beton paketini düzenle' : 'Yeni Beton paketi',
+        ),
+      ),
       body: SafeArea(
         child: Form(
           key: _form,
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              DropdownButtonFormField<MobileProject>(
-                initialValue: _project,
-                decoration: const InputDecoration(
-                  labelText: 'Proje',
-                  border: OutlineInputBorder(),
+              if (_isEditing)
+                _readOnlyField(
+                  'Proje',
+                  widget.initialPour!.projectName,
+                  key: const Key('concrete-project-read-only'),
+                )
+              else
+                DropdownButtonFormField<MobileProject>(
+                  initialValue: _project,
+                  decoration: const InputDecoration(
+                    labelText: 'Proje',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: widget.projects
+                      .map(
+                        (item) => DropdownMenuItem(
+                          value: item,
+                          child: Text(item.name),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _saving
+                      ? null
+                      : (value) {
+                          if (value != null) _changeProject(value);
+                        },
                 ),
-                items: widget.projects
-                    .map(
-                      (item) =>
-                          DropdownMenuItem(value: item, child: Text(item.name)),
-                    )
-                    .toList(),
-                onChanged: _saving
-                    ? null
-                    : (value) {
-                        if (value != null) _changeProject(value);
-                      },
-              ),
               const SizedBox(height: 12),
-              _field(_code, 'Döküm kodu (boşsa otomatik üretilir)'),
+              _field(
+                _code,
+                _isEditing
+                    ? 'Döküm kodu'
+                    : 'Döküm kodu (boşsa otomatik üretilir)',
+                key: const Key('concrete-pour-code'),
+                readOnly: _isEditing,
+              ),
               _buildLocationSelector(),
               _field(_location, 'Eleman / yer tarifi', required: true),
               ListTile(
@@ -328,55 +442,65 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
                 trailing: const Icon(Icons.edit_calendar_outlined),
                 onTap: _saving ? null : _pickPlanned,
               ),
-              DropdownButtonFormField<ProjectConcreteClass>(
-                key: const Key('concrete-class-selector'),
-                initialValue: _selectedClass,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: 'Beton sınıfı',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: _loadingClasses
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : null,
-                ),
-                items: _classes
-                    .map(
-                      (item) => DropdownMenuItem(
-                        value: item,
-                        child: Text(
-                          item.displayName,
-                          overflow: TextOverflow.ellipsis,
+              if (_isEditing)
+                _readOnlyField(
+                  'Beton sınıfı',
+                  widget.initialPour!.concreteClass,
+                  key: const Key('concrete-class-read-only'),
+                )
+              else ...[
+                DropdownButtonFormField<ProjectConcreteClass>(
+                  key: const Key('concrete-class-selector'),
+                  initialValue: _selectedClass,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Beton sınıfı',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: _loadingClasses
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
+                  ),
+                  items: _classes
+                      .map(
+                        (item) => DropdownMenuItem(
+                          value: item,
+                          child: Text(
+                            item.displayName,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                    )
-                    .toList(growable: false),
-                onChanged: _saving || _loadingClasses
-                    ? null
-                    : (value) => setState(() {
-                        _selectedClass = value;
-                        _slump.text = value?.defaultTargetSlump ?? '';
-                      }),
-                validator: (value) =>
-                    value == null ? 'Beton sınıfı zorunludur.' : null,
-              ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  key: const Key('add-concrete-class'),
-                  onPressed: _saving ? null : _addClass,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Yeni sınıf ekle'),
+                      )
+                      .toList(growable: false),
+                  onChanged: _saving || _loadingClasses
+                      ? null
+                      : (value) => setState(() {
+                          _selectedClass = value;
+                          _slump.text = value?.defaultTargetSlump ?? '';
+                        }),
+                  validator: (value) =>
+                      value == null ? 'Beton sınıfı zorunludur.' : null,
                 ),
-              ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    key: const Key('add-concrete-class'),
+                    onPressed: _saving ? null : _addClass,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Yeni sınıf ekle'),
+                  ),
+                ),
+              ],
               _field(
                 _volume,
                 'Planlanan metraj (m³)',
                 required: true,
                 decimal: true,
               ),
+              if (_isEditing)
+                _field(_orderedVolume, 'Sipariş metrajı (m³)', decimal: true),
               ExpansionTile(
                 tilePadding: EdgeInsets.zero,
                 title: const Text('İsteğe bağlı planlama bilgileri'),
@@ -386,8 +510,12 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
                   _field(_axis, 'Aks'),
                   _field(_slump, 'Hedef kıvam / slump'),
                   _field(_plant, 'Santral'),
+                  if (_isEditing) _field(_plantBranch, 'Santral şubesi'),
+                  if (_isEditing) _field(_plantContact, 'Santral iletişim'),
                   _field(_plantReference, 'Santral randevu referansı'),
                   _field(_laboratory, 'Laboratuvar'),
+                  if (_isEditing)
+                    _field(_laboratoryContact, 'Laboratuvar iletişim'),
                   _optionalDateTile(
                     'Laboratuvar randevu zamanı',
                     _laboratoryAppointment,
@@ -404,6 +532,9 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
                     (value) => _inspectionNotifiedAt = value,
                   ),
                   _field(_note, 'Genel not', lines: 3),
+                  if (_isEditing)
+                    _field(_sampleException, 'Numune istisna nedeni', lines: 2),
+                  if (_isEditing) _field(_varianceNote, 'Sapma notu', lines: 2),
                 ],
               ),
               if (_error case final error?)
@@ -425,7 +556,11 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.save_outlined),
-                label: const Text('Beton paketini oluştur'),
+                label: Text(
+                  _isEditing
+                      ? 'Beton paketini kaydet'
+                      : 'Beton paketini oluştur',
+                ),
               ),
             ],
           ),
@@ -453,6 +588,17 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
               value: null,
               child: Text('Mahal seçilmedi'),
             ),
+            if (_isEditing &&
+                _locationId != null &&
+                !_locations.any((item) => item.id == _locationId))
+              DropdownMenuItem<String>(
+                value: _locationId,
+                child: Text(
+                  '${widget.initialPour!.stableLocationName ?? 'Kayıtlı mahal'}'
+                  '${widget.initialPour!.stableLocationArchivedAt == null ? '' : ' (Arşivli)'}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ..._concreteLocationOptions(_locations).map(
               (item) => DropdownMenuItem<String>(
                 value: item.$1,
@@ -495,14 +641,18 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
   Widget _field(
     TextEditingController controller,
     String label, {
+    Key? key,
     bool required = false,
     bool decimal = false,
+    bool readOnly = false,
     int lines = 1,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: TextFormField(
+      key: key,
       controller: controller,
       maxLines: lines,
+      readOnly: readOnly,
       keyboardType: decimal
           ? const TextInputType.numberWithOptions(decimal: true)
           : TextInputType.text,
@@ -515,6 +665,7 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
           return '$label zorunludur.';
         }
         if (decimal &&
+            (value ?? '').trim().isNotEmpty &&
             (double.tryParse((value ?? '').replaceAll(',', '.')) ?? 0) <= 0) {
           return 'Sıfırdan büyük bir metraj girin.';
         }
@@ -522,6 +673,20 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
       },
     ),
   );
+
+  Widget _readOnlyField(String label, String value, {required Key key}) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TextFormField(
+          key: key,
+          initialValue: value,
+          readOnly: true,
+          decoration: InputDecoration(
+            labelText: label,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+      );
 
   Widget _optionalDateTile(
     String label,
@@ -576,7 +741,20 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
           day: value.day,
           hour: value.hour,
           minute: value.minute,
+          second: value.second,
         );
+
+  DateTime? _toIstanbulOptional(String? value) =>
+      value == null ? null : CseTimeCodec.toIstanbul(value);
+
+  double? _optionalDecimal(String value) {
+    final normalized = value.trim();
+    return normalized.isEmpty
+        ? null
+        : double.parse(normalized.replaceAll(',', '.'));
+  }
+
+  String _decimalText(double? value) => value == null ? '' : value.toString();
 
   String _localLabel(DateTime value) =>
       '${value.day.toString().padLeft(2, '0')}.'

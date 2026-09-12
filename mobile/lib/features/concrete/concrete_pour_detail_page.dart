@@ -10,6 +10,7 @@ import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/attachments/attachment_catalog_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_attachment_viewer_page.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_pour_form_page.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
@@ -41,6 +42,7 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
   bool _mutating = false;
   String? _error;
   _TruckRetry? _retryTruck;
+  _SampleRetry? _retrySample;
 
   AttachmentCatalogApplication? get _attachmentCatalog =>
       widget.concrete is AttachmentCatalogHost
@@ -70,6 +72,26 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
     }
   }
 
+  Future<void> _refreshVerifiedDetail(String pourId) async {
+    try {
+      final verified = await widget.concrete.getPourDetail(pourId);
+      if (mounted) {
+        setState(() {
+          _detail = verified;
+          _error = null;
+        });
+      }
+    } on Object {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Kayıt kaydedildi ancak dosya bütünlüğü doğrulanmış güncel görünüm '
+              'yüklenemedi. Yeniden yükleyin.',
+        );
+      }
+    }
+  }
+
   Future<bool> _run(Future<Object?> Function() mutation) async {
     if (_mutating) return false;
     setState(() {
@@ -77,14 +99,40 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
       _error = null;
     });
     try {
-      await mutation();
-      await _reload();
+      final result = await mutation();
+      if (result is ConcretePourDetail) {
+        await _refreshVerifiedDetail(result.pour.id);
+      } else {
+        await _reload();
+      }
       return true;
     } on Object catch (error) {
       if (mounted) {
         setState(() => _error = _message(error, 'İşlem tamamlanamadı.'));
       }
       return false;
+    } finally {
+      if (mounted) setState(() => _mutating = false);
+    }
+  }
+
+  Future<void> _editPour() async {
+    final result = await Navigator.of(context).push<ConcretePourDetail>(
+      MaterialPageRoute(
+        builder: (_) => ConcretePourFormPage(
+          concrete: widget.concrete,
+          projectLocations: widget.projectLocations,
+          initialPour: _detail!.pour,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _mutating = true;
+      _error = null;
+    });
+    try {
+      await _refreshVerifiedDetail(result.pour.id);
     } finally {
       if (mounted) setState(() => _mutating = false);
     }
@@ -357,6 +405,76 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _editSample(
+    ConcreteSampleSet current, [
+    _SampleRetry? retry,
+  ]) async {
+    final draft = await showDialog<_SampleDraft>(
+      context: context,
+      builder: (context) =>
+          _SampleDialog(current: current, initialDraft: retry?.draft),
+    );
+    if (draft == null) return;
+    final detail = _detail!;
+    final eventId = retry?.eventId ?? RecordId.randomUuid();
+    final saved = await _run(
+      () => widget.concrete.saveSampleSet(
+        SaveConcreteSampleSetCommand(
+          id: current.id,
+          pourId: current.pourId,
+          eventId: eventId,
+          expectedPourRevision: detail.pour.revision,
+          expectedSampleRevision: current.revision,
+          sourceTruckId: current.sourceTruckId,
+          sampleCode: draft.sampleCode,
+          sampleCount: draft.sampleCount,
+          sampleLabels: draft.sampleLabels,
+          sampledAt: draft.sampledAt,
+          sampledBy: draft.sampledBy,
+          laboratoryAppointmentAt: draft.laboratoryAppointmentAt,
+          deliveredAt: draft.deliveredAt,
+          deliveredTo: draft.deliveredTo,
+          expectedResultDates: current.expectedResultDates,
+          status: draft.status,
+          note: draft.note,
+          reason: draft.reason,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (saved) {
+      setState(() => _retrySample = null);
+      return;
+    }
+    setState(() {
+      _retrySample = _SampleRetry(
+        draft: draft,
+        sampleId: current.id,
+        eventId: eventId,
+      );
+    });
+  }
+
+  Future<void> _reopenSampleDraft() async {
+    final retry = _retrySample;
+    if (retry == null) return;
+    ConcreteSampleSet? current;
+    for (final item in _detail!.sampleSets) {
+      if (item.id == retry.sampleId) {
+        current = item;
+        break;
+      }
+    }
+    if (current == null) {
+      setState(() {
+        _retrySample = null;
+        _error = 'Düzenlenecek numune seti artık bulunamadı.';
+      });
+      return;
+    }
+    await _editSample(current, retry);
   }
 
   Future<void> _attach({
@@ -845,6 +963,14 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
       appBar: AppBar(
         title: Text(pour.pourCode),
         actions: [
+          if (pour.status != ConcretePourStatus.closed &&
+              pour.status != ConcretePourStatus.cancelled)
+            IconButton(
+              key: const Key('edit-concrete-pour'),
+              tooltip: 'Beton paketini düzenle',
+              onPressed: _mutating ? null : _editPour,
+              icon: const Icon(Icons.edit_outlined),
+            ),
           IconButton(onPressed: _reload, icon: const Icon(Icons.refresh)),
         ],
       ),
@@ -1155,23 +1281,47 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: FilledButton.tonalIcon(
-                    onPressed: _addSample,
+                    onPressed:
+                        _mutating ||
+                            pour.status == ConcretePourStatus.closed ||
+                            pour.status == ConcretePourStatus.cancelled
+                        ? null
+                        : _addSample,
                     icon: const Icon(Icons.add),
                     label: const Text('Numune seti ekle'),
                   ),
                 ),
+                if (_retrySample != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      key: const Key('reopen-concrete-sample-draft'),
+                      onPressed: _mutating ? null : _reopenSampleDraft,
+                      icon: const Icon(Icons.edit_note_outlined),
+                      label: const Text('Son numune girdisini yeniden aç'),
+                    ),
+                  ),
                 for (
                   var index = 0;
                   index < detail.sampleSets.length;
                   index += 1
                 )
                   ListTile(
+                    key: Key('concrete-sample-${detail.sampleSets[index].id}'),
+                    onTap:
+                        _mutating ||
+                            pour.status == ConcretePourStatus.closed ||
+                            pour.status == ConcretePourStatus.cancelled
+                        ? null
+                        : () => _editSample(detail.sampleSets[index]),
                     title: Text(
                       'Numune seti ${index + 1} • '
                       '${detail.sampleSets[index].sampleCount} adet',
                     ),
                     subtitle: Text(
-                      '${detail.sampleSets[index].status.label}\nSonuç: '
+                      '${detail.sampleSets[index].status.label} • '
+                      'Revizyon ${detail.sampleSets[index].revision}'
+                      '\nBeklenen sonuç tarihleri: '
                       '${detail.sampleSets[index].expectedResultDates.map(CseTimeCodec.formatIstanbul).join(', ')}',
                     ),
                     trailing: IconButton(
@@ -1617,6 +1767,301 @@ class _FieldNotificationsDialogState extends State<_FieldNotificationsDialog> {
           child: const Text('Vazgeç'),
         ),
         FilledButton(
+          onPressed: _closing ? null : _submit,
+          child: const Text('Kaydet'),
+        ),
+      ],
+    );
+  }
+}
+
+class _SampleDraft {
+  const _SampleDraft({
+    required this.sampleCode,
+    required this.sampleCount,
+    required this.sampleLabels,
+    required this.sampledAt,
+    required this.sampledBy,
+    required this.laboratoryAppointmentAt,
+    required this.deliveredAt,
+    required this.deliveredTo,
+    required this.status,
+    required this.note,
+    required this.reason,
+  });
+
+  final String sampleCode;
+  final int sampleCount;
+  final List<String> sampleLabels;
+  final String? sampledAt;
+  final String sampledBy;
+  final String? laboratoryAppointmentAt;
+  final String? deliveredAt;
+  final String deliveredTo;
+  final ConcreteSampleStatus status;
+  final String note;
+  final String reason;
+}
+
+class _SampleRetry {
+  const _SampleRetry({
+    required this.draft,
+    required this.sampleId,
+    required this.eventId,
+  });
+
+  final _SampleDraft draft;
+  final String sampleId;
+  final String eventId;
+}
+
+class _SampleDialog extends StatefulWidget {
+  const _SampleDialog({required this.current, required this.initialDraft});
+
+  final ConcreteSampleSet current;
+  final _SampleDraft? initialDraft;
+
+  @override
+  State<_SampleDialog> createState() => _SampleDialogState();
+}
+
+class _SampleDialogState extends State<_SampleDialog> {
+  late final TextEditingController _sampleCode;
+  late final TextEditingController _sampleCount;
+  late final TextEditingController _sampleLabels;
+  late final TextEditingController _sampledBy;
+  late final TextEditingController _deliveredTo;
+  late final TextEditingController _note;
+  late final TextEditingController _reason;
+  late ConcreteSampleStatus _status;
+  String? _sampledAt;
+  String? _laboratoryAppointmentAt;
+  String? _deliveredAt;
+  String? _validationMessage;
+  bool _closing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final current = widget.current;
+    final draft = widget.initialDraft;
+    _sampleCode = TextEditingController(
+      text: draft?.sampleCode ?? current.sampleCode,
+    );
+    _sampleCount = TextEditingController(
+      text: (draft?.sampleCount ?? current.sampleCount).toString(),
+    );
+    _sampleLabels = TextEditingController(
+      text: (draft?.sampleLabels ?? current.sampleLabels).join(', '),
+    );
+    _sampledBy = TextEditingController(
+      text: draft?.sampledBy ?? current.sampledBy,
+    );
+    _deliveredTo = TextEditingController(
+      text: draft?.deliveredTo ?? current.deliveredTo,
+    );
+    _note = TextEditingController(text: draft?.note ?? current.note);
+    _reason = TextEditingController(text: draft?.reason ?? current.reason);
+    _status = draft?.status ?? current.status;
+    _sampledAt = draft?.sampledAt ?? current.sampledAt;
+    _laboratoryAppointmentAt =
+        draft?.laboratoryAppointmentAt ?? current.laboratoryAppointmentAt;
+    _deliveredAt = draft?.deliveredAt ?? current.deliveredAt;
+  }
+
+  @override
+  void dispose() {
+    _sampleCode.dispose();
+    _sampleCount.dispose();
+    _sampleLabels.dispose();
+    _sampledBy.dispose();
+    _deliveredTo.dispose();
+    _note.dispose();
+    _reason.dispose();
+    super.dispose();
+  }
+
+  bool get _requiresSampledAt => switch (_status) {
+    ConcreteSampleStatus.sampled ||
+    ConcreteSampleStatus.delivered ||
+    ConcreteSampleStatus.waitingResult ||
+    ConcreteSampleStatus.completed => true,
+    ConcreteSampleStatus.planned || ConcreteSampleStatus.exception => false,
+  };
+
+  bool get _requiresDeliveredAt => switch (_status) {
+    ConcreteSampleStatus.delivered ||
+    ConcreteSampleStatus.waitingResult ||
+    ConcreteSampleStatus.completed => true,
+    _ => false,
+  };
+
+  void _changeStatus(ConcreteSampleStatus value) {
+    if (_closing) return;
+    final now = CseTimeCodec.encodeUtc(DateTime.now().toUtc());
+    setState(() {
+      _status = value;
+      if (_requiresSampledAt) _sampledAt ??= now;
+      if (_requiresDeliveredAt) _deliveredAt ??= now;
+      _validationMessage = null;
+    });
+  }
+
+  void _submit() {
+    if (_closing) return;
+    final count = int.tryParse(_sampleCount.text.trim());
+    final labels = _sampleLabels.text
+        .split(RegExp(r'[,\n]'))
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+    String? validation;
+    if (count == null || count <= 0) {
+      validation = 'Pozitif bir numune adedi yazın.';
+    } else if (_requiresSampledAt && labels.length != count) {
+      validation = 'Her numune için tam bir etiket yazın.';
+    } else if (_requiresSampledAt && _sampledAt == null) {
+      validation = 'Bu durum için numune alma zamanı zorunludur.';
+    } else if (_requiresDeliveredAt && _deliveredAt == null) {
+      validation = 'Bu durum için teslim zamanı zorunludur.';
+    } else if (_status == ConcreteSampleStatus.exception &&
+        _reason.text.trim().isEmpty) {
+      validation = 'İstisna durumu için gerekçe zorunludur.';
+    }
+    if (validation != null) {
+      setState(() => _validationMessage = validation);
+      return;
+    }
+    _closing = true;
+    Navigator.pop(
+      context,
+      _SampleDraft(
+        sampleCode: _sampleCode.text,
+        sampleCount: count!,
+        sampleLabels: labels,
+        sampledAt: _sampledAt,
+        sampledBy: _sampledBy.text,
+        laboratoryAppointmentAt: _laboratoryAppointmentAt,
+        deliveredAt: _deliveredAt,
+        deliveredTo: _deliveredTo.text,
+        status: _status,
+        note: _note.text,
+        reason: _reason.text,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Numune setini düzenle'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              key: const Key('concrete-sample-code'),
+              controller: _sampleCode,
+              readOnly: true,
+              decoration: const InputDecoration(labelText: 'Numune kodu'),
+            ),
+            TextField(
+              key: const Key('concrete-sample-count'),
+              controller: _sampleCount,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() => _validationMessage = null),
+              decoration: const InputDecoration(labelText: 'Adet'),
+            ),
+            TextField(
+              key: const Key('concrete-sample-labels'),
+              controller: _sampleLabels,
+              onChanged: (_) => setState(() => _validationMessage = null),
+              decoration: const InputDecoration(
+                labelText: 'Etiketler (virgülle ayırın)',
+              ),
+            ),
+            DropdownButtonFormField<ConcreteSampleStatus>(
+              key: const Key('concrete-sample-status'),
+              initialValue: _status,
+              decoration: const InputDecoration(labelText: 'Durum'),
+              items: ConcreteSampleStatus.values
+                  .map(
+                    (value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(value.label),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: _closing
+                  ? null
+                  : (value) {
+                      if (value != null) _changeStatus(value);
+                    },
+            ),
+            _TruckTimeTile(
+              key: const Key('concrete-sample-sampled-at'),
+              label: 'Numune alma zamanı',
+              value: _sampledAt,
+              onChanged: (value) => setState(() => _sampledAt = value),
+            ),
+            TextField(
+              key: const Key('concrete-sample-sampled-by'),
+              controller: _sampledBy,
+              decoration: const InputDecoration(labelText: 'Numuneyi alan'),
+            ),
+            _TruckTimeTile(
+              key: const Key('concrete-sample-lab-at'),
+              label: 'Laboratuvar randevusu',
+              value: _laboratoryAppointmentAt,
+              onChanged: (value) =>
+                  setState(() => _laboratoryAppointmentAt = value),
+            ),
+            _TruckTimeTile(
+              key: const Key('concrete-sample-delivered-at'),
+              label: 'Teslim zamanı',
+              value: _deliveredAt,
+              onChanged: (value) => setState(() => _deliveredAt = value),
+            ),
+            TextField(
+              key: const Key('concrete-sample-delivered-to'),
+              controller: _deliveredTo,
+              decoration: const InputDecoration(labelText: 'Teslim alan'),
+            ),
+            TextField(
+              key: const Key('concrete-sample-note'),
+              controller: _note,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: 'Not'),
+            ),
+            if (_status == ConcreteSampleStatus.exception)
+              TextField(
+                key: const Key('concrete-sample-reason'),
+                controller: _reason,
+                onChanged: (_) => setState(() => _validationMessage = null),
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'İstisna gerekçesi',
+                ),
+              ),
+            if (_validationMessage case final message?)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  message,
+                  key: const Key('concrete-sample-validation'),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _closing ? null : () => Navigator.pop(context),
+          child: const Text('Vazgeç'),
+        ),
+        FilledButton(
+          key: const Key('save-concrete-sample'),
           onPressed: _closing ? null : _submit,
           child: const Text('Kaydet'),
         ),
