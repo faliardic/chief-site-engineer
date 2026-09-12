@@ -58,6 +58,7 @@ void main() {
     );
     expect(find.byKey(const Key('dashboard-memory-backup')), findsNothing);
     expect(find.byKey(const Key('dashboard-attachment-catalog')), findsNothing);
+    expect(find.byKey(const Key('dashboard-attachment-health')), findsNothing);
   });
 
   for (final width in [320.0, 390.0]) {
@@ -480,6 +481,9 @@ void main() {
       find.byKey(const Key('project-profile-tools-sheet')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('dashboard-memory-backup')), findsNothing);
+    expect(find.byKey(const Key('dashboard-attachment-health')), findsNothing);
+    expect(find.byKey(const Key('dashboard-project-album')), findsOneWidget);
     await tester.tap(find.byKey(const Key('dashboard-open-plan')));
     await tester.pumpAndSettle();
     expect(openedProject, project.id);

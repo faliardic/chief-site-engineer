@@ -27,6 +27,7 @@ import 'package:chief_site_engineer/features/projects/project_create_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
+import 'package:chief_site_engineer/features/settings/settings_page.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -722,14 +723,29 @@ class _MobileShellState extends State<MobileShell> {
     );
   }
 
+  Future<void> _openSettings() async {
+    final backup = widget.bootstrap.backup;
+    final reconciliation = widget.bootstrap.attachmentReconciliation;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => SettingsPage(
+          backupPageBuilder: backup == null
+              ? null
+              : (_) => MemoryBackupPage(backup: backup),
+          fileDataHealthPageBuilder: reconciliation == null
+              ? null
+              : (_) => AttachmentHealthPage(reconciliation: reconciliation),
+        ),
+      ),
+    );
+  }
+
   ProjectDashboardPage _buildDashboard() {
     final bootstrap = widget.bootstrap;
     final dailyLog = bootstrap.dailyLog;
     final materials = bootstrap.materialRequests;
     final catalog = bootstrap.attachmentCatalog;
     final attendance = bootstrap.attendance;
-    final backup = bootstrap.backup;
-    final reconciliation = bootstrap.attachmentReconciliation;
     return ProjectDashboardPage(
       key: ValueKey('project-dashboard-context-$_dashboardContextEpoch'),
       agenda: bootstrap.agenda,
@@ -818,15 +834,6 @@ class _MobileShellState extends State<MobileShell> {
           : (projectId) => unawaited(_openWorkforce(projectId)),
       onOpenPhoneCall: (projectId) =>
           unawaited(_openPhoneCallResult(projectId)),
-      onOpenBackup: backup == null
-          ? null
-          : () => unawaited(
-              Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => MemoryBackupPage(backup: backup),
-                ),
-              ),
-            ),
       onOpenCatalog: catalog == null
           ? null
           : (projectId) => unawaited(
@@ -836,16 +843,6 @@ class _MobileShellState extends State<MobileShell> {
                     catalog: catalog,
                     initialProjectId: projectId,
                   ),
-                ),
-              ),
-            ),
-      onOpenAttachmentHealth: reconciliation == null
-          ? null
-          : () => unawaited(
-              Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      AttachmentHealthPage(reconciliation: reconciliation),
                 ),
               ),
             ),
@@ -878,7 +875,24 @@ class _MobileShellState extends State<MobileShell> {
         final useExtendedRail = constraints.maxWidth >= 840;
         return Scaffold(
           appBar: AppBar(
-            title: Text(title),
+            leading: Semantics(
+              button: true,
+              label: 'Ayarlar',
+              onTap: () => unawaited(_openSettings()),
+              child: ExcludeSemantics(
+                child: IconButton(
+                  key: const Key('shell-settings'),
+                  tooltip: 'Ayarlar',
+                  constraints: const BoxConstraints.tightFor(
+                    width: 48,
+                    height: 48,
+                  ),
+                  onPressed: () => unawaited(_openSettings()),
+                  icon: const Icon(Icons.settings_outlined),
+                ),
+              ),
+            ),
+            title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
             actions: [
               ActiveProjectControl(
                 label: _activeProjectLabel,

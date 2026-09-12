@@ -32,9 +32,7 @@ class ProjectDashboardPage extends StatefulWidget {
     this.onOpenProjectAlbum,
     this.onOpenWorkforce,
     this.onOpenPhoneCall,
-    this.onOpenBackup,
     this.onOpenCatalog,
-    this.onOpenAttachmentHealth,
     DateTime Function()? clock,
     super.key,
   }) : clock = clock ?? _systemUtcClock;
@@ -54,9 +52,7 @@ class ProjectDashboardPage extends StatefulWidget {
   final DashboardProjectAction? onOpenProjectAlbum;
   final DashboardProjectAction? onOpenWorkforce;
   final DashboardProjectAction? onOpenPhoneCall;
-  final VoidCallback? onOpenBackup;
   final DashboardProjectAction? onOpenCatalog;
-  final VoidCallback? onOpenAttachmentHealth;
   final DateTime Function() clock;
 
   @override
@@ -584,26 +580,12 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
             ),
             _toolTile(
               sheetContext,
-              key: const Key('dashboard-memory-backup'),
-              icon: Icons.settings_backup_restore_rounded,
-              title: 'Hafıza ve Yedekleme',
-              action: widget.onOpenBackup,
-            ),
-            _toolTile(
-              sheetContext,
               key: const Key('dashboard-attachment-catalog'),
               icon: Icons.folder_copy_outlined,
               title: 'Dosya Kataloğu',
               action: widget.onOpenCatalog == null
                   ? null
                   : () => _openProjectAction(widget.onOpenCatalog, project.id),
-            ),
-            _toolTile(
-              sheetContext,
-              key: const Key('dashboard-attachment-health'),
-              icon: Icons.health_and_safety_outlined,
-              title: 'Dosya sağlığı',
-              action: widget.onOpenAttachmentHealth,
             ),
           ],
         ),
