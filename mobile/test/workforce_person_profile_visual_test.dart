@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:chief_site_engineer/application/attendance_application.dart';
+import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
+import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_person_detail_page.dart';
 import 'package:flutter/material.dart';
@@ -1452,28 +1454,314 @@ void main() {
       await _tab(tester, 'KKD');
       await tester.tap(find.byKey(const Key('add-ppe-assignment')));
       await tester.pumpAndSettle();
-      await tester.enterText(_field('KKD türü *'), 'Baret');
-      await _saveDialog(tester);
+      await tester.tap(find.byKey(const Key('ppe-quick-helmet')));
+      await tester.tap(find.byKey(const Key('ppe-submit')));
+      await tester.pumpAndSettle();
       final ppe = attendance.ppeCommands.single;
       expect(ppe.memberId, 'person-1');
       expect(ppe.expectedRevision, 0);
       expect(ppe.ppeType, 'Baret');
       expect(ppe.quantity, 1);
       expect(ppe.status, PpeAssignmentStatus.assigned);
+      expect(ppe.assignedDate, _istanbulTodayForTest());
       expect(find.text('Baret • 1 adet'), findsOneWidget);
-      await tester.tap(find.byKey(Key('ppe-${ppe.id}')));
+      await tester.tap(find.byKey(Key('edit-ppe-${ppe.id}')));
       await tester.pumpAndSettle();
       await tester.enterText(_field('KKD türü *'), 'Koruyucu baret');
-      await _saveDialog(tester);
+      await _selectDialogValue<PpeAssignmentStatus>(tester, 'İade edildi');
+      await _revealPpeControl(tester, find.byKey(const Key('ppe-submit')));
+      await tester.tap(find.byKey(const Key('ppe-submit')));
+      await tester.pumpAndSettle();
+      await _revealPpeControl(tester, find.byKey(const Key('ppe-save-error')));
+      expect(
+        find.text('İade edilen KKD için tarih zorunludur.'),
+        findsOneWidget,
+      );
+      final failedEdit = attendance.ppeCommands.last;
+      expect(
+        attendance.store.ppeAssignments.single.status,
+        PpeAssignmentStatus.assigned,
+      );
+      await _revealPpeControl(tester, _field('İade tarihi (YYYY-AA-GG)'));
+      await tester.enterText(_field('İade tarihi (YYYY-AA-GG)'), '2026-09-12');
+      await _revealPpeControl(tester, find.byKey(const Key('ppe-submit')));
+      await tester.tap(find.byKey(const Key('ppe-submit')));
+      await tester.pumpAndSettle();
       final changed = attendance.ppeCommands.last;
       expect(changed.id, ppe.id);
       expect(changed.expectedRevision, 1);
       expect(changed.eventId, isNot(ppe.eventId));
+      expect(changed.eventId, failedEdit.eventId);
+      expect(changed.status, PpeAssignmentStatus.returned);
+      expect(changed.returnedDate, '2026-09-12');
       expect(find.text('Koruyucu baret • 1 adet'), findsOneWidget);
       expect(
         attendance.calls.where((call) => call.startsWith('read:')).length,
         6,
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('PPE empty state and cancel keep assignment mutation-free', (
+    tester,
+  ) async {
+    final attendance = _Attendance();
+    await _pump(tester, attendance, size: const Size(320, 640), scale: 2);
+    await _tab(tester, 'KKD');
+    expect(find.byKey(const Key('ppe-empty-state')), findsOneWidget);
+    expect(find.text('Henüz KKD zimmeti yok.'), findsOneWidget);
+    final add = find.byKey(const Key('add-ppe-assignment'));
+    expect(tester.getSize(add).height, greaterThanOrEqualTo(48));
+    await _revealPpeTabControl(tester, add);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    for (final label in [
+      'Baret',
+      'Reflektif yelek',
+      'İş ayakkabısı',
+      'Koruyucu gözlük',
+      'İş eldiveni',
+      'Diğer KKD',
+    ]) {
+      expect(find.text(label), findsOneWidget);
+    }
+    expect(attendance.ppeCommands, isEmpty);
+    final vest = find.byKey(const Key('ppe-quick-vest'));
+    await _revealPpeControl(tester, vest);
+    await tester.tap(vest);
+    final increase = find.byKey(const Key('ppe-quantity-increase'));
+    await _revealPpeControl(tester, increase);
+    await tester.tap(increase);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('ppe-quantity-field')))
+          .controller!
+          .text,
+      '2',
+    );
+    final cancel = find.byKey(const Key('ppe-cancel'));
+    await _revealPpeControl(tester, cancel);
+    await tester.tap(cancel);
+    await tester.pumpAndSettle();
+    expect(attendance.ppeCommands, isEmpty);
+    expect(attendance.store.ppeAssignments, isEmpty);
+    expect(find.byKey(const Key('ppe-empty-state')), findsOneWidget);
+    await _revealPpeTabControl(tester, add);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    final shoes = find.byKey(const Key('ppe-quick-shoes'));
+    await _revealPpeControl(tester, shoes);
+    await tester.tap(shoes);
+    final close = find.byKey(const Key('ppe-sheet-close'));
+    await _revealPpeControl(tester, close);
+    await tester.tap(close);
+    await tester.pumpAndSettle();
+    expect(attendance.ppeCommands, isEmpty);
+    expect(attendance.store.ppeAssignments, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('PPE failed save preserves draft and supports retry', (
+    tester,
+  ) async {
+    final attendance = _Attendance()..ppeFailure = Exception('temporary');
+    await _pump(tester, attendance, size: const Size(390, 844));
+    await _tab(tester, 'KKD');
+    await tester.tap(find.byKey(const Key('add-ppe-assignment')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ppe-quick-other')));
+    await _revealPpeControl(tester, _field('KKD türü *'));
+    await tester.enterText(_field('KKD türü *'), 'Emniyet kemeri');
+    await tester.tap(find.byKey(const Key('ppe-quantity-increase')));
+    await tester.tap(find.byKey(const Key('ppe-details-toggle')));
+    await tester.pumpAndSettle();
+    await _revealPpeControl(tester, _field('Marka/model'));
+    await tester.enterText(_field('Marka/model'), 'Model 42');
+    await _revealPpeControl(tester, _field('Not'));
+    await tester.enterText(_field('Not'), 'Taslak notu');
+    await _revealPpeControl(tester, find.byKey(const Key('ppe-submit')));
+    await tester.tap(find.byKey(const Key('ppe-submit')));
+    await tester.pumpAndSettle();
+    await _revealPpeControl(tester, find.byKey(const Key('ppe-save-error')));
+    expect(find.byKey(const Key('ppe-save-error')), findsOneWidget);
+    expect(
+      find.text(
+        'KKD zimmeti kaydedilemedi. Bilgileri kontrol edip yeniden deneyin.',
+      ),
+      findsOneWidget,
+    );
+    await _revealPpeControl(tester, _field('KKD türü *'));
+    expect(
+      tester.widget<TextField>(_field('KKD türü *')).controller!.text,
+      'Emniyet kemeri',
+    );
+    await _revealPpeControl(
+      tester,
+      find.byKey(const Key('ppe-quantity-field')),
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('ppe-quantity-field')))
+          .controller!
+          .text,
+      '2',
+    );
+    await _revealPpeControl(tester, _field('Marka/model'));
+    expect(
+      tester.widget<TextField>(_field('Marka/model')).controller!.text,
+      'Model 42',
+    );
+    await _revealPpeControl(tester, _field('Not'));
+    expect(
+      tester.widget<TextField>(_field('Not')).controller!.text,
+      'Taslak notu',
+    );
+    await _revealPpeControl(tester, find.byKey(const Key('ppe-submit')));
+    await tester.tap(find.byKey(const Key('ppe-submit')));
+    await tester.pumpAndSettle();
+    expect(attendance.ppeCommands, hasLength(2));
+    expect(attendance.ppeCommands[1].id, attendance.ppeCommands[0].id);
+    expect(
+      attendance.ppeCommands[1].eventId,
+      attendance.ppeCommands[0].eventId,
+    );
+    expect(attendance.ppeCommands[1].ppeType, 'Emniyet kemeri');
+    expect(attendance.ppeCommands[1].quantity, 2);
+    expect(attendance.ppeCommands[1].brandModel, 'Model 42');
+    expect(attendance.ppeCommands[1].note, 'Taslak notu');
+    expect(find.text('Emniyet kemeri • 2 adet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('PPE save in flight blocks duplicate submit', (tester) async {
+    final attendance = _Attendance()..ppeSaveBlocker = Completer<void>();
+    await _pump(tester, attendance);
+    await _tab(tester, 'KKD');
+    await tester.tap(find.byKey(const Key('add-ppe-assignment')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ppe-quick-gloves')));
+    await _revealPpeControl(tester, find.byKey(const Key('ppe-submit')));
+    await tester.tap(find.byKey(const Key('ppe-submit')));
+    await tester.pump();
+    expect(attendance.ppeCommands, hasLength(1));
+    expect(find.text('Kaydediliyor…'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('ppe-submit')))
+          .onPressed,
+      isNull,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.byKey(const Key('ppe-quick-sheet-scroll')), findsOneWidget);
+    expect(attendance.ppeCommands, hasLength(1));
+    await tester.tap(find.byKey(const Key('ppe-submit')), warnIfMissed: false);
+    await tester.pump();
+    expect(attendance.ppeCommands, hasLength(1));
+    attendance.ppeSaveBlocker!.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('İş eldiveni • 1 adet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final size in [const Size(320, 360), const Size(390, 844)]) {
+    testWidgets('PPE quick controls are accessible at $size text 2', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final attendance = _Attendance();
+        await _pump(tester, attendance, size: size, scale: 2);
+        await _tab(tester, 'KKD');
+        final add = find.byKey(const Key('add-ppe-assignment'));
+        await _revealPpeTabControl(tester, add);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        final helmet = find.byKey(const Key('ppe-quick-helmet'));
+        await _revealPpeControl(tester, helmet);
+        await tester.tap(helmet);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(helmet),
+          matchesSemantics(
+            label: 'Baret hızlı seçimi',
+            isButton: true,
+            hasSelectedState: true,
+            isSelected: true,
+            hasTapAction: true,
+            hasEnabledState: true,
+            isEnabled: true,
+          ),
+        );
+        for (final key in [
+          'ppe-quick-helmet',
+          'ppe-quick-vest',
+          'ppe-quick-shoes',
+          'ppe-quick-glasses',
+          'ppe-quick-gloves',
+          'ppe-quick-other',
+          'ppe-sheet-close',
+          'ppe-cancel',
+          'ppe-submit',
+        ]) {
+          final control = find.byKey(Key(key));
+          await _revealPpeControl(tester, control);
+          final controlSize = tester.getSize(control);
+          expect(controlSize.width, greaterThanOrEqualTo(48));
+          expect(controlSize.height, greaterThanOrEqualTo(48));
+        }
+        final details = find.byKey(const Key('ppe-details-toggle'));
+        await _revealPpeControl(tester, details);
+        expect(tester.getSize(details).height, greaterThanOrEqualTo(48));
+        await tester.tap(details);
+        await tester.pumpAndSettle();
+        await _revealPpeControl(tester, _field('Not'));
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    });
+  }
+
+  testWidgets(
+    'PPE details and submit stay reachable above keyboard and inset',
+    (tester) async {
+      final attendance = _Attendance();
+      await _pump(
+        tester,
+        attendance,
+        size: const Size(320, 640),
+        scale: 2,
+        keyboardInset: 280,
+        bottomPadding: 24,
+      );
+      await _tab(tester, 'KKD');
+      final add = find.byKey(const Key('add-ppe-assignment'));
+      await _revealPpeTabControl(tester, add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      final sheet = tester.widget<ListView>(
+        find.byKey(const Key('ppe-quick-sheet-scroll')),
+      );
+      expect(
+        sheet.padding!.resolve(TextDirection.ltr).bottom,
+        greaterThanOrEqualTo(40),
+      );
+      final other = find.byKey(const Key('ppe-quick-other'));
+      await _revealPpeControl(tester, other);
+      await tester.tap(other);
+      await _revealPpeControl(tester, _field('KKD türü *'));
+      await tester.enterText(_field('KKD türü *'), 'Yüz siperi');
+      final details = find.byKey(const Key('ppe-details-toggle'));
+      await _revealPpeControl(tester, details);
+      await tester.tap(details);
+      await tester.pumpAndSettle();
+      await _revealPpeControl(tester, _field('Not'));
+      final submit = find.byKey(const Key('ppe-submit'));
+      await _revealPpeControl(tester, submit);
+      expect(submit.hitTestable(), findsOneWidget);
+      expect(attendance.ppeCommands, isEmpty);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1515,6 +1803,48 @@ Future<void> _revealDialogControl(WidgetTester tester, Finder control) async {
   FocusManager.instance.primaryFocus?.unfocus();
   await tester.pumpAndSettle();
   await Scrollable.ensureVisible(tester.element(control), alignment: 0.5);
+  await tester.pumpAndSettle();
+  expect(control.hitTestable(), findsOneWidget);
+  expect(tester.takeException(), isNull);
+}
+
+Future<void> _revealPpeControl(WidgetTester tester, Finder control) async {
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pumpAndSettle();
+  final scrollable = find
+      .descendant(
+        of: find.byKey(const Key('ppe-quick-sheet-scroll')),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+  if (control.evaluate().isEmpty) {
+    tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+    await tester.pumpAndSettle();
+  }
+  await tester.scrollUntilVisible(
+    control,
+    120,
+    maxScrolls: 40,
+    scrollable: scrollable,
+  );
+  await tester.pumpAndSettle();
+  expect(control.hitTestable(), findsOneWidget);
+  expect(tester.takeException(), isNull);
+}
+
+Future<void> _revealPpeTabControl(WidgetTester tester, Finder control) async {
+  final scrollable = find
+      .descendant(
+        of: find.byKey(const PageStorageKey('workforce-person-ppe')),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+  await tester.scrollUntilVisible(
+    control,
+    120,
+    maxScrolls: 40,
+    scrollable: scrollable,
+  );
   await tester.pumpAndSettle();
   expect(control.hitTestable(), findsOneWidget);
   expect(tester.takeException(), isNull);
@@ -1585,6 +1915,12 @@ Future<void> _saveDialog(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+String _istanbulTodayForTest() {
+  return CseTimeCodec.istanbulDayKey(
+    CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+  );
+}
+
 Future<void> _tab(WidgetTester tester, String label) async {
   final tab = find.widgetWithText(Tab, label);
   await tester.ensureVisible(tab);
@@ -1598,12 +1934,18 @@ Future<void> _pump(
   _Attendance attendance, {
   Size size = const Size(390, 844),
   double scale = 1,
+  double keyboardInset = 0,
+  double bottomPadding = 0,
   bool settle = true,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
+  tester.view.viewInsets = FakeViewPadding(bottom: keyboardInset);
+  tester.view.padding = FakeViewPadding(bottom: bottomPadding);
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetViewInsets);
+  addTearDown(tester.view.resetPadding);
   await tester.pumpWidget(
     MaterialApp(
       builder: (context, child) => MediaQuery(
@@ -1684,6 +2026,8 @@ class _Attendance implements AttendanceApplication {
   RestoreComplianceRecordCommand? restoreCommand;
   Object? complianceFailureAfterSave;
   Object? personDetailFailure;
+  Object? ppeFailure;
+  Completer<void>? ppeSaveBlocker;
   Completer<WorkforcePersonDetail>? pending;
 
   @override
@@ -1757,9 +2101,20 @@ class _Attendance implements AttendanceApplication {
   @override
   Future<WorkforcePpeAssignment> savePpeAssignment(
     SavePpeAssignmentCommand command,
-  ) {
+  ) async {
     calls.add('save-ppe');
     ppeCommands.add(command);
+    if (command.status == PpeAssignmentStatus.returned &&
+        (command.returnedDate?.trim().isEmpty ?? true)) {
+      throw const AgendaValidationFailure(
+        'İade edilen KKD için tarih zorunludur.',
+      );
+    }
+    if (ppeFailure case final failure?) {
+      ppeFailure = null;
+      throw failure;
+    }
+    if (ppeSaveBlocker case final blocker?) await blocker.future;
     return store.savePpeAssignment(command);
   }
 
