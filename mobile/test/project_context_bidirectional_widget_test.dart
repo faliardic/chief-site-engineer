@@ -479,25 +479,21 @@ void main() {
       expect(callbacks, [_projectA.id]);
       expect(daily.calls.last, _projectA.id);
 
-      callbacks.clear();
       final materials = _MaterialFake.fromMobile(const [_projectA, _projectB]);
       await _pumpPage(
         tester,
         MaterialRequestsPage(
           application: materials,
           initialProjectId: _projectB.id,
-          onProjectSelected: callbacks.add,
         ),
       );
-      expect(callbacks, isEmpty);
       expect(materials.calls, [_projectB.id]);
-      await _chooseProject(
-        tester,
-        find.byKey(ValueKey('material-request-project-${_projectB.id}')),
-        _projectA.name,
+      expect(
+        find.byKey(const Key('material-request-project-context')),
+        findsOneWidget,
       );
-      expect(callbacks, [_projectA.id]);
-      expect(materials.calls.last, _projectA.id);
+      expect(find.text(_projectB.name), findsOneWidget);
+      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
