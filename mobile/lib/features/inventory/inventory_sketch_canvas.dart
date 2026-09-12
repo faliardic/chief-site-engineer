@@ -818,6 +818,8 @@ class InventorySketchCanvasState extends State<InventorySketchCanvas> {
     _multiTouchGesture = false;
   }
 
+  void _handleDoubleTap() => fitCanvas();
+
   @override
   Widget build(BuildContext context) {
     final selectionLabel = widget.snapshot.selection?.semanticLabel;
@@ -838,6 +840,7 @@ class InventorySketchCanvasState extends State<InventorySketchCanvas> {
               key: const Key('inventory-sketch-canvas-gesture'),
               behavior: HitTestBehavior.opaque,
               onTapUp: _handleTap,
+              onDoubleTap: _handleDoubleTap,
               onScaleStart: _handleScaleStart,
               onScaleUpdate: _handleScaleUpdate,
               onScaleEnd: _handleScaleEnd,

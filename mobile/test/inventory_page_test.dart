@@ -931,7 +931,7 @@ void main() {
   ]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(
-        '683 top tools reserve canvas and retain targets at $size text $scale',
+        'Q06 bottom switch and top context tools stay usable at $size text $scale',
         (tester) async {
           tester.view.physicalSize = size;
           tester.view.devicePixelRatio = 1;
@@ -971,20 +971,11 @@ void main() {
             tester.widget<Scrollable>(scroll).axisDirection,
             AxisDirection.right,
           );
-          if (size.width == 320) {
-            expect(
-              tester.state<ScrollableState>(scroll).position.maxScrollExtent,
-              greaterThan(0),
-            );
-          }
           for (final key in [
             'inventory-search-tool',
             'inventory-block-tool',
             'inventory-floor-tool',
             'inventory-filters-tool',
-            'inventory-map-zoom-in',
-            'inventory-map-zoom-out',
-            'inventory-map-fit',
           ]) {
             final tool = find.byKey(Key(key));
             expect(find.descendant(of: top, matching: tool), findsOneWidget);
@@ -1006,10 +997,33 @@ void main() {
                   .message,
             );
           }
+          expect(find.byKey(const Key('inventory-map-tools')), findsNothing);
+          expect(find.byKey(const Key('inventory-map-zoom-in')), findsNothing);
+          expect(find.byKey(const Key('inventory-map-zoom-out')), findsNothing);
+          expect(find.byKey(const Key('inventory-map-fit')), findsNothing);
+          final viewSwitch = find.byKey(const Key('inventory-view-switch'));
+          expect(viewSwitch, findsOneWidget);
+          expect(
+            tester.getRect(viewSwitch).bottom,
+            closeTo(size.height - 8, 1),
+          );
+          for (final view in InventoryPageView.values) {
+            final destination = find.byKey(
+              ValueKey('inventory-view-${view.name}'),
+            );
+            expect(destination.hitTestable(), findsOneWidget);
+            expect(
+              tester.getSize(destination).height,
+              greaterThanOrEqualTo(48),
+            );
+          }
           final edit = find.byKey(const Key('inventory-update-sketch'));
           expect(tester.getSize(edit), const Size(48, 48));
           expect(tester.getRect(edit).right, closeTo(size.width - 8, 1));
-          expect(tester.getRect(edit).bottom, closeTo(size.height - 8, 1));
+          expect(
+            tester.getRect(edit).bottom,
+            lessThanOrEqualTo(tester.getRect(viewSwitch).top - 8),
+          );
           for (final view in [
             InventoryPageView.floors,
             InventoryPageView.list,
@@ -1019,13 +1033,15 @@ void main() {
             );
             await tester.pumpAndSettle();
             expect(controller.view, view);
-            expect(find.byKey(const Key('inventory-map-tools')), findsNothing);
             final content = view == InventoryPageView.floors
                 ? find.byType(InventoryFloorView)
                 : find.byKey(const Key('inventory-list'));
-            // Floor/list content now owns the full right edge; only the left rail has a gutter.
             expect(tester.getRect(content).right, closeTo(size.width, 1));
-            expect(tester.getRect(content).left, 64);
+            expect(tester.getRect(content).left, 0);
+            expect(
+              tester.getRect(content).bottom,
+              lessThanOrEqualTo(tester.getRect(viewSwitch).top),
+            );
             expect(tester.takeException(), isNull);
           }
           expect(inventory.mutations, 0);
@@ -1036,7 +1052,7 @@ void main() {
   }
 
   testWidgets(
-    '683 top map controls retain zoom fit and diagnostics stay above tools',
+    'Q06 double tap recovers map viewport and diagnostics stay above tools',
     (tester) async {
       final inventory = _FakeInventory()
         ..sketches[_projectA] = _activeMappedSketch(_projectA)
@@ -1054,18 +1070,22 @@ void main() {
       );
       final page = tester.state<InventoryPageState>(find.byType(InventoryPage));
       final initial = page.mapViewState!.viewport!;
-      await tester.tap(find.byKey(const Key('inventory-map-zoom-in')));
-      await tester.pumpAndSettle();
+      page.mapViewState!
+        ..zoomIn()
+        ..zoomIn();
+      await tester.pump();
       expect(page.mapViewState!.viewport!.zoom, greaterThan(initial.zoom));
-      await tester.tap(find.byKey(const Key('inventory-map-zoom-out')));
-      await tester.pumpAndSettle();
-      expect(page.mapViewState!.viewport!.zoom, closeTo(initial.zoom, 0.0001));
-      await tester.tap(find.byKey(const Key('inventory-map-zoom-in')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('inventory-map-fit')));
+      tester
+          .widget<GestureDetector>(
+            find.byKey(const Key('inventory-map-gesture')),
+          )
+          .onDoubleTap!();
       await tester.pumpAndSettle();
       expect(page.mapViewState!.viewport!.zoom, closeTo(initial.zoom, 0.0001));
       expect(page.mapViewState!.viewport!.pan, initial.pan);
+      expect(find.byKey(const Key('inventory-map-zoom-in')), findsNothing);
+      expect(find.byKey(const Key('inventory-map-zoom-out')), findsNothing);
+      expect(find.byKey(const Key('inventory-map-fit')), findsNothing);
       controller.recordPresentationFailure('inventory_test_diagnostic');
       await tester.pumpAndSettle();
       final diagnostic = find.byKey(const Key('inventory-typed-diagnostic'));
@@ -1124,7 +1144,8 @@ void main() {
         for (var i = 0; i < views.length; i++) {
           final control = find.byKey(ValueKey('inventory-view-${views[i]}'));
           expect(control.hitTestable(), findsOneWidget);
-          expect(tester.getSize(control), const Size(48, 48));
+          expect(tester.getSize(control).width, greaterThanOrEqualTo(48));
+          expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
           expect(
             tester
                 .getSemantics(control)
@@ -1135,13 +1156,13 @@ void main() {
           );
           if (i > 0) {
             expect(
-              tester.getTopLeft(control).dy,
+              tester.getTopLeft(control).dx,
               greaterThan(
                 tester
                     .getTopLeft(
                       find.byKey(ValueKey('inventory-view-${views[i - 1]}')),
                     )
-                    .dy,
+                    .dx,
               ),
             );
           }
@@ -1151,9 +1172,6 @@ void main() {
           'block-tool',
           'floor-tool',
           'filters-tool',
-          'map-zoom-in',
-          'map-zoom-out',
-          'map-fit',
           'update-sketch',
         ]) {
           final control = find.byKey(Key('inventory-$name'));
@@ -1356,10 +1374,112 @@ void main() {
       },
     );
 
-    await tester.tap(find.byKey(const Key('inventory-marker-$_assetA')));
-    await tester.pump();
+    await _openMapMarkerItem(tester, _assetA);
     expect(opened, [_assetA]);
   });
+
+  testWidgets(
+    'Q06 mixed cluster keeps exact-point add and deterministic asset order',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _spatialSketch()
+        ..assets[_projectA] = [
+          _asset(
+            _projectA,
+            _assetA,
+            name: 'Z vinci',
+            floorId: _spatialFloorA1,
+            x: 256,
+            y: 256,
+          ),
+          _asset(
+            _projectA,
+            _assetB,
+            name: 'A lazeri',
+            floorId: _spatialFloorA1,
+            x: 256,
+            y: 256,
+          ),
+          _asset(
+            _projectA,
+            _assetArchived,
+            name: 'M matkabı',
+            floorId: _spatialFloorA1,
+            x: 320,
+            y: 256,
+          ),
+        ];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      await _pumpPage(tester, inventory: inventory, source: source);
+      final page = tester.state<InventoryPageState>(find.byType(InventoryPage));
+      final group = buildInventoryMarkerGroups(
+        page.mapController!.projections,
+        page.mapViewState!.viewport!,
+      ).single;
+      expect(group.isCluster, isTrue);
+      expect(
+        group.projections.map((projection) => projection.asset.displayName),
+        orderedEquals(['A lazeri', 'M matkabı', 'Z vinci']),
+      );
+
+      await tester.tap(
+        find.byKey(Key('inventory-cluster-${group.bucketX}-${group.bucketY}')),
+      );
+      await tester.pumpAndSettle();
+
+      final firstItem = find.byKey(Key('inventory-cluster-item-$_assetB'));
+      final secondItem = find.byKey(
+        Key('inventory-cluster-item-$_assetArchived'),
+      );
+      expect(firstItem, findsOneWidget);
+      expect(secondItem, findsOneWidget);
+      expect(
+        tester.getTopLeft(firstItem).dy,
+        lessThan(tester.getTopLeft(secondItem).dy),
+      );
+      expect(
+        find.byKey(const Key('inventory-cluster-add-at-point')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('inventory-cluster-add-at-point-1')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('inventory-cluster-add-at-point')));
+      await tester.pumpAndSettle();
+      expect(find.text('A Blok · A 1. Kat'), findsOneWidget);
+      expect(find.text('Şematik kroki konumu: 256, 256'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('inventory-quick-name')),
+        'Aynı nokta kaydı',
+      );
+      await tester.tap(find.byKey(const Key('inventory-quick-category')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Makine / ekipman').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inventory-quick-submit')));
+      await tester.pumpAndSettle();
+
+      expect(inventory.createCalls, 1);
+      expect(inventory.lastCreate?.floorId, _spatialFloorA1);
+      expect((inventory.lastCreate?.x, inventory.lastCreate?.y), (256, 256));
+      expect(
+        inventory.assets[_projectA]!
+            .take(2)
+            .map(
+              (projection) => (
+                projection.activePlacement!.floorId,
+                projection.activePlacement!.x,
+                projection.activePlacement!.y,
+              ),
+            ),
+        everyElement((_spatialFloorA1, 256, 256)),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'real detail move selects map target confirms and canonical reloads',
@@ -1372,8 +1492,7 @@ void main() {
       await _pumpPage(tester, inventory: inventory, source: source);
       final readsBeforeMutation = inventory.listReads;
 
-      await tester.tap(find.byKey(const Key('inventory-marker-$_assetA')));
-      await tester.pumpAndSettle();
+      await _openMapMarkerItem(tester, _assetA);
       expect(find.byKey(const Key('inventory-asset-detail')), findsOneWidget);
       await tester.tap(find.byKey(const Key('inventory-detail-move')));
       await tester.pumpAndSettle();
@@ -1418,8 +1537,7 @@ void main() {
       ..projects = [_project(_projectA, 'Proje A')];
     await _pumpPage(tester, inventory: inventory, source: source);
 
-    await tester.tap(find.byKey(const Key('inventory-marker-$_assetA')));
-    await tester.pumpAndSettle();
+    await _openMapMarkerItem(tester, _assetA);
     await tester.tap(find.byKey(const Key('inventory-detail-move')));
     await tester.pumpAndSettle();
     await tester.tap(
@@ -1467,8 +1585,7 @@ void main() {
       await controller.selectProject(_projectA);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('inventory-marker-$_assetA')));
-      await tester.pumpAndSettle();
+      await _openMapMarkerItem(tester, _assetA);
       await tester.tap(find.byKey(const Key('inventory-detail-move')));
       await tester.pumpAndSettle();
       expect(
@@ -1499,8 +1616,7 @@ void main() {
       expect(find.byKey(const Key('inventory-list-$_assetA')), findsNothing);
       controller.setView(InventoryPageView.map);
       await tester.pump();
-      await tester.tap(find.byKey(const Key('inventory-marker-$_assetB')));
-      await tester.pumpAndSettle();
+      await _openMapMarkerItem(tester, _assetB);
       expect(find.byKey(const Key('inventory-asset-detail')), findsOneWidget);
       expect(find.text('Lazer metre B'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -2366,6 +2482,20 @@ Future<void> _tapMapTarget(WidgetTester tester) async {
   final gesture = find.byKey(const Key('inventory-map-gesture'));
   expect(gesture, findsOneWidget);
   await tester.tapAt(tester.getCenter(gesture));
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
+Future<void> _openMapMarkerItem(WidgetTester tester, String assetId) async {
+  final marker = find.byKey(Key('inventory-marker-$assetId'));
+  expect(marker.hitTestable(), findsOneWidget);
+  await tester.tap(marker);
+  await tester.pumpAndSettle();
+  final chooser = find.byKey(const Key('inventory-cluster-chooser'));
+  if (chooser.evaluate().isEmpty) return;
+  final item = find.byKey(Key('inventory-cluster-item-$assetId'));
+  expect(item.hitTestable(), findsOneWidget);
+  await tester.tap(item);
+  await tester.pumpAndSettle();
 }
 
 Future<void> _dismissDetail(WidgetTester tester) async {

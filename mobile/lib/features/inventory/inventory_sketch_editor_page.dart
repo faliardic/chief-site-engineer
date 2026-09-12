@@ -546,7 +546,10 @@ class InventorySketchEditorController extends ChangeNotifier {
     final selection = current?.selection;
     if (current == null || selection == null) return false;
     final blockId = _blockIdAtPolygonIndex(selection.polylineIndex);
-    if (blockId == null) {
+    final isNewBlock = _newBlocks.any(
+      (block) => block.polygonIndex == selection.polylineIndex,
+    );
+    if (blockId == null && !isNewBlock) {
       lastErrorCode = lockedBaseGeometryCode;
       _notify();
       return false;
@@ -561,6 +564,7 @@ class InventorySketchEditorController extends ChangeNotifier {
       );
       return _applyEditorAction(
         next,
+        newBlocks: isNewBlock ? _newBlocks : null,
         existingBlockMappings: _existingBlockMappings,
       );
     } on InventoryGeometryFailure catch (error) {
@@ -691,6 +695,7 @@ class InventorySketchEditorController extends ChangeNotifier {
   bool _applyEditorAction(
     InventorySketchEditorSnapshot? next, {
     InventoryBlockDraft? addedBlock,
+    List<InventoryBlockDraft>? newBlocks,
     Map<String, int>? existingBlockMappings,
     Map<String, InventoryExistingBlockAction>? lifecycleActions,
   }) {
@@ -700,13 +705,15 @@ class InventorySketchEditorController extends ChangeNotifier {
     }
     final geometryChanged =
         current.geometry.canonicalJson != next.geometry.canonicalJson;
-    final nextBlocks = geometryChanged
-        ? _remapNewBlocks(
-            current.geometry,
-            next.geometry,
-            addedBlock: addedBlock,
-          )
-        : _newBlocks;
+    final nextBlocks =
+        newBlocks ??
+        (geometryChanged
+            ? _remapNewBlocks(
+                current.geometry,
+                next.geometry,
+                addedBlock: addedBlock,
+              )
+            : _newBlocks);
     final nextMappings =
         existingBlockMappings ??
         (geometryChanged
@@ -2099,6 +2106,7 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
         final hasMovementWheel =
             editor.mode == InventorySketchEditorMode.select &&
             editor.selection != null;
+        final hasContextualLineAction = editor.hasWorkingPolyline;
         final compactWheelLayout = hasMovementWheel && movementWheelBottom < 72;
         return Stack(
           key: const Key('inventory-editor-fullscreen-workspace'),
@@ -2194,7 +2202,7 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
                 ),
               ),
             Positioned(
-              top: _EditorToolbar.height + 16,
+              top: _EditorToolbar.height + (hasContextualLineAction ? 72 : 16),
               left: 8,
               right: 8,
               bottom: 72,
@@ -2304,24 +2312,52 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
                 ),
               ),
             ),
+            if (hasContextualLineAction)
+              Positioned(
+                top: _EditorToolbar.height + 16,
+                right: 8,
+                child: Semantics(
+                  button: true,
+                  label: 'Çizgiyi bitir',
+                  child: FilledButton.icon(
+                    key: const Key('inventory-editor-finish-line'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                    ),
+                    onPressed: controller.finishWorkingPolyline,
+                    icon: const Icon(Icons.stop_rounded),
+                    label: const Text('Çizgiyi bitir'),
+                  ),
+                ),
+              ),
             Positioned(
               top: 8,
-              left: 8,
-              right: 8,
+              left: 0,
+              child: Material(
+                key: const Key('inventory-editor-top-navigation'),
+                color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                elevation: 4,
+                shape: const CircleBorder(),
+                child: _ToolbarIconButton(
+                  key: const Key('inventory-editor-back'),
+                  label: 'Geri',
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  onPressed: () => unawaited(_attemptExit()),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 48,
+              right: 0,
               child: _EditorToolbar(
                 editor: editor,
-                onBack: () => unawaited(_attemptExit()),
                 onModeChanged: controller.setMode,
                 onUndo: controller.undo,
                 onRedo: controller.redo,
-                onFinish: controller.finishWorkingPolyline,
-                onClose: () => unawaited(_closeCurrentBlock()),
                 onDelete: () => unawaited(_deleteSelection()),
                 freeLengthNextSegment: controller.freeLengthNextSegment,
                 onFreeLengthChanged: controller.setFreeLengthNextSegment,
-                onZoomOut: () => _canvasKey.currentState?.zoomOut(),
-                onZoomIn: () => _canvasKey.currentState?.zoomIn(),
-                onFit: () => _canvasKey.currentState?.fitCanvas(),
                 finalizeLabel: finalizeLabel,
                 finalizing: controller.finalizing,
                 onFinalize: controller.isFinalizeEnabled
@@ -2467,50 +2503,98 @@ class _MovementWheelButton extends StatelessWidget {
 }
 
 class _EditorToolbar extends StatelessWidget {
-  static const height = 96.0;
+  static const height = 48.0;
 
   const _EditorToolbar({
     required this.editor,
-    required this.onBack,
     required this.onModeChanged,
     required this.onUndo,
     required this.onRedo,
-    required this.onFinish,
-    required this.onClose,
     required this.onDelete,
     required this.freeLengthNextSegment,
     required this.onFreeLengthChanged,
-    required this.onZoomOut,
-    required this.onZoomIn,
-    required this.onFit,
     required this.finalizeLabel,
     required this.finalizing,
     required this.onFinalize,
   });
 
   final InventorySketchEditorSnapshot editor;
-  final VoidCallback onBack;
   final ValueChanged<InventorySketchEditorMode> onModeChanged;
   final VoidCallback onUndo;
   final VoidCallback onRedo;
-  final VoidCallback onFinish;
-  final VoidCallback onClose;
   final VoidCallback onDelete;
   final bool freeLengthNextSegment;
   final ValueChanged<bool> onFreeLengthChanged;
-  final VoidCallback onZoomOut;
-  final VoidCallback onZoomIn;
-  final VoidCallback onFit;
   final String finalizeLabel;
   final bool finalizing;
   final VoidCallback? onFinalize;
 
   @override
   Widget build(BuildContext context) {
-    final canClose =
-        editor.hasWorkingPolyline &&
-        editor.geometry.polylines[editor.workingPolylineIndex!].points.length >=
-            3;
+    final controls = <Widget>[
+      _ToolbarIconButton(
+        key: const Key('inventory-editor-mode-draw'),
+        label: 'Çiz',
+        selected: editor.mode == InventorySketchEditorMode.draw,
+        selectedIndicatorKey: const Key('inventory-editor-mode-selected-draw'),
+        icon: const Icon(Icons.polyline_rounded),
+        onPressed: () => onModeChanged(InventorySketchEditorMode.draw),
+      ),
+      _ToolbarIconButton(
+        key: const Key('inventory-editor-mode-select'),
+        label: 'Seç',
+        selected: editor.mode == InventorySketchEditorMode.select,
+        selectedIndicatorKey: const Key(
+          'inventory-editor-mode-selected-select',
+        ),
+        icon: const Icon(Icons.ads_click_rounded),
+        onPressed: () => onModeChanged(InventorySketchEditorMode.select),
+      ),
+      _ToolbarIconButton(
+        key: const Key('inventory-editor-undo'),
+        label: 'Geri al',
+        icon: const Icon(Icons.undo_rounded),
+        onPressed: editor.canUndo ? onUndo : null,
+      ),
+      _ToolbarIconButton(
+        key: const Key('inventory-editor-redo'),
+        label: 'İleri al',
+        icon: const Icon(Icons.redo_rounded),
+        onPressed: editor.canRedo ? onRedo : null,
+      ),
+      _ToolbarIconButton(
+        key: const Key('inventory-editor-free-length'),
+        label: 'Serbest uzunluk',
+        selected: freeLengthNextSegment,
+        selectedIndicatorKey: const Key(
+          'inventory-editor-free-length-selected',
+        ),
+        icon: const Icon(Icons.alt_route_rounded),
+        onPressed:
+            editor.mode == InventorySketchEditorMode.draw &&
+                editor.hasWorkingPolyline
+            ? () => onFreeLengthChanged(!freeLengthNextSegment)
+            : null,
+      ),
+      _ToolbarIconButton(
+        key: const Key('inventory-editor-delete'),
+        label: 'Seçileni sil',
+        icon: const Icon(Icons.delete_outline_rounded),
+        onPressed: editor.selection == null ? null : onDelete,
+      ),
+      _ToolbarIconButton(
+        key: const Key('inventory-editor-finalize'),
+        label: finalizeLabel,
+        emphasized: true,
+        icon: finalizing
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.check_circle_rounded),
+        onPressed: onFinalize,
+      ),
+    ];
     return Material(
       key: const Key('inventory-editor-top-toolbar'),
       color: Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -2521,142 +2605,10 @@ class _EditorToolbar extends StatelessWidget {
         height: height,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Column(
+          child: Row(
             key: const Key('inventory-editor-modes'),
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                key: const Key('inventory-editor-toolbar-row-1'),
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-back'),
-                    label: 'Geri',
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    onPressed: onBack,
-                  ),
-                  const SizedBox(height: 32, child: VerticalDivider(width: 8)),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-mode-draw'),
-                    label: 'Çiz',
-                    selected: editor.mode == InventorySketchEditorMode.draw,
-                    selectedIndicatorKey: const Key(
-                      'inventory-editor-mode-selected-draw',
-                    ),
-                    icon: const Icon(Icons.polyline_rounded),
-                    onPressed: () =>
-                        onModeChanged(InventorySketchEditorMode.draw),
-                  ),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-mode-select'),
-                    label: 'Seç',
-                    selected: editor.mode == InventorySketchEditorMode.select,
-                    selectedIndicatorKey: const Key(
-                      'inventory-editor-mode-selected-select',
-                    ),
-                    icon: const Icon(Icons.ads_click_rounded),
-                    onPressed: () =>
-                        onModeChanged(InventorySketchEditorMode.select),
-                  ),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-mode-pan'),
-                    label: 'Taşı',
-                    selected: editor.mode == InventorySketchEditorMode.pan,
-                    selectedIndicatorKey: const Key(
-                      'inventory-editor-mode-selected-pan',
-                    ),
-                    icon: const Icon(Icons.pan_tool_alt_outlined),
-                    onPressed: () =>
-                        onModeChanged(InventorySketchEditorMode.pan),
-                  ),
-                  const SizedBox(height: 32, child: VerticalDivider(width: 8)),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-undo'),
-                    label: 'Geri al',
-                    icon: const Icon(Icons.undo_rounded),
-                    onPressed: editor.canUndo ? onUndo : null,
-                  ),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-redo'),
-                    label: 'İleri al',
-                    icon: const Icon(Icons.redo_rounded),
-                    onPressed: editor.canRedo ? onRedo : null,
-                  ),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-finish-line'),
-                    label: 'Çizgiyi bitir',
-                    icon: const Icon(Icons.stop_rounded),
-                    onPressed: editor.hasWorkingPolyline ? onFinish : null,
-                  ),
-                ],
-              ),
-              Row(
-                key: const Key('inventory-editor-toolbar-row-2'),
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-close-block'),
-                    label: 'Alanı kapat',
-                    icon: const Icon(Icons.polyline_rounded),
-                    onPressed: canClose ? onClose : null,
-                  ),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-free-length'),
-                    label: 'Serbest uzunluk',
-                    selected: freeLengthNextSegment,
-                    selectedIndicatorKey: const Key(
-                      'inventory-editor-free-length-selected',
-                    ),
-                    icon: const Icon(Icons.straighten_rounded),
-                    onPressed:
-                        editor.mode == InventorySketchEditorMode.draw &&
-                            editor.hasWorkingPolyline
-                        ? () => onFreeLengthChanged(!freeLengthNextSegment)
-                        : null,
-                  ),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-delete'),
-                    label: 'Seçileni sil',
-                    icon: const Icon(Icons.delete_outline_rounded),
-                    onPressed: editor.selection == null ? null : onDelete,
-                  ),
-                  const SizedBox(height: 32, child: VerticalDivider(width: 8)),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-zoom-out'),
-                    label: 'Uzaklaştır',
-                    icon: const Icon(Icons.remove_rounded),
-                    onPressed: onZoomOut,
-                  ),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-zoom-in'),
-                    label: 'Yakınlaştır',
-                    icon: const Icon(Icons.add_rounded),
-                    onPressed: onZoomIn,
-                  ),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-fit'),
-                    label: 'Tamamını göster',
-                    icon: const Icon(Icons.fit_screen_rounded),
-                    onPressed: onFit,
-                  ),
-                  const SizedBox(height: 32, child: VerticalDivider(width: 8)),
-                  _ToolbarIconButton(
-                    key: const Key('inventory-editor-finalize'),
-                    label: finalizeLabel,
-                    emphasized: true,
-                    icon: finalizing
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.check_circle_rounded),
-                    onPressed: onFinalize,
-                  ),
-                ],
-              ),
-            ],
+            children: controls,
           ),
         ),
       ),
@@ -2686,7 +2638,7 @@ class _ToolbarIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final decoratedIcon = selected == true
         ? SizedBox.square(
-            dimension: 24,
+            dimension: 22,
             child: Stack(
               clipBehavior: Clip.none,
               alignment: Alignment.center,
@@ -2694,19 +2646,40 @@ class _ToolbarIconButton extends StatelessWidget {
                 icon,
                 Positioned(
                   key: selectedIndicatorKey,
-                  top: -5,
-                  right: -5,
-                  child: const Icon(Icons.check_circle, size: 11),
+                  top: -4,
+                  right: -4,
+                  child: const Icon(Icons.check_circle, size: 10),
                 ),
               ],
             ),
           )
         : icon;
+    final buttonStyle = IconButton.styleFrom(
+      fixedSize: const Size.square(48),
+      minimumSize: const Size.square(48),
+      maximumSize: const Size.square(48),
+      iconSize: 18,
+      padding: EdgeInsets.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.standard,
+    );
     final button = emphasized
-        ? IconButton.filled(onPressed: onPressed, icon: decoratedIcon)
+        ? IconButton.filled(
+            style: buttonStyle,
+            onPressed: onPressed,
+            icon: decoratedIcon,
+          )
         : selected == true
-        ? IconButton.filledTonal(onPressed: onPressed, icon: decoratedIcon)
-        : IconButton(onPressed: onPressed, icon: decoratedIcon);
+        ? IconButton.filledTonal(
+            style: buttonStyle,
+            onPressed: onPressed,
+            icon: decoratedIcon,
+          )
+        : IconButton(
+            style: buttonStyle,
+            onPressed: onPressed,
+            icon: decoratedIcon,
+          );
     return Semantics(
       label: label,
       button: true,
