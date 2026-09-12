@@ -156,13 +156,11 @@ void main() {
     );
     expect(materials.calls, [projectB.id]);
     expect(
-      tester
-          .widget<DropdownButtonFormField<String>>(
-            find.byKey(ValueKey('material-request-project-${projectB.id}')),
-          )
-          .initialValue,
-      projectB.id,
+      find.byKey(const Key('material-request-project-context')),
+      findsOneWidget,
     );
+    expect(find.text(projectB.name), findsOneWidget);
+    expect(find.byType(DropdownButtonFormField<String>), findsNothing);
   });
 
   testWidgets(
@@ -242,13 +240,10 @@ void main() {
       expect(materials.livingPlanCalls, 0);
       expect(materials.createCalls, 0);
       expect(
-        tester
-            .widget<DropdownButtonFormField<String>>(
-              find.byKey(ValueKey('material-request-project-${projectB.id}')),
-            )
-            .initialValue,
-        projectB.id,
+        find.byKey(const Key('material-request-project-context')),
+        findsOneWidget,
       );
+      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
       expect(find.byKey(const Key('material-request-create')), findsOneWidget);
     },
   );
@@ -311,12 +306,9 @@ void main() {
         find.byKey(const Key('material-request-project-context-unavailable')),
         findsOneWidget,
       );
-      await _chooseProject(
-        tester,
-        find.byKey(const Key('material-request-project-none')),
-        projectB.name,
-      );
-      expect(materials.calls, [projectB.id]);
+      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+      expect(find.byKey(const Key('material-request-create')), findsNothing);
+      expect(materials.calls, isEmpty);
     },
   );
 
@@ -339,7 +331,13 @@ void main() {
 
     final materials = _MaterialFake.fromMobile(const [projectA, projectB]);
     await _pumpPage(tester, MaterialRequestsPage(application: materials));
-    expect(materials.calls, [projectA.id]);
+    expect(materials.events, isEmpty);
+    expect(materials.calls, isEmpty);
+    expect(
+      find.byKey(const Key('material-request-project-context-unavailable')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('material-request-create')), findsNothing);
   });
 
   testWidgets(
@@ -385,11 +383,6 @@ void main() {
           initialProjectId: projectB.id,
         ),
       );
-      await _chooseProject(
-        tester,
-        find.byKey(Key('material-request-project-${projectB.id}')),
-        projectA.name,
-      );
       materials.projects = [
         MaterialRequestProject(id: projectA.id, name: projectA.name),
         MaterialRequestProject(id: projectC.id, name: projectC.name),
@@ -398,20 +391,12 @@ void main() {
           .widget<RefreshIndicator>(find.byType(RefreshIndicator))
           .onRefresh();
       await tester.pumpAndSettle();
-      expect(materials.calls, [projectB.id, projectA.id, projectA.id]);
-
-      materials.projects = [
-        MaterialRequestProject(id: projectC.id, name: projectC.name),
-      ];
-      await tester
-          .widget<RefreshIndicator>(find.byType(RefreshIndicator))
-          .onRefresh();
-      await tester.pumpAndSettle();
-      expect(materials.calls, [projectB.id, projectA.id, projectA.id]);
+      expect(materials.calls, [projectB.id]);
       expect(
         find.byKey(const Key('material-request-project-context-unavailable')),
         findsOneWidget,
       );
+      expect(find.byKey(const Key('material-request-create')), findsNothing);
     },
   );
 }

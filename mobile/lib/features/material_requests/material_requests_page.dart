@@ -6,6 +6,10 @@ import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/material_request_models.dart';
 import 'package:flutter/material.dart';
 
+const _minimumTouchTargetStyle = ButtonStyle(
+  minimumSize: WidgetStatePropertyAll(Size(48, 48)),
+);
+
 class MaterialRequestsPage extends StatefulWidget {
   const MaterialRequestsPage({
     required this.application,
@@ -16,6 +20,8 @@ class MaterialRequestsPage extends StatefulWidget {
 
   final MaterialRequestApplicationPort application;
   final String? initialProjectId;
+  // Kept for source compatibility with older route callers. Materials now
+  // consumes the shared Dashboard context and never changes it locally.
   final ValueChanged<String>? onProjectSelected;
 
   @override
@@ -23,56 +29,94 @@ class MaterialRequestsPage extends StatefulWidget {
 }
 
 class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
-  List<MaterialRequestProject> _projects = const [];
   List<MaterialRequest> _requests = const [];
-  String? _projectIdToValidate;
-  String? _projectId;
+  MaterialRequestProject? _project;
+  String? _contextProjectId;
   MaterialRequestListKind _kind = MaterialRequestListKind.open;
   bool _loading = true;
+  bool _refreshing = false;
+  bool _contextValid = false;
   bool _projectDiscoveryFailed = false;
+  bool _projectMissing = false;
+  bool _openingCreate = false;
   String? _failure;
+  final Set<String> _transitioning = {};
 
   @override
   void initState() {
     super.initState();
-    _projectIdToValidate = widget.initialProjectId;
+    _contextProjectId = widget.initialProjectId;
     unawaited(_loadProjects());
   }
 
+  @override
+  void didUpdateWidget(covariant MaterialRequestsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialProjectId == widget.initialProjectId) return;
+    _contextProjectId = widget.initialProjectId;
+    _project = null;
+    _requests = const [];
+    _contextValid = false;
+    unawaited(_loadProjects());
+  }
+
+  bool get _canMutate =>
+      _contextValid && !_loading && !_refreshing && _failure == null;
+
   Future<void> _loadProjects() async {
-    final projectIdToValidate = _projectIdToValidate;
+    final projectIdToValidate = _contextProjectId;
+    if (projectIdToValidate == null) {
+      if (!mounted) return;
+      setState(() {
+        _project = null;
+        _requests = const [];
+        _contextValid = false;
+        _loading = false;
+        _refreshing = false;
+        _projectDiscoveryFailed = false;
+        _projectMissing = false;
+        _failure = null;
+      });
+      return;
+    }
+    final hasPriorContent = _project != null || _requests.isNotEmpty;
     setState(() {
-      _projects = const [];
-      _requests = const [];
-      _projectId = null;
-      _loading = true;
+      _loading = !hasPriorContent;
+      _refreshing = hasPriorContent;
       _projectDiscoveryFailed = false;
+      _projectMissing = false;
       _failure = null;
     });
     try {
       final projects = await widget.application.listProjects();
-      final selected =
-          projects.any((project) => project.id == projectIdToValidate)
-          ? projectIdToValidate
-          : widget.initialProjectId == null && projects.isNotEmpty
-          ? projects.first.id
-          : null;
-      if (!mounted) return;
-      setState(() {
-        _projects = projects;
-        _projectId = selected;
-        if (selected != null) {
-          _projectIdToValidate = selected;
+      MaterialRequestProject? selected;
+      for (final project in projects) {
+        if (project.id == projectIdToValidate) {
+          selected = project;
+          break;
         }
+      }
+      if (!mounted) return;
+      if (selected == null) {
+        setState(() {
+          _contextValid = false;
+          _loading = false;
+          _refreshing = false;
+          _projectMissing = true;
+        });
+        return;
+      }
+      setState(() {
+        _project = selected;
+        _contextValid = true;
       });
       await _reload();
     } on MaterialRequestFailure catch (error) {
       if (!mounted) return;
       setState(() {
-        _projects = const [];
-        _requests = const [];
-        _projectId = null;
+        _contextValid = false;
         _loading = false;
+        _refreshing = false;
         _projectDiscoveryFailed = true;
         _failure = error.code;
       });
@@ -80,17 +124,19 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
   }
 
   Future<void> _reload() async {
-    final projectId = _projectId;
-    if (projectId == null) {
+    final projectId = _project?.id;
+    if (!_contextValid || projectId == null) {
       if (!mounted) return;
       setState(() {
-        _requests = const [];
         _loading = false;
+        _refreshing = false;
       });
       return;
     }
+    final hasPriorContent = _requests.isNotEmpty;
     setState(() {
-      _loading = true;
+      _loading = !hasPriorContent;
+      _refreshing = hasPriorContent;
       _failure = null;
     });
     try {
@@ -102,64 +148,63 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
       setState(() {
         _requests = requests;
         _loading = false;
+        _refreshing = false;
       });
     } on MaterialRequestFailure catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _refreshing = false;
         _failure = error.code;
       });
     }
   }
 
-  Future<void> _selectProject(String? value) async {
-    if (value == null || value == _projectId) return;
-    setState(() {
-      _projectIdToValidate = value;
-      _projectId = value;
-    });
-    widget.onProjectSelected?.call(value);
-    await _reload();
-  }
-
   Future<void> _changeKind(Set<MaterialRequestListKind> values) async {
-    setState(() => _kind = values.single);
+    if (values.isEmpty || values.single == _kind) return;
+    setState(() {
+      _kind = values.single;
+      _requests = const [];
+      _failure = null;
+    });
     await _reload();
   }
 
   Future<void> _openCreate() async {
-    final projectId = _projectId;
-    if (projectId == null) return;
+    final projectId = _project?.id;
+    if (!_canMutate || projectId == null || _openingCreate) return;
+    setState(() => _openingCreate = true);
     try {
       final locations = await widget.application.listLocations(projectId);
       final planItems = await widget.application.listLivingPlanItems(projectId);
       if (!mounted) return;
-      final value = await showDialog<_CreateValue>(
+      final created = await showDialog<bool>(
         context: context,
         builder: (_) => _CreateMaterialRequestDialog(
           locations: locations,
           planItems: planItems,
+          onSubmit: (value) => widget.application.createMaterialRequest(
+            CreateMaterialRequestCommand(
+              requestId: RecordId.randomUuid(),
+              eventId: RecordId.randomUuid(),
+              projectId: projectId,
+              materialName: value.materialName,
+              locationId: value.locationId,
+              livingPlanItemId: value.livingPlanItemId,
+              quantity: value.quantity,
+              unit: value.unit,
+              neededOn: value.neededOn,
+              priority: value.priority,
+              description: value.description,
+            ),
+          ),
         ),
       );
-      if (value == null) return;
-      await widget.application.createMaterialRequest(
-        CreateMaterialRequestCommand(
-          requestId: RecordId.randomUuid(),
-          eventId: RecordId.randomUuid(),
-          projectId: projectId,
-          materialName: value.materialName,
-          locationId: value.locationId,
-          livingPlanItemId: value.livingPlanItemId,
-          quantity: value.quantity,
-          unit: value.unit,
-          neededOn: value.neededOn,
-          priority: value.priority,
-          description: value.description,
-        ),
-      );
-      await _reload();
+      if (created == true) await _reload();
     } on MaterialRequestFailure catch (error) {
       _showFailure(error);
+    } finally {
+      if (mounted) setState(() => _openingCreate = false);
     }
   }
 
@@ -167,6 +212,8 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
     MaterialRequest request,
     MaterialRequestStatus status,
   ) async {
+    if (!_canMutate || !_transitioning.add(request.id)) return;
+    setState(() {});
     try {
       await widget.application.transitionMaterialRequest(
         TransitionMaterialRequestCommand(
@@ -179,6 +226,10 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
       await _reload();
     } on MaterialRequestFailure catch (error) {
       _showFailure(error);
+    } finally {
+      if (mounted) {
+        setState(() => _transitioning.remove(request.id));
+      }
     }
   }
 
@@ -202,19 +253,43 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
   void _showFailure(MaterialRequestFailure error) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('İşlem tamamlanamadı. (${error.code})')),
+      SnackBar(
+        content: Text(
+          'İşlem tamamlanamadı. İçerik korunuyor; tekrar deneyin. '
+          '(${error.code})',
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final project = _project;
+    final compactStateControls =
+        MediaQuery.sizeOf(context).width < 360 ||
+        MediaQuery.textScalerOf(context).scale(1) > 1.3;
     return Scaffold(
-      appBar: AppBar(title: const Text('İstenecek Malzemeler')),
-      floatingActionButton: _projectId == null
+      appBar: AppBar(
+        title: const Text(
+          'İstenecek Malzemeler',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          IconButton(
+            key: const Key('material-request-refresh'),
+            tooltip: 'Malzemeleri yenile',
+            onPressed: _loading || _refreshing ? null : _loadProjects,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
+      floatingActionButton: !_contextValid
           ? null
           : FloatingActionButton.extended(
               key: const Key('material-request-create'),
-              onPressed: _loading ? null : _openCreate,
+              tooltip: 'Yeni malzeme ihtiyacı ekle',
+              onPressed: _canMutate && !_openingCreate ? _openCreate : null,
               icon: const Icon(Icons.add_rounded),
               label: const Text('Malzeme'),
             ),
@@ -228,107 +303,161 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
               const Text(
                 'Hangi malzemeyi istemeniz gerektiğini ve güncel durumunu takip edin.',
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                key: ValueKey(
-                  'material-request-project-${_projectId ?? 'none'}',
-                ),
-                initialValue: _projectId,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Proje',
-                  border: OutlineInputBorder(),
-                ),
-                items: _projects
-                    .map(
-                      (project) => DropdownMenuItem(
-                        value: project.id,
-                        child: Text(project.name),
-                      ),
-                    )
-                    .toList(growable: false),
-                onChanged: _loading ? null : _selectProject,
-              ),
+              if (_contextValid && project != null) ...[
+                const SizedBox(height: 12),
+                _ProjectContext(project: project),
+              ],
               const SizedBox(height: 12),
               SegmentedButton<MaterialRequestListKind>(
                 key: const Key('material-request-list-kind'),
-                segments: const [
+                style: _minimumTouchTargetStyle,
+                segments: [
                   ButtonSegment(
                     value: MaterialRequestListKind.open,
-                    icon: Icon(Icons.pending_actions_outlined),
-                    label: Text('Açık'),
+                    icon: compactStateControls
+                        ? null
+                        : const Icon(Icons.pending_actions_outlined),
+                    label: Semantics(
+                      selected: _kind == MaterialRequestListKind.open,
+                      child: const Text('Açık'),
+                    ),
                   ),
                   ButtonSegment(
                     value: MaterialRequestListKind.history,
-                    icon: Icon(Icons.history_rounded),
-                    label: Text('Geçmiş'),
+                    icon: compactStateControls
+                        ? null
+                        : const Icon(Icons.history_rounded),
+                    label: Semantics(
+                      selected: _kind == MaterialRequestListKind.history,
+                      child: const Text('Geçmiş'),
+                    ),
                   ),
                 ],
                 selected: {_kind},
-                onSelectionChanged: _loading || _projectId == null
-                    ? null
-                    : _changeKind,
+                onSelectionChanged: !_canMutate ? null : _changeKind,
               ),
               const SizedBox(height: 12),
-              if (_loading)
+              if (_refreshing) ...[
+                const LinearProgressIndicator(
+                  key: Key('material-request-refresh-progress'),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_loading && _requests.isEmpty)
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(24),
                     child: CircularProgressIndicator(),
                   ),
                 )
-              else if (_failure case final failure?)
-                Column(
-                  children: [
-                    _MessageCard(
-                      icon: Icons.error_outline_rounded,
-                      text: 'Malzeme talepleri okunamadı. ($failure)',
+              else ...[
+                if (!_contextValid)
+                  KeyedSubtree(
+                    key: Key('material-request-project-context-unavailable'),
+                    child: _MessageCard(
+                      icon: _projectDiscoveryFailed
+                          ? Icons.cloud_off_outlined
+                          : Icons.folder_off_outlined,
+                      text: _projectDiscoveryFailed
+                          ? 'Proje bilgisi doğrulanamadı. Hiçbir değişiklik '
+                                'yapılmadı; tekrar deneyin veya Dashboard’a dönün.'
+                          : _projectMissing
+                          ? 'Dashboard’dan gelen proje artık kullanılamıyor. '
+                                'Dashboard’a dönüp aktif projeyi kontrol edin.'
+                          : 'Aktif proje bulunamadı. Dashboard’a dönüp bir '
+                                'proje seçin.',
+                      action: _contextProjectId == null
+                          ? null
+                          : OutlinedButton.icon(
+                              key: const Key('material-request-project-retry'),
+                              style: _minimumTouchTargetStyle,
+                              onPressed: _loadProjects,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Tekrar dene'),
+                            ),
                     ),
-                    if (_projectDiscoveryFailed) ...[
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        key: const Key('material-request-project-retry'),
-                        onPressed: _loadProjects,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Projeleri yeniden dene'),
+                  ),
+                if (_contextValid && _failure != null)
+                  _MessageCard(
+                    icon: Icons.error_outline_rounded,
+                    text: _requests.isEmpty
+                        ? 'Malzeme talepleri okunamadı. Tekrar deneyin. '
+                              '($_failure)'
+                        : 'Malzeme talepleri yenilenemedi. Önceki içerik '
+                              'korunuyor; tekrar deneyin. ($_failure)',
+                    action: OutlinedButton.icon(
+                      key: const Key('material-request-list-retry'),
+                      style: _minimumTouchTargetStyle,
+                      onPressed: _loadProjects,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Tekrar dene'),
+                    ),
+                  ),
+                if (_contextValid && _failure == null && _requests.isEmpty)
+                  _MessageCard(
+                    key: ValueKey(
+                      _kind == MaterialRequestListKind.open
+                          ? 'material-request-open-empty'
+                          : 'material-request-history-empty',
+                    ),
+                    icon: _kind == MaterialRequestListKind.open
+                        ? Icons.inventory_2_outlined
+                        : Icons.history_rounded,
+                    text: _kind == MaterialRequestListKind.open
+                        ? 'Açık malzeme ihtiyacı yok.'
+                        : 'Geldi veya iptal edildi kaydı yok.',
+                  ),
+                if (_requests.isNotEmpty) ...[
+                  if (!_contextValid || _failure != null)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Son güvenli içerik yalnızca görüntüleniyor.',
                       ),
-                    ],
-                  ],
-                )
-              else if (_projects.isEmpty)
-                const _MessageCard(
-                  icon: Icons.apartment_outlined,
-                  text: 'Önce aktif bir proje oluşturun.',
-                )
-              else if (_projectId == null)
-                const KeyedSubtree(
-                  key: Key('material-request-project-context-unavailable'),
-                  child: _MessageCard(
-                    icon: Icons.folder_off_outlined,
-                    text:
-                        'Dashboard projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
+                    ),
+                  ..._requests.map(
+                    (request) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _RequestCard(
+                        request: request,
+                        onDetail: () => _showDetail(request),
+                        onTransition: (status) => _transition(request, status),
+                        mutationsEnabled:
+                            _canMutate && !_transitioning.contains(request.id),
+                        transitionInProgress: _transitioning.contains(
+                          request.id,
+                        ),
+                      ),
+                    ),
                   ),
-                )
-              else if (_requests.isEmpty)
-                _MessageCard(
-                  icon: _kind == MaterialRequestListKind.open
-                      ? Icons.inventory_2_outlined
-                      : Icons.history_rounded,
-                  text: _kind == MaterialRequestListKind.open
-                      ? 'Açık malzeme ihtiyacı yok.'
-                      : 'Geldi veya iptal edildi kaydı yok.',
-                )
-              else
-                ..._requests.map(
-                  (request) => _RequestCard(
-                    request: request,
-                    onDetail: () => _showDetail(request),
-                    onTransition: (status) => _transition(request, status),
-                  ),
-                ),
+                ],
+              ],
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ProjectContext extends StatelessWidget {
+  const _ProjectContext({required this.project});
+
+  final MaterialRequestProject project;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Aktif proje: ${project.name}',
+      readOnly: true,
+      child: InputDecorator(
+        key: const Key('material-request-project-context'),
+        decoration: const InputDecoration(
+          labelText: 'Aktif proje',
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.folder_outlined),
+        ),
+        child: Text(project.name, maxLines: 2, overflow: TextOverflow.ellipsis),
       ),
     );
   }
@@ -339,76 +468,124 @@ class _RequestCard extends StatelessWidget {
     required this.request,
     required this.onDetail,
     required this.onTransition,
+    required this.mutationsEnabled,
+    required this.transitionInProgress,
   });
 
   final MaterialRequest request;
   final VoidCallback onDetail;
   final ValueChanged<MaterialRequestStatus> onTransition;
+  final bool mutationsEnabled;
+  final bool transitionInProgress;
 
   @override
   Widget build(BuildContext context) {
     final quantity = request.quantity == null
         ? null
         : _quantityLabel(request.quantity!, request.unit!);
-    return Card(
-      key: ValueKey('material-request-${request.id}'),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    request.materialName,
-                    style: Theme.of(context).textTheme.titleMedium,
+    return Semantics(
+      container: true,
+      label:
+          '${request.materialName}, ${request.status.label}, '
+          '${request.priority.label} öncelik',
+      child: Card(
+        key: ValueKey('material-request-${request.id}'),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                request.materialName,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  Chip(
+                    avatar: const Icon(Icons.sync_alt_rounded, size: 18),
+                    label: Text(request.status.label),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  Chip(
+                    avatar: const Icon(Icons.flag_outlined, size: 18),
+                    label: Text(request.priority.label),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+              if (quantity != null) Text('Miktar: $quantity'),
+              if (request.neededOn case final neededOn?)
+                Text(
+                  'İhtiyaç tarihi: ${CseTimeCodec.formatIstanbulDay(neededOn)}',
+                ),
+              if (request.locationName case final location?)
+                Text('Mahal: $location'),
+              if (request.livingPlanActivityName case final activity?)
+                Text('Plan işi: $activity'),
+              const SizedBox(height: 4),
+              if (transitionInProgress)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 8),
+                      Text('Durum güncelleniyor…'),
+                    ],
                   ),
                 ),
-                Chip(label: Text(request.priority.label)),
-              ],
-            ),
-            Text(request.status.label),
-            if (quantity != null) Text(quantity),
-            if (request.neededOn case final neededOn?)
-              Text(
-                'İhtiyaç tarihi: ${CseTimeCodec.formatIstanbulDay(neededOn)}',
-              ),
-            if (request.locationName case final location?)
-              Text('Mahal: $location'),
-            if (request.livingPlanActivityName case final activity?)
-              Text('Plan işi: $activity'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                TextButton(onPressed: onDetail, child: const Text('Detay')),
-                if (request.status == MaterialRequestStatus.needed)
-                  FilledButton.tonal(
-                    onPressed: () =>
-                        onTransition(MaterialRequestStatus.requested),
-                    child: const Text('İstendi'),
-                  ),
-                if (request.status == MaterialRequestStatus.requested)
-                  FilledButton.tonal(
-                    onPressed: () =>
-                        onTransition(MaterialRequestStatus.received),
-                    child: const Text('Geldi'),
-                  ),
-                if (request.status.isOpen)
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: [
                   TextButton(
-                    onPressed: () =>
-                        onTransition(MaterialRequestStatus.cancelled),
-                    child: const Text('İptal'),
+                    style: _minimumTouchTargetStyle,
+                    onPressed: onDetail,
+                    child: const Text('Detayı aç'),
                   ),
-                if (!request.status.isOpen)
-                  FilledButton.tonal(
-                    onPressed: () => onTransition(MaterialRequestStatus.needed),
-                    child: const Text('Yeniden aç'),
-                  ),
-              ],
-            ),
-          ],
+                  if (request.status == MaterialRequestStatus.needed)
+                    FilledButton.tonal(
+                      style: _minimumTouchTargetStyle,
+                      onPressed: mutationsEnabled
+                          ? () => onTransition(MaterialRequestStatus.requested)
+                          : null,
+                      child: const Text('İstendi yap'),
+                    ),
+                  if (request.status == MaterialRequestStatus.requested)
+                    FilledButton.tonal(
+                      style: _minimumTouchTargetStyle,
+                      onPressed: mutationsEnabled
+                          ? () => onTransition(MaterialRequestStatus.received)
+                          : null,
+                      child: const Text('Geldi yap'),
+                    ),
+                  if (request.status.isOpen)
+                    TextButton(
+                      style: _minimumTouchTargetStyle,
+                      onPressed: mutationsEnabled
+                          ? () => onTransition(MaterialRequestStatus.cancelled)
+                          : null,
+                      child: const Text('İptal et'),
+                    ),
+                  if (!request.status.isOpen)
+                    FilledButton.tonal(
+                      style: _minimumTouchTargetStyle,
+                      onPressed: mutationsEnabled
+                          ? () => onTransition(MaterialRequestStatus.needed)
+                          : null,
+                      child: const Text('Yeniden aç'),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -419,10 +596,12 @@ class _CreateMaterialRequestDialog extends StatefulWidget {
   const _CreateMaterialRequestDialog({
     required this.locations,
     required this.planItems,
+    required this.onSubmit,
   });
 
   final List<MaterialRequestLocationOption> locations;
   final List<MaterialRequestLivingPlanOption> planItems;
+  final Future<MaterialRequest> Function(_CreateValue value) onSubmit;
 
   @override
   State<_CreateMaterialRequestDialog> createState() =>
@@ -440,6 +619,8 @@ class _CreateMaterialRequestDialogState
   String? _livingPlanItemId;
   String? _neededOn;
   MaterialRequestPriority _priority = MaterialRequestPriority.normal;
+  bool _submitting = false;
+  String? _failure;
 
   @override
   void dispose() {
@@ -464,25 +645,42 @@ class _CreateMaterialRequestDialogState
     setState(() => _neededOn = '$year-$month-$day');
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_submitting) return;
     if (!_formKey.currentState!.validate()) return;
-    Navigator.of(context).pop(
-      _CreateValue(
-        materialName: _name.text.trim(),
-        locationId: _locationId,
-        livingPlanItemId: _livingPlanItemId,
-        quantity: _parseQuantity(_quantity.text),
-        unit: _emptyToNull(_unit.text),
-        neededOn: _neededOn,
-        priority: _priority,
-        description: _emptyToNull(_description.text),
-      ),
-    );
+    setState(() {
+      _submitting = true;
+      _failure = null;
+    });
+    try {
+      await widget.onSubmit(
+        _CreateValue(
+          materialName: _name.text.trim(),
+          locationId: _locationId,
+          livingPlanItemId: _livingPlanItemId,
+          quantity: _parseQuantity(_quantity.text),
+          unit: _emptyToNull(_unit.text),
+          neededOn: _neededOn,
+          priority: _priority,
+          description: _emptyToNull(_description.text),
+        ),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on MaterialRequestFailure catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _failure = error.code;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      key: const Key('material-request-create-dialog'),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Malzeme ihtiyacı'),
       content: SizedBox(
         width: 520,
@@ -501,114 +699,164 @@ class _CreateMaterialRequestDialogState
                       ? 'Malzeme adı gerekli.'
                       : null,
                 ),
-                Row(
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Yalnızca malzeme adı zorunludur.'),
+                ),
+                ExpansionTile(
+                  key: const Key('material-request-optional-details'),
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(bottom: 4),
+                  maintainState: true,
+                  title: const Text('İsteğe bağlı ayrıntılar'),
                   children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _quantity,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final quantityField = TextFormField(
+                          controller: _quantity,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Miktar',
+                          ),
+                          validator: _validateQuantity,
+                        );
+                        final unitField = TextFormField(
+                          controller: _unit,
+                          maxLength: 40,
+                          decoration: const InputDecoration(labelText: 'Birim'),
+                        );
+                        final textScale = MediaQuery.textScalerOf(
+                          context,
+                        ).scale(1);
+                        if (constraints.maxWidth < 400 || textScale > 1.3) {
+                          return Column(
+                            children: [
+                              quantityField,
+                              const SizedBox(height: 8),
+                              unitField,
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: quantityField),
+                            const SizedBox(width: 12),
+                            Expanded(child: unitField),
+                          ],
+                        );
+                      },
+                    ),
+                    DropdownButtonFormField<MaterialRequestPriority>(
+                      initialValue: _priority,
+                      decoration: const InputDecoration(labelText: 'Öncelik'),
+                      items: MaterialRequestPriority.values
+                          .map(
+                            (priority) => DropdownMenuItem(
+                              value: priority,
+                              child: Text(priority.label),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: (value) {
+                        if (value != null) setState(() => _priority = value);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String?>(
+                      initialValue: _locationId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Mahal'),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Mahal seçilmedi'),
                         ),
-                        decoration: const InputDecoration(labelText: 'Miktar'),
-                        validator: _validateQuantity,
+                        ...widget.locations.map(
+                          (location) => DropdownMenuItem(
+                            value: location.id,
+                            child: Text(location.displayName),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) => setState(() => _locationId = value),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String?>(
+                      initialValue: _livingPlanItemId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: '7 Günlük Plan işi',
+                      ),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Plan işi seçilmedi'),
+                        ),
+                        ...widget.planItems.map(
+                          (item) => DropdownMenuItem(
+                            value: item.id,
+                            child: Text(
+                              '${item.activityName} · ${CseTimeCodec.formatIstanbulDay(item.plannedDate)}',
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _livingPlanItemId = value),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            _neededOn == null
+                                ? 'İhtiyaç tarihi seçilmedi'
+                                : CseTimeCodec.formatIstanbulDay(_neededOn!),
+                          ),
+                          TextButton(
+                            style: _minimumTouchTargetStyle,
+                            onPressed: _pickDate,
+                            child: const Text('Tarih seç'),
+                          ),
+                          if (_neededOn != null)
+                            IconButton(
+                              tooltip: 'Tarihi kaldır',
+                              onPressed: () => setState(() => _neededOn = null),
+                              icon: const Icon(Icons.clear_rounded),
+                            ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _unit,
-                        maxLength: 40,
-                        decoration: const InputDecoration(labelText: 'Birim'),
-                      ),
+                    TextFormField(
+                      controller: _description,
+                      maxLength: 1000,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: 'Açıklama'),
                     ),
                   ],
                 ),
-                DropdownButtonFormField<MaterialRequestPriority>(
-                  initialValue: _priority,
-                  decoration: const InputDecoration(labelText: 'Öncelik'),
-                  items: MaterialRequestPriority.values
-                      .map(
-                        (priority) => DropdownMenuItem(
-                          value: priority,
-                          child: Text(priority.label),
-                        ),
-                      )
-                      .toList(growable: false),
-                  onChanged: (value) {
-                    if (value != null) setState(() => _priority = value);
-                  },
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String?>(
-                  initialValue: _locationId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Mahal'),
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Mahal seçilmedi'),
-                    ),
-                    ...widget.locations.map(
-                      (location) => DropdownMenuItem(
-                        value: location.id,
-                        child: Text(location.displayName),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) => setState(() => _locationId = value),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String?>(
-                  initialValue: _livingPlanItemId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: '7 Günlük Plan işi',
-                  ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Plan işi seçilmedi'),
-                    ),
-                    ...widget.planItems.map(
-                      (item) => DropdownMenuItem(
-                        value: item.id,
-                        child: Text(
-                          '${item.activityName} · ${CseTimeCodec.formatIstanbulDay(item.plannedDate)}',
-                        ),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _livingPlanItemId = value),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
+                if (_failure != null)
+                  Semantics(
+                    liveRegion: true,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        _neededOn == null
-                            ? 'İhtiyaç tarihi seçilmedi'
-                            : CseTimeCodec.formatIstanbulDay(_neededOn!),
+                        'Kaydedilemedi. Taslağınız korunuyor; tekrar deneyin. '
+                        '($_failure)',
+                        key: const Key('material-request-create-error'),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ),
-                    TextButton(
-                      onPressed: _pickDate,
-                      child: const Text('Tarih seç'),
-                    ),
-                    if (_neededOn != null)
-                      IconButton(
-                        tooltip: 'Tarihi kaldır',
-                        onPressed: () => setState(() => _neededOn = null),
-                        icon: const Icon(Icons.clear_rounded),
-                      ),
-                  ],
-                ),
-                TextFormField(
-                  controller: _description,
-                  maxLength: 1000,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Açıklama'),
-                ),
+                  ),
               ],
             ),
           ),
@@ -616,13 +864,20 @@ class _CreateMaterialRequestDialogState
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          style: _minimumTouchTargetStyle,
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
           child: const Text('Vazgeç'),
         ),
         FilledButton(
           key: const Key('material-request-save'),
-          onPressed: _submit,
-          child: const Text('Kaydet'),
+          style: _minimumTouchTargetStyle,
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Kaydet'),
         ),
       ],
     );
@@ -707,15 +962,31 @@ class _DetailSheet extends StatelessWidget {
 }
 
 class _MessageCard extends StatelessWidget {
-  const _MessageCard({required this.icon, required this.text});
+  const _MessageCard({
+    required this.icon,
+    required this.text,
+    this.action,
+    super.key,
+  });
 
   final IconData icon;
   final String text;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: ListTile(leading: Icon(icon), title: Text(text)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(leading: Icon(icon), title: Text(text)),
+          if (action case final action?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Align(alignment: Alignment.centerLeft, child: action),
+            ),
+        ],
+      ),
     );
   }
 }

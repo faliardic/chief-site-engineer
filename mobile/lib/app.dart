@@ -802,7 +802,6 @@ class _MobileShellState extends State<MobileShell> {
                   builder: (_) => MaterialRequestsPage(
                     application: materials,
                     initialProjectId: projectId,
-                    onProjectSelected: _reportRouteProjectSelection,
                   ),
                 ),
               ),
