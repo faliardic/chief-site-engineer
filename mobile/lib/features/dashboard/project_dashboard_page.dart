@@ -548,18 +548,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
             ),
             _toolTile(
               sheetContext,
-              key: const Key('dashboard-project-album'),
-              icon: Icons.photo_library_outlined,
-              title: 'Proje Albümü',
-              action: widget.onOpenProjectAlbum == null
-                  ? null
-                  : () => _openProjectAction(
-                      widget.onOpenProjectAlbum,
-                      project.id,
-                    ),
-            ),
-            _toolTile(
-              sheetContext,
               key: const Key('dashboard-workforce-directory'),
               icon: Icons.contacts_outlined,
               title: 'Saha Rehberi',
@@ -578,11 +566,36 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                   : () =>
                         _openProjectAction(widget.onOpenPhoneCall, project.id),
             ),
+            Semantics(
+              key: const Key('dashboard-project-files-section'),
+              header: true,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                child: Text(
+                  'Proje dosyaları',
+                  style: Theme.of(sheetContext).textTheme.titleSmall,
+                ),
+              ),
+            ),
+            _toolTile(
+              sheetContext,
+              key: const Key('dashboard-project-album'),
+              icon: Icons.photo_library_outlined,
+              title: 'Proje Albümü',
+              subtitle: 'Proje medyası ve kaynak kayıtları',
+              action: widget.onOpenProjectAlbum == null
+                  ? null
+                  : () => _openProjectAction(
+                      widget.onOpenProjectAlbum,
+                      project.id,
+                    ),
+            ),
             _toolTile(
               sheetContext,
               key: const Key('dashboard-attachment-catalog'),
               icon: Icons.folder_copy_outlined,
               title: 'Dosya Kataloğu',
+              subtitle: 'Ek metadata, bağlantı ve bütünlük bilgileri',
               action: widget.onOpenCatalog == null
                   ? null
                   : () => _openProjectAction(widget.onOpenCatalog, project.id),
@@ -598,11 +611,13 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     required Key key,
     required IconData icon,
     required String title,
+    String? subtitle,
     required FutureOr<void> Function()? action,
   }) => ListTile(
     key: key,
     leading: Icon(icon),
     title: Text(title),
+    subtitle: subtitle == null ? null : Text(subtitle),
     enabled: action != null,
     onTap: action == null
         ? null
