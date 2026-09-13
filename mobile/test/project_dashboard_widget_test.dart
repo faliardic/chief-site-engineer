@@ -813,6 +813,48 @@ void main() {
     expect(find.text('Pin 2'), findsOneWidget);
     expect(find.text('Pin 1'), findsNothing);
   });
+
+  testWidgets(
+    'Profil action visibly expands and scrolls to the profile editor',
+    (tester) async {
+      final project = _project('11111111-1111-4111-8111-111111111111', 'Kuzey');
+      final fixture = _Fixture(projects: [project]);
+      addTearDown(fixture.dispose);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+
+      final editorTitle = find.text('Profil alanlarını düzenle');
+      expect(
+        tester
+            .widgetList<ExpansionTile>(
+              find.ancestor(
+                of: editorTitle,
+                matching: find.byType(ExpansionTile),
+              ),
+            )
+            .isEmpty,
+        isFalse,
+      );
+
+      await tester.tap(find.byKey(const Key('dashboard-action-profile')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('project-profile-fields')), findsOneWidget);
+    },
+  );
+
+  testWidgets('Profil action stays disabled with no active project', (
+    tester,
+  ) async {
+    final fixture = _Fixture(projects: const []);
+    addTearDown(fixture.dispose);
+
+    await tester.pumpWidget(fixture.app());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('dashboard-action-profile')), findsNothing);
+  });
 }
 
 ProjectInformationEntry _dashboardUserEntry(String projectId, int index) =>

@@ -88,6 +88,30 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   bool _mutating = false;
   bool _reportedFirstSuccessfulProjectRead = false;
   EdgeDraggingAutoScroller? _fieldAutoScroller;
+  final ExpansibleController _profileTileController =
+      ExpansibleController();
+  BuildContext? _profileTileContext;
+
+  bool _profileEditorAvailable(MobileProject project) =>
+      _profileApplication != null &&
+      _informationStatus == _LoadStatus.ready &&
+      _information?.projectId == project.id &&
+      _information!.statusFor(ProjectInformationSource.profile).state !=
+          ProjectInformationReadState.failed;
+
+  void _focusProfile() {
+    if (!_profileTileController.isExpanded) {
+      _profileTileController.expand();
+    }
+    final tileContext = _profileTileContext;
+    if (tileContext == null || !tileContext.mounted) return;
+    unawaited(
+      Scrollable.ensureVisible(
+        tileContext,
+        duration: const Duration(milliseconds: 200),
+      ),
+    );
+  }
 
   ProjectProfileApplication? get _profileApplication =>
       widget.agenda is ProjectProfileApplication
@@ -826,6 +850,18 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                   onPressed: () => _openTools(project),
                   icon: const Icon(Icons.widgets_outlined),
                 ),
+                IconButton(
+                  key: const Key('dashboard-action-profile'),
+                  tooltip: 'Profil',
+                  constraints: const BoxConstraints(
+                    minWidth: 48,
+                    minHeight: 48,
+                  ),
+                  onPressed: _profileEditorAvailable(project)
+                      ? _focusProfile
+                      : null,
+                  icon: const Icon(Icons.badge_outlined),
+                ),
               ],
             ),
           ),
@@ -854,11 +890,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           icon: const Icon(Icons.list_alt_rounded),
           label: const Text('Tüm proje bilgileri'),
         ),
-        if (_profileApplication != null &&
-            _informationStatus == _LoadStatus.ready &&
-            _information?.projectId == project.id &&
-            _information!.statusFor(ProjectInformationSource.profile).state !=
-                ProjectInformationReadState.failed) ...[
+        if (_profileEditorAvailable(project)) ...[
           const SizedBox(height: 8),
           _buildProfileEditor(project, _information!),
         ],
@@ -873,73 +905,82 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     final fields = snapshot.profileFields
         .where((field) => !field.isArchived)
         .toList(growable: false);
-    return Card(
-      key: const Key('project-profile-editor'),
-      child: ExpansionTile(
-        leading: const Icon(Icons.edit_note_rounded),
-        title: const Text('Profil alanlarını düzenle'),
-        subtitle: const Text('Mevcut alanları düzenle, ekle veya sırala'),
-        childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 520 ? 3 : 2;
-              final width =
-                  (constraints.maxWidth - (columns - 1) * 8) / columns;
-              final height = 64 + MediaQuery.textScalerOf(context).scale(52);
-              return Wrap(
-                key: const Key('project-profile-fields'),
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (var index = 0; index < fields.length; index++)
-                    SizedBox(
-                      key: ValueKey(
-                        'project-profile-field-${fields[index].id}',
-                      ),
-                      width: width,
-                      height: height,
-                      child: _buildFieldCell(
-                        project,
-                        fields,
-                        index,
-                        width,
-                        height,
-                      ),
-                    ),
-                  SizedBox(
-                    width: width,
-                    height: height,
-                    child: Tooltip(
-                      message: 'Özel alan ekle',
-                      child: OutlinedButton(
-                        key: const Key('project-profile-add-field'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.all(8),
+    return Builder(
+      builder: (context) {
+        _profileTileContext = context;
+        return Card(
+          key: const Key('project-profile-editor'),
+          child: ExpansionTile(
+            controller: _profileTileController,
+            leading: const Icon(Icons.edit_note_rounded),
+            title: const Text('Profil alanlarını düzenle'),
+            subtitle: const Text('Mevcut alanları düzenle, ekle veya sırala'),
+            childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 520 ? 3 : 2;
+                  final width =
+                      (constraints.maxWidth - (columns - 1) * 8) / columns;
+                  final height =
+                      64 + MediaQuery.textScalerOf(context).scale(52);
+                  return Wrap(
+                    key: const Key('project-profile-fields'),
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (var index = 0; index < fields.length; index++)
+                        SizedBox(
+                          key: ValueKey(
+                            'project-profile-field-${fields[index].id}',
+                          ),
+                          width: width,
+                          height: height,
+                          child: _buildFieldCell(
+                            project,
+                            fields,
+                            index,
+                            width,
+                            height,
+                          ),
                         ),
-                        onPressed: _mutating ? null : () => _addField(project),
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add_rounded),
-                            SizedBox(height: 4),
-                            Text(
-                              'Özel alan ekle',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
+                      SizedBox(
+                        width: width,
+                        height: height,
+                        child: Tooltip(
+                          message: 'Özel alan ekle',
+                          child: OutlinedButton(
+                            key: const Key('project-profile-add-field'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.all(8),
                             ),
-                          ],
+                            onPressed: _mutating
+                                ? null
+                                : () => _addField(project),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_rounded),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Özel alan ekle',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ],
-              );
-            },
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
