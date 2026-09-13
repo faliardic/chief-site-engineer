@@ -2225,7 +2225,7 @@ void main() {
   );
 
   test(
-    'managed Agenda refresh failure rolls back Attendance reminder Agenda and link',
+    'managed Agenda update failure rolls back Attendance reminder Agenda and link',
     () async {
       final originalClock = now;
       addTearDown(() => now = originalClock);
@@ -2298,11 +2298,21 @@ void main() {
         directories.databaseFile,
         dayId,
       );
-      var hookCalled = false;
-      Future<void> failAfterRefresh(Transaction _) async {
-        hookCalled = true;
-        throw StateError('intentional managed Agenda refresh failure');
-      }
+      final agendaLogId = before['field_observations']!.single['id']! as String;
+      final triggerDatabase = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await triggerDatabase.execute('''
+        CREATE TRIGGER fail_managed_agenda_refresh
+        BEFORE UPDATE OF observed_at, updated_at, revision
+        ON field_observations
+        WHEN OLD.id = '$agendaLogId'
+        BEGIN
+          SELECT RAISE(ABORT, 'intentional managed Agenda update failure');
+        END
+      ''');
+      await triggerDatabase.close();
 
       now = DateTime.utc(2026, 7, 19, 11);
       final failing = SqliteAttendanceApplication(
@@ -2310,7 +2320,6 @@ void main() {
         databaseFactory: databaseFactoryFfi,
         clock: () => now,
         agenda: agenda,
-        beforeManagedAgendaEventInsert: failAfterRefresh,
       );
       await expectLater(
         failing.transitionDay(
@@ -2322,9 +2331,8 @@ void main() {
             transition: AttendanceTransition.complete,
           ),
         ),
-        throwsStateError,
+        throwsA(isA<DatabaseException>()),
       );
-      expect(hookCalled, isTrue);
       expect(
         await _attendanceAgendaSnapshot(directories.databaseFile, dayId),
         before,
