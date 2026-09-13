@@ -1759,7 +1759,9 @@ class SqliteAttendanceApplication implements AttendanceApplication {
             continue;
           }
           final existing = existingRows.single;
-          if (existing['id'] != value.entryId) {
+          final canonicalEntryId = existing['id']! as String;
+          final isRemoved = existing['removed_at'] != null;
+          if (!isRemoved && canonicalEntryId != value.entryId) {
             throw const AgendaValidationFailure(
               'Puantaj entry kimliği mevcut personel kaydıyla eşleşmiyor.',
             );
@@ -1786,10 +1788,10 @@ class SqliteAttendanceApplication implements AttendanceApplication {
               'removed_at': null,
             },
             where: 'id = ?',
-            whereArgs: [value.entryId],
+            whereArgs: [canonicalEntryId],
           );
           changes.add({
-            'entry_id': value.entryId,
+            'entry_id': canonicalEntryId,
             'member_id': member.id,
             'team_name': member.teamName,
             'before': before,
