@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:chief_site_engineer/application/project_information_application.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -7,13 +8,17 @@ import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/domain/project_information_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
+import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _projectA = 'project-a';
 const _projectB = 'project-b';
 final _now = DateTime.utc(2026, 9, 13, 9);
 
 void main() {
+  setUpAll(sqfliteFfiInit);
+
   test('composes canonical sources in deterministic hierarchy', () async {
     final source = _FakeProjectInformationSource.standard();
     source.metadataByProject[_projectA] = _metadata(
@@ -465,6 +470,319 @@ void main() {
     expect(await loading, isA<ProjectInformationSuperseded>());
     expect(session.projectId, isNull);
   });
+
+  test(
+    'typed entries contacts and heterogeneous pins preserve project identity',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cse_project_info_');
+      addTearDown(() => root.delete(recursive: true));
+      final databasePath = '${root.path}/application.sqlite3';
+      const projectA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+      const projectB = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+      const companyA = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+      const entryId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+      const contactId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
+      String event(int value) =>
+          'dddddddd-dddd-4ddd-8ddd-${value.toString().padLeft(12, '0')}';
+      final database = AppDatabase(
+        path: databasePath,
+        factory: databaseFactoryFfi,
+        clock: () => _now,
+      );
+      await database.open();
+      for (final id in [projectA, projectB]) {
+        await database.database.insert('projects', {
+          'id': id,
+          'name': id,
+          'revision': 1,
+          'created_at': '2026-09-13T09:00:00Z',
+          'updated_at': '2026-09-13T09:00:00Z',
+        });
+      }
+      await database.database.insert('subcontractors', {
+        'id': companyA,
+        'project_id': projectA,
+        'name': 'Açık seçilmiş şirket',
+        'name_normalized': 'açık seçilmiş şirket',
+        'status': 'active',
+        'revision': 1,
+        'created_at': '2026-09-13T09:00:00Z',
+        'updated_at': '2026-09-13T09:00:00Z',
+      });
+      await database.close();
+
+      final mutations = SqliteProjectInformationMutationApplication(
+        databasePath: databasePath,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => _now,
+      );
+      final application = ProjectInformationApplication(
+        source: _FakeProjectInformationSource.standard(),
+        mutations: mutations,
+      );
+      final created = await application.createUserEntry(
+        CreateProjectInformationEntryCommand(
+          id: entryId,
+          eventId: event(1),
+          projectId: projectA,
+          category: ProjectInformationCategory.technical,
+          label: 'Beton sınıfı',
+          value: const ProjectInformationEntryValue.text('C35'),
+        ),
+      );
+      expect(created.revision, 1);
+      final updated = await application.updateUserEntry(
+        UpdateProjectInformationEntryCommand(
+          id: entryId,
+          eventId: event(2),
+          projectId: projectA,
+          expectedRevision: 1,
+          category: ProjectInformationCategory.technical,
+          label: 'Beton sınıfı',
+          value: const ProjectInformationEntryValue.text('C40'),
+        ),
+      );
+      expect(updated.value.text, 'C40');
+      await expectLater(
+        application.updateUserEntry(
+          UpdateProjectInformationEntryCommand(
+            id: entryId,
+            eventId: event(3),
+            projectId: projectA,
+            expectedRevision: 1,
+            category: ProjectInformationCategory.technical,
+            label: 'Beton sınıfı',
+            value: const ProjectInformationEntryValue.text('C45'),
+          ),
+        ),
+        throwsA(isA<ProjectInformationRevisionConflict>()),
+      );
+      expect(await application.listUserEntries(projectB), isEmpty);
+
+      final contact = await application.createUserEntry(
+        CreateProjectInformationEntryCommand(
+          id: contactId,
+          eventId: event(4),
+          projectId: projectA,
+          category: ProjectInformationCategory.contact,
+          label: 'Şantiye şefi',
+          value: const ProjectInformationEntryValue.contact(
+            ProjectInformationContact(
+              name: 'Fatih',
+              company: 'CSE',
+              phone: '555',
+              whatsAppNumber: '555',
+              referenceType: ProjectInformationReferenceType.subcontractor,
+              referenceId: companyA,
+            ),
+          ),
+        ),
+      );
+      expect(contact.value.contact?.referenceId, companyA);
+      final updatedContact = await application.updateUserEntry(
+        UpdateProjectInformationEntryCommand(
+          id: contactId,
+          eventId: event(5),
+          projectId: projectA,
+          expectedRevision: 1,
+          category: ProjectInformationCategory.contact,
+          label: 'Şantiye şefi',
+          value: const ProjectInformationEntryValue.contact(
+            ProjectInformationContact(
+              name: 'Fatih',
+              company: 'CSE',
+              role: 'Yetkili',
+              phone: '555',
+              whatsAppNumber: '555',
+              referenceType: ProjectInformationReferenceType.subcontractor,
+              referenceId: companyA,
+            ),
+          ),
+        ),
+      );
+      expect(updatedContact.value.contact?.role, 'Yetkili');
+      await expectLater(
+        application.createUserEntry(
+          CreateProjectInformationEntryCommand(
+            id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3',
+            eventId: event(6),
+            projectId: projectB,
+            category: ProjectInformationCategory.contact,
+            label: 'Yanlış proje',
+            value: const ProjectInformationEntryValue.contact(
+              ProjectInformationContact(
+                name: 'Fatih',
+                referenceType: ProjectInformationReferenceType.subcontractor,
+                referenceId: companyA,
+              ),
+            ),
+          ),
+        ),
+        throwsA(
+          isA<ProjectInformationFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'contact_reference_not_in_project',
+          ),
+        ),
+      );
+
+      const pinA = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
+      const pinB = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2';
+      await application.setPin(
+        SetProjectInformationPinCommand(
+          id: pinA,
+          eventId: event(7),
+          projectId: projectA,
+          key: const ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: entryId,
+          ),
+        ),
+      );
+      await application.setPin(
+        SetProjectInformationPinCommand(
+          id: pinB,
+          eventId: event(8),
+          projectId: projectA,
+          key: const ProjectInformationKey(
+            space: ProjectInformationKeySpace.systemValue,
+            id: 'project.name',
+          ),
+        ),
+      );
+      await expectLater(
+        application.setPin(
+          SetProjectInformationPinCommand(
+            id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee4',
+            eventId: event(15),
+            projectId: projectA,
+            key: const ProjectInformationKey(
+              space: ProjectInformationKeySpace.systemValue,
+              id: 'unknown.value',
+            ),
+          ),
+        ),
+        throwsA(
+          isA<ProjectInformationFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'unknown_system_value_key',
+          ),
+        ),
+      );
+      await expectLater(
+        application.setPin(
+          SetProjectInformationPinCommand(
+            id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5',
+            eventId: event(16),
+            projectId: projectA,
+            key: ProjectInformationKey.system(
+              ProjectInformationSystemValue.address,
+            ),
+          ),
+        ),
+        throwsA(
+          isA<ProjectInformationFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'pin_source_unavailable',
+          ),
+        ),
+      );
+      final reordered = await application.reorderPins(
+        ReorderProjectInformationPinsCommand(
+          eventId: event(9),
+          projectId: projectA,
+          orderedPinIds: const [pinB, pinA],
+          expectedRevisions: const {pinA: 1, pinB: 1},
+        ),
+      );
+      expect(reordered.map((pin) => pin.id), [pinB, pinA]);
+      await expectLater(
+        application.setPin(
+          SetProjectInformationPinCommand(
+            id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee3',
+            eventId: event(10),
+            projectId: projectA,
+            key: const ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: entryId,
+            ),
+          ),
+        ),
+        throwsA(
+          isA<ProjectInformationFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'duplicate_active_pin',
+          ),
+        ),
+      );
+      await application.removePin(
+        RemoveProjectInformationPinCommand(
+          id: pinA,
+          eventId: event(11),
+          projectId: projectA,
+          expectedRevision: 2,
+        ),
+      );
+      expect((await application.listPins(projectA)).map((pin) => pin.id), [
+        pinB,
+      ]);
+      final restoredPin = await application.setPin(
+        SetProjectInformationPinCommand(
+          id: pinA,
+          eventId: event(12),
+          projectId: projectA,
+          key: const ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: entryId,
+          ),
+        ),
+      );
+      expect(restoredPin.revision, 4);
+      final archived = await application.setUserEntryArchived(
+        SetProjectInformationEntryArchiveCommand(
+          id: entryId,
+          eventId: event(13),
+          projectId: projectA,
+          expectedRevision: 2,
+          archived: true,
+        ),
+      );
+      expect(archived.isArchived, isTrue);
+      expect(
+        await application.listUserEntries(
+          projectA,
+          archiveFilter: ProjectInformationArchiveFilter.archived,
+        ),
+        hasLength(1),
+      );
+      final pins = await application.listPins(projectA);
+      expect(
+        pins.singleWhere((pin) => pin.id == pinA).sourceAvailable,
+        isFalse,
+      );
+      expect(pins.singleWhere((pin) => pin.id == pinB).sourceAvailable, isTrue);
+      await application.setUserEntryArchived(
+        SetProjectInformationEntryArchiveCommand(
+          id: entryId,
+          eventId: event(14),
+          projectId: projectA,
+          expectedRevision: 3,
+          archived: false,
+        ),
+      );
+      expect(
+        await application.listUserEntries(
+          projectA,
+          archiveFilter: ProjectInformationArchiveFilter.all,
+        ),
+        hasLength(2),
+      );
+    },
+  );
 }
 
 class _FakeProjectInformationSource implements ProjectInformationReadSource {
