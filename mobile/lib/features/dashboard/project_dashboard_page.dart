@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 typedef DashboardCaptureAction =
     Future<bool> Function(String projectId, String localDay);
 typedef DashboardProjectAction = void Function(String projectId);
+typedef DashboardProjectReadiness = void Function(List<MobileProject> projects);
 
 class ProjectDashboardPage extends StatefulWidget {
   const ProjectDashboardPage({
@@ -33,6 +34,7 @@ class ProjectDashboardPage extends StatefulWidget {
     this.onOpenWorkforce,
     this.onOpenPhoneCall,
     this.onOpenCatalog,
+    this.onFirstSuccessfulProjectRead,
     DateTime Function()? clock,
     super.key,
   }) : clock = clock ?? _systemUtcClock;
@@ -53,6 +55,7 @@ class ProjectDashboardPage extends StatefulWidget {
   final DashboardProjectAction? onOpenWorkforce;
   final DashboardProjectAction? onOpenPhoneCall;
   final DashboardProjectAction? onOpenCatalog;
+  final DashboardProjectReadiness? onFirstSuccessfulProjectRead;
   final DateTime Function() clock;
 
   @override
@@ -72,6 +75,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   int _projectGeneration = 0;
   int _profileGeneration = 0;
   bool _mutating = false;
+  bool _reportedFirstSuccessfulProjectRead = false;
   EdgeDraggingAutoScroller? _fieldAutoScroller;
 
   ProjectProfileApplication? get _profileApplication =>
@@ -126,6 +130,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         _projects = projects;
         _projectStatus = _LoadStatus.ready;
       });
+      _reportFirstSuccessfulProjectRead(projects);
       final selected = widget.session.selectedProject(projects);
       if (selected == null) {
         _clearProfile();
@@ -141,6 +146,15 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
       });
       _clearProfile();
     }
+  }
+
+  void _reportFirstSuccessfulProjectRead(List<MobileProject> projects) {
+    if (_reportedFirstSuccessfulProjectRead) return;
+    _reportedFirstSuccessfulProjectRead = true;
+    final callback = widget.onFirstSuccessfulProjectRead;
+    if (callback == null) return;
+    final snapshot = List<MobileProject>.unmodifiable(projects);
+    callback(snapshot);
   }
 
   void _handleActiveProjectChanged() {

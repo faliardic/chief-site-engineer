@@ -24,6 +24,7 @@ dependencies:
   permission_handler: ^12.0.1
   pdf: ^3.11.3
   share_plus: ^12.0.1
+  shared_preferences: ^2.5.5
   sqflite: ^2.4.3
   timezone: ^0.11.1
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:chief_site_engineer/application/onboarding_preference.dart';
 import 'package:chief_site_engineer/application/project_search_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
@@ -22,6 +23,7 @@ import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
 import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
 import 'package:chief_site_engineer/features/material_requests/material_requests_page.dart';
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
+import 'package:chief_site_engineer/features/onboarding/guided_onboarding_page.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_control.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
 import 'package:chief_site_engineer/features/projects/project_create_page.dart';
@@ -30,6 +32,7 @@ import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:chief_site_engineer/features/search/project_search_page.dart';
 import 'package:chief_site_engineer/features/settings/settings_page.dart';
+import 'package:chief_site_engineer/platform/device_onboarding_preference.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -96,6 +99,7 @@ class CseApp extends StatelessWidget {
     required this.bootstrap,
     this.fatalErrors,
     this.environmentLabel,
+    this.onboardingPreference = const DeviceOnboardingPreference(),
     super.key,
   });
 
@@ -111,6 +115,7 @@ class CseApp extends StatelessWidget {
   final Future<BootstrapResult> bootstrap;
   final ValueListenable<String?>? fatalErrors;
   final String? environmentLabel;
+  final OnboardingPreference onboardingPreference;
 
   @override
   Widget build(BuildContext context) {
@@ -167,16 +172,24 @@ class CseApp extends StatelessWidget {
         );
       },
       home: fatalErrorCode == null
-          ? BootstrapGate(bootstrap: bootstrap)
+          ? BootstrapGate(
+              bootstrap: bootstrap,
+              onboardingPreference: onboardingPreference,
+            )
           : SafeDiagnosticScreen(code: fatalErrorCode),
     );
   }
 }
 
 class BootstrapGate extends StatelessWidget {
-  const BootstrapGate({required this.bootstrap, super.key});
+  const BootstrapGate({
+    required this.bootstrap,
+    this.onboardingPreference = const DeviceOnboardingPreference(),
+    super.key,
+  });
 
   final Future<BootstrapResult> bootstrap;
+  final OnboardingPreference onboardingPreference;
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +203,10 @@ class BootstrapGate extends StatelessWidget {
         }
         final result = snapshot.requireData;
         return switch (result) {
-          BootstrapSuccess() => MobileShell(bootstrap: result),
+          BootstrapSuccess() => MobileShell(
+            bootstrap: result,
+            onboardingPreference: onboardingPreference,
+          ),
           BootstrapFailure() => BootstrapFailureScreen(code: result.code),
         };
       },
@@ -292,9 +308,14 @@ class _ReminderNotificationRoute {
 }
 
 class MobileShell extends StatefulWidget {
-  const MobileShell({required this.bootstrap, super.key});
+  const MobileShell({
+    required this.bootstrap,
+    this.onboardingPreference = const DeviceOnboardingPreference(),
+    super.key,
+  });
 
   final BootstrapSuccess bootstrap;
+  final OnboardingPreference onboardingPreference;
 
   @override
   State<MobileShell> createState() => _MobileShellState();
@@ -313,11 +334,20 @@ class _MobileShellState extends State<MobileShell> {
   int _projectContextGeneration = 0;
   int _routeProjectValidationGeneration = 0;
   int _dashboardContextEpoch = 0;
+  late final OnboardingPreferenceGate _onboardingPreferenceGate;
+  bool _dashboardHasSuccessfulProjectRead = false;
+  List<MobileProject> _dashboardProjects = const [];
+  bool _onboardingDecisionStarted = false;
+  bool _onboardingDismissedForSession = false;
+  late final bool _initialIntentSuppressesOnboarding;
 
   @override
   void initState() {
     super.initState();
     _activeProjectSession = ActiveProjectSession();
+    _onboardingPreferenceGate = OnboardingPreferenceGate(
+      widget.onboardingPreference,
+    );
     _activeProjectSession.addListener(_handleActiveProjectChanged);
     _projectContextSubscription = widget.bootstrap.agenda.projectChanges.listen(
       (_) => unawaited(_refreshActiveProjectOptions()),
@@ -341,6 +371,7 @@ class _MobileShellState extends State<MobileShell> {
         (legacyInitial == null
             ? null
             : ReminderNotificationIntent(reminderId: legacyInitial));
+    _initialIntentSuppressesOnboarding = initial != null;
     if (initial != null) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _openReminderFromNotification(initial),
@@ -360,11 +391,60 @@ class _MobileShellState extends State<MobileShell> {
   void _handleActiveProjectChanged() {
     if (!mounted) return;
     setState(() {});
+    _maybeOfferGuidedOnboarding();
     final selectedProjectId = _activeProjectSession.selectedProjectId;
     if (selectedProjectId != null &&
         !_activeProjectNames.containsKey(selectedProjectId)) {
       unawaited(_refreshActiveProjectOptions());
     }
+  }
+
+  void _handleFirstSuccessfulProjectRead(List<MobileProject> projects) {
+    if (!mounted || _dashboardHasSuccessfulProjectRead) return;
+    _dashboardHasSuccessfulProjectRead = true;
+    _dashboardProjects = List<MobileProject>.unmodifiable(projects);
+    _maybeOfferGuidedOnboarding();
+  }
+
+  bool get _onboardingBlockedByProjectSelection =>
+      _dashboardProjects.length > 1 &&
+      _activeProjectSession.selectedProjectId == null;
+
+  void _maybeOfferGuidedOnboarding() {
+    if (!mounted ||
+        !_dashboardHasSuccessfulProjectRead ||
+        _initialIntentSuppressesOnboarding ||
+        _onboardingBlockedByProjectSelection ||
+        _onboardingDecisionStarted ||
+        _onboardingDismissedForSession) {
+      return;
+    }
+    _onboardingDecisionStarted = true;
+    unawaited(_evaluateGuidedOnboarding());
+  }
+
+  Future<void> _evaluateGuidedOnboarding() async {
+    final shouldOffer = await _onboardingPreferenceGate.shouldOffer();
+    if (!mounted) return;
+    if (!shouldOffer) {
+      _onboardingDismissedForSession = true;
+      return;
+    }
+    if (_initialIntentSuppressesOnboarding ||
+        _onboardingBlockedByProjectSelection) {
+      _onboardingDecisionStarted = false;
+      return;
+    }
+    _onboardingDismissedForSession = true;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => GuidedOnboardingPage(
+          hasExistingProject: _dashboardProjects.isNotEmpty,
+          onCreateProject: () async => await _openProjectCreate() != null,
+          onHandled: _onboardingPreferenceGate.markHandled,
+        ),
+      ),
+    );
   }
 
   Future<void> _refreshActiveProjectOptions() async {
@@ -471,13 +551,13 @@ class _MobileShellState extends State<MobileShell> {
     setState(() => _dashboardContextEpoch += 1);
   }
 
-  Future<void> _openProjectCreate() async {
+  Future<MobileProject?> _openProjectCreate() async {
     final project = await Navigator.of(context).push<MobileProject>(
       MaterialPageRoute(
         builder: (_) => ProjectCreatePage(agenda: widget.bootstrap.agenda),
       ),
     );
-    if (!mounted || project == null) return;
+    if (!mounted || project == null) return null;
 
     final activeProjects = [
       for (final current in _activeProjectOptions)
@@ -494,6 +574,7 @@ class _MobileShellState extends State<MobileShell> {
       _dashboardContextEpoch += 1;
     });
     _activeProjectSession.select(project.id, activeProjects);
+    return project;
   }
 
   void _selectPrimaryTab(int index) {
@@ -832,7 +913,8 @@ class _MobileShellState extends State<MobileShell> {
       livingPlan: bootstrap.livingPlan,
       materialRequests: materials,
       session: _activeProjectSession,
-      onCreateProject: () => unawaited(_openProjectCreate()),
+      onCreateProject: () => unawaited(_openProjectCreate().then<void>((_) {})),
+      onFirstSuccessfulProjectRead: _handleFirstSuccessfulProjectRead,
       onAddReminder: (projectId, localDay) async {
         final value = await Navigator.of(context).push<Object?>(
           MaterialPageRoute(
