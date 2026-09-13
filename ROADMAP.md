@@ -1,7 +1,7 @@
 # CSE V2 — Kanonik Ürün Yol Haritası
 
 **Durum:** Güncel yürütme sırası ve ilk genel yayın öncesi tek kanonik kuyruk  
-**Güncelleme:** 10 Eylül 2026
+**Güncelleme:** 13 Eylül 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`  
 **Değişken repository gerçeği:** Güncel SHA, açık Issue/PR, merge ve gate durumu her görevde GitHub `master` üzerinden doğrulanır.
 
@@ -25,7 +25,7 @@ CSE owner-only, local-first ve mobile-first kişisel saha asistanıdır. V1 saha
 
 Frictionless Release Readiness programı Issue #617 ile yürür. UI/UX sözleşmesi, adaptive shell, ortak aktif proje, 48×48 erişilebilirlik tabanı, form/primary-action standardı, temel search/filter/error state altyapısı ve visual-first dönüşümün ana dilimleri merged durumdadır.
 
-Son Inventory refinement zinciri #709/#710 → #711/#712 → #713/#714 tamamlanmış ve owner manuel kabulünden geçmiştir. 6 Eylül owner saha kullanım geri bildirimleriyle İş Gücü/Sicil first-class alanı, Firma → Personel sadeleştirmesi ve Günlük Puantaj yeniden bilgi mimarisi Q04 olarak; Proje Profili genişletmesi Q05 olarak; dar Kroki/interaction refinement istisnası Q06 olarak kanonik kuyruğa alınmıştır. DWG Viewer / Issue #523 ilk genel yayın için blocker değildir ve `POST-RELEASE / DEFERRED` kalır.
+Son Inventory refinement zinciri #709/#710 → #711/#712 → #713/#714 tamamlanmış ve owner manuel kabulünden geçmiştir. 6 Eylül owner saha kullanım geri bildirimleriyle İş Gücü/Sicil first-class alanı, Firma → Personel sadeleştirmesi ve Günlük Puantaj yeniden bilgi mimarisi Q04 olarak; Proje Profili genişletmesi Q05 olarak; dar Kroki/interaction refinement istisnası Q06 olarak kanonik kuyruğa alınmıştır. Q13 CRITICAL Puantaj→Ajanda işi PR #795 ile 13 Eylül 2026'da master'a merge edilmiştir. Aynı gün owner ürün toplantısında Q05, **Ana Sayfa / Proje Hafızası ve Hızlı Proje Bilgileri** yönüyle yeniden kilitlenmiş ve sıradaki öncelikli ürün işi olarak belirlenmiştir. DWG Viewer / Issue #523 ilk genel yayın için blocker değildir ve `POST-RELEASE / DEFERRED` kalır.
 
 Değişmeyen teknik baseline değerleri ilgili source/protokol ve current master'dan okunur; bu dosya sabit master SHA tutmaz.
 
@@ -38,7 +38,7 @@ Aşağıdaki alanlar yeni queue maddesi olarak tekrar açılmaz; yalnız release
 - #617 Phase 1 adaptive/accessibility foundation.
 - #617 Phase 2 ortak form/action, search/filter, loading/error/retry ve insan-okunur event dili temel işleri.
 - Reminder/Unutma, Ajanda ve Living Plan günlük akış sadeleştirmelerinin mevcut merged dalgaları; Q02 ve Q03 yalnız 6 Eylül owner saha kullanımında kalan yeni sürtünme/bağlam borcunu ele alır.
-- Daily Log + Work Chain targeted Acceptance evidence closure (#698).
+- Daily Log + Work Chain targeted evidence closure (#698).
 - Saha Rehberi/Sicil temel bilgi mimarisi ve Puantaj prerequisite/quick-result sadeleştirmeleri mevcut baseline'dır. Q04 bu baseline'ı silmez; yalnız first-class İş Gücü IA'sı, Firma → Personel hızlı kayıt yolu, user-facing Ekip opsiyonelliği, personel/form progressive disclosure ve Günlük Puantaj'ın direct-list günlük akış borcunu düzeltir.
 - İSG model audit + 20A aktif checklist/tracking temeli.
 - Inventory compact top tools + D-pad + iki sıralı sketch-editor toolbar (#709–#714) tamamlanmış baseline'dır. Q06 yalnız 6 Eylül owner kullanımında kanıtlanan toolbar/gesture, first-create movement ve same-point multi-record borcunu düzeltir; Inventory'nin geri kalanını yeniden tasarım programına dönüştürmez.
@@ -310,7 +310,7 @@ Bitiş tanımı:
 ### Q04 — İş Gücü / Sicil first-class alanı + Firma → Personel + Günlük Puantaj sadeleştirmesi
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimleri — `İş Gücü / Saha Rehberi / Sicil` ve `Puantaj` başlıkları; #617 daily-core ve progressive-disclosure ilkeleri; current `WorkforceDirectoryPage`, `WorkforcePage`, `AttendancePage`, `AttendanceDayPage` baseline'ı.  
-**Durum:** `NEXT`
+**Durum:** `COMPLETE` — current GitHub implementation/review/acceptance chain completed before the Q05 audit and subsequent Q13 work.
 
 Amaç; İş Gücü'nü yalnız Puantaj ön-koşulu veya gizli yardımcı akış olmaktan çıkarıp aktif projenin first-class günlük insan kaynağı alanı haline getirmek, mevcut güçlü Saha Rehberi/Sicil yeteneklerini korumak, ilk kayıt yolunu `Firma → Personel` seviyesine indirmek ve Günlük Puantaj'ı firma/ekip navigasyonu yerine doğrudan personel durum girişi yüzeyi haline getirmektir.
 
@@ -491,130 +491,259 @@ Mevcut değerler edit sırasında korunur; kapalı `Diğer` bölümü existing d
 - existing ekip, person identity, Puantaj/İSG/KKD geçmişi, revision/event ilişkileri korunur;
 - teknik team compatibility veya save/complete transaction değişikliği CRITICAL sınır açarsa ayrı authority olmadan implementation yapılmaz.
 
-### Q05 — Ana Sayfa / Proje Profili genişletme
+### Q05 — Ana Sayfa / Proje Hafızası ve Hızlı Proje Bilgileri
 
-**Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi — `Ana Sayfa / Proje Profili` başlığı  
-**Durum:** `OWNER-DEFERRED — FUTURE OWNER PRODUCT/UX DECISION REQUIRED`
+**Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi; 13 Eylül 2026 Ana Sayfa / Proje Bilgileri ürün toplantısı  
+**Durum:** `NEXT — OWNER-PRIORITIZED`
 
-Amaç; Ana Sayfa'yı menü veya dar özet olmaktan çıkarıp aktif projenin okunabilir profili ve günlük saha kontrol yüzeyi haline getirmektir. Uygulama tek büyük PR olarak yapılmaz; aşağıdaki AP dilimleri current model audit'i ve risk düzeyine göre ayrı child'lara bölünebilir.
+**Owner kararı — 13 Eylül 2026:** Önceki `OWNER-DEFERRED` Dashboard/Profile UI disposition'ı supersede edilmiştir. Q13 CRITICAL Puantaj→Ajanda işi PR #795 ile master'a merge edilip kapandığından Q05 artık sıradaki yeni owner-prioritized ürün işidir. Bu karar, daha önce merged #766/#767 proje metadata + party-role ve #768/#769 blok metadata + Floor↔Mahal relation temellerini geri almaz; yalnız Q05'in user-facing bilgi mimarisi, önceliği ve kabul hedefini yeniden kilitler.
 
-**Güncel disposition:** Birleşmiş #766/#767 proje metadata + party-role ve #768/#769 blok metadata + Floor↔Mahal relation çalışmaları tamamlanmış kanonik Q05 temelleri olarak korunur. Buna karşılık #770, owner'ın mevcut Dashboard/Profile UI yönünü kabul etmemesi nedeniyle `not_planned` kapatılmıştır; yayımlanmamış yerel #770 snapshot'ı kanonik ürün gerçeği değildir. Aşağıdaki Dashboard/Profile UI tamamlama işi, gelecekte açık bir owner ürün kararı ve yeniden tasarım yetkisi verilene kadar yeniden başlatılamaz ve ilk pilot öncesinde aktif blocker sayılmaz.
+Amaç; Ana Sayfa'yı veri yığınına veya klasik yönetim paneline çevirmeden şantiye şefinin **aktif proje için birkaç saniyede bilgi bulduğu, kopyaladığı, paylaştığı ve aksiyon aldığı proje hafızası + hızlı saha kontrol yüzeyi** haline getirmektir. Ana Sayfa ileride `Bugün / Kritik / Geciken` gibi yaşayan dashboard verilerine alan bırakır; Q05 bu canlı operasyon katmanını yeniden tasarlamaz, onun üstündeki hızlı proje bilgi katmanını kurar.
 
-#### AP-01 — Mevcut proje veri modelini denetle
+Uygulama tek büyük PR olmaz. İlk child current model/persistence audit'idir; schema/stable identity/persistence değişikliği kanıtlanırsa ilgili dilim ayrı CRITICAL authority olmadan uygulanmaz.
 
-Kod değişikliğinden önce proje/blok/kat/mahal/personel omurgası incelenir:
+#### AP-01 — Mevcut proje bilgi/persistence audit'i
 
-- hangi proje alanları zaten mevcut;
-- blok için stable ID/kayıt yapısı;
-- kat ve Mahal'in blokla mevcut ilişkisi;
-- toplam alan/kat bilgilerinin current source-of-truth'u;
-- İşveren / Ana yüklenici / Yapı denetim gibi tarafların mevcut kaynakları;
-- yeni alanlardan hangilerinin schema/persistence değişikliği gerektirdiği.
+Kod değişikliğinden önce proje/blok/kat/Mahal/personel ve mevcut metadata kaynakları çıkarılır:
 
-**Kural:** Mevcut bilgi ikinci kez saklanmaz. Audit schema değişikliğinin gerçekten gerekli olduğunu kanıtlarsa implementation öncesi ayrı CRITICAL child gerekir.
+- proje adı, proje kodu, adres, ada/parsel, YİBF, ruhsat, toplam alan, kat/blok ve mevcut diğer proje alanları;
+- şantiye konumu/koordinat için mevcut source ve platform capability;
+- taraf/kişi/firma kayıtları ve telefon/iletişim kaynakları;
+- merged blok metadata ve Floor↔Mahal relation temelinin user-facing Q05'e nasıl bağlanacağı;
+- mevcut `Özel alan` capability'si, stable identity'si ve category/pin/search ihtiyaçlarına ne kadar yettiği;
+- her yeni alanın yalnız UI/read-model mi yoksa schema/persistence değişikliği mi gerektirdiği.
 
-#### AP-02 — Proje profilinin bilgi mimarisini kur
+**Kural:** Mevcut bilgi ikinci kez saklanmaz. Aynı gerçek için ikinci source-of-truth yaratılmaz. Audit schema/stable identity/persistence değişikliğinin gerçekten gerekli olduğunu kanıtlarsa implementation öncesi exact CRITICAL child açılır.
 
-İlk görünümde kompakt **Proje Özeti** bulunur. Hedef hazır alanlar:
+#### AP-02 — Ana Sayfa üst katmanını sade ve hızlı kur
 
-- Proje adı;
-- adres;
-- toplam alan;
+Ana Sayfa'nın proje bilgi bölümü şu hiyerarşiyi izler:
+
+`Aktif Proje → Hızlı Bilgiler → Tüm proje bilgileri`
+
+Aktif Proje kartı:
+
+- proje adını ve kısa proje bağlamını gösterir;
+- görünür hızlı aksiyonlar: **Konum**, **Paylaş**, **Profil**;
+- kartın tamamı Proje Profili'ne gidebilir;
+- ayrı büyük bilgi kartlarıyla ekranı doldurmaz.
+
+**Hızlı Bilgiler**:
+
+- varsayılan olarak yaklaşık `4–6` yüksek değerli bilgi gösterir;
+- ilk adaylar: Ada/Parsel, YİBF, Ruhsat No, ±0.00 kotu ve kullanıcının sabitledikleri;
+- mevcut `Toplam kat / Toplam alan / YİBF` üçlüsü zorunlu sabit ana kart düzeni değildir;
+- kullanıcı projeye göre hangi bilgilerin hızlı alanda görüneceğini değiştirebilir;
+- living dashboard için ekran alanı korunur; proje referans bilgileri bütün Ana Sayfa'yı ele geçirmez.
+
+#### AP-03 — `Tüm proje bilgileri` tek giriş ve global arama
+
+Ana Sayfa üzerinde bütün kategoriler sürekli açık accordion listesi halinde gösterilmez. Tek görünür giriş:
+
+**`Tüm proje bilgileri ›`**
+
+Bu giriş bounded bottom sheet / uygun adaptive detay yüzeyi açar. Üstte tek **`Bilgi ara…`** araması bulunur ve supported bütün proje-bilgi kategorilerini tarar.
+
+Ana kategoriler:
+
+1. **Proje Bilgileri**
+2. **Konum ve Adres**
+3. **Önemli Kişiler**
+4. **Teknik Bilgiler**
+5. **Resmî Bilgiler**
+6. **Saha Referansları**
+
+Arama kategori sınırını aşabilir; örneğin `beton` araması Teknik Bilgiler'deki beton sınıfını, Önemli Kişiler'deki beton santralini ve Saha Referansları'ndaki ilgili özel notu birlikte bulabilir. Büyük/global semantic index motoru bu Q'nun kapsamı değildir.
+
+#### AP-04 — Proje Bilgileri kategorisi
+
+Hazır/system alanlar current source izin verdiği ölçüde şunları kapsar:
+
+- proje adı;
+- proje kodu;
+- ada / parsel;
+- YİBF No;
+- ruhsat no ve ruhsat tarihi;
+- toplam inşaat alanı;
 - blok sayısı;
-- toplam kat;
-- **YİBF No**.
+- kat sayısı;
+- yapı sınıfı / kullanım türü gibi audit'te mevcut olduğu kanıtlanan alanlar.
 
-Boş alanlar ana ekranı gereksiz doldurmaz. Ayrıntılar katmanlı/açılır bölümlerde sunulur:
+Mevcut merged **Bloklar** ve **Proje → Blok → Kat → Mahal** ilişkisi Proje Profili içinde korunur. Çok bloklu projede bloklar ayrı açılabilir; tek bloklu projede gereksiz çok-blok UI dayatılmaz. Aynı bilgi proje ve blok seviyesinde ikinci kez girdirilmez; semantik olarak güvenli toplamlar mevcut source'lardan türetilir.
 
-- **Resmî Bilgiler:** YİBF No, ruhsat no, ruhsat tarihi, ada/parsel;
-- **Proje Bilgileri:** başlangıç tarihi, hedef bitiş, kullanım türü, taşıyıcı sistem;
-- **İlgili Taraflar:** İşveren, Ana yüklenici, Yapı denetim, Şantiye şefi.
+#### AP-05 — Konum ve Adres first-class proje bilgisi
 
-Kesin alan listesi AP-01 audit sonucu kilitlenir; mevcut source'ta olmayan bilgi uydurulmaz.
+Şantiye konumu sıradan metin alanı değil doğrudan aksiyon üreten first-class proje bilgisidir.
 
-#### AP-03 — Zengin profili ağır zorunlu forma dönüştürme
+Supported davranış:
 
-İlk proje oluşturma minimum bilgilerle tamamlanabilir kalır. Ayrıntılı proje bilgileri sonradan **Proje Profili → Düzenle** üzerinden eklenebilir. Zengin proje profili yeni proje oluşturma sürtünmesini artırmaz.
+- şantiye açık adresi;
+- şantiye konumu / koordinat;
+- **Haritada aç**;
+- **Konumu paylaş**;
+- **Adresi kopyala**;
+- **Adresi paylaş**.
 
-#### AP-04 — Blok bazlı proje yapısı
+Kullanıcı koordinatı görmek zorunda kalmadan asıl işini yapabilmelidir. `Konumu paylaş` telefonun normal güvenli paylaşım akışını açar; konum/harita entegrasyonu için yeni permission veya background tracking sessizce eklenmez.
 
-Çok bloklu projelerde ayrı **Bloklar** bölümü bulunur. A Blok / B Blok / C Blok gibi kayıtlar ayrı açılabilir. Audit izin verdiği ölçüde blokta şu bilgiler gösterilebilir:
+#### AP-06 — Önemli Kişiler doğrudan iletişim yüzeyi
 
-- blok adı;
-- toplam kat;
-- bodrum kat;
-- toplam alan;
-- oturum alanı;
-- bağımsız bölüm sayısı;
-- kullanım türü.
+Bu kategori telefon rehberi kopyası değildir; proje bağlamındaki önemli role hızlı erişimdir. Audit izin verdiği ölçüde örnek roller:
 
-Tek bloklu projede gereksiz çok-blok arayüzü dayatılmaz. Yeni stable identity veya persistence ihtiyacı audit edilmeden varsayılmaz.
+- Yapı denetim / kontrol mühendisi;
+- Müteahhit / ana yüklenici yetkilisi;
+- Proje müdürü;
+- Satın alma;
+- Harita mühendisi;
+- Beton santrali / laboratuvar;
+- İSG uzmanı;
+- Elektrik / mekanik sorumlusu.
 
-#### AP-05 — Proje toplamlarını mümkün olduğunca bloklardan türet
+Kişi satırında uygun eylemler doğrudan görünür olabilir:
 
-Aynı bilgi proje ve blok seviyesinde kullanıcıya ikinci kez girdirilmez. Örneğin A Blok `4.500 m²`, B Blok `3.500 m²` ise semantik olarak uygunsa proje toplam alanı `8.000 m²` türetilebilir. Blok sayısı, toplam alan ve uygun bazı kat/bağımsız bölüm toplamları aynı ilkeye tabidir.
+**Ara · WhatsApp · Kopyala**
 
-**Kural:** Türetilmiş değer ile bağımsız proje-level source alanı birbirine karıştırılmaz; mevcut source-of-truth sessizce değiştirilmez.
+Backend/source'ta bulunmayan kişi veya ilişki uydurulmaz. Telefon/WhatsApp gibi dış uygulama çağrıları explicit kullanıcı eylemiyle başlar.
 
-#### AP-06 — Mahal'i proje profilinin ana öğesi yap
+#### AP-07 — Teknik Bilgiler
 
-`Mahal Kataloğu` Ajanda bağlamından çıkarılıp proje profiline taşınır. Proje profilinde erişilebilir, etiketli **Mahaller** girişi bulunur; yalnız icon kullanılmaz. Mevcut model izin verdiği ölçüde kullanıcıya `Proje → Blok → Kat → Mahal` ilişkisi anlaşılır biçimde gösterilir.
+Şefin ara ara doğrulaması gereken proje sabitleri burada tutulur. Audit/current model veya kullanıcı-ekli bilgi olarak örnekler:
 
-#### AP-07 — Özel Alan özelliğini koru
+- ±0.00 kotu;
+- temel alt kotu;
+- beton sınıfı;
+- donatı çeliği sınıfı;
+- pas payı;
+- zemin sınıfı;
+- röper bilgisi.
 
-Mevcut **Özel alan ekle** kaldırılmaz. Ancak standart ve yaygın proje bilgileri kullanıcıya özel alan olarak yeniden tanımlatılmaz. Özel alan; sözleşme numarası, belediye dosya numarası, kule vinç referansı veya gerçekten projeye/kullanıcıya özgü ek bilgiler için esnek katman olarak kalır.
+Bu örnekler varsayılan zorunlu schema alanları değildir. Mevcut canonical source varsa onu kullanır; yoksa user-added proje bilgisi olarak eklenebilir.
 
-#### AP-08 — Ana sayfaya İş Gücü kartı ekle
+#### AP-08 — Resmî Bilgiler
 
-Proje profilinde görünür **İş Gücü** kartı bulunur. Birincil günlük bilgi **Bugün sahada: N kişi** olur. Mevcut veri kaynakları güvenilir biçimde ayırabiliyorsa ikincil olarak **N kayıtlı personel** bilgisi gösterilebilir.
+Sık gerekmeyen fakat gerektiğinde bulunması zor olan proje referansları aynı yerde tutulur. Örnekler:
 
-**Kural:** `Sicilde kayıtlı personel` ile `bugün gerçekten sahada bulunan personel` aynı metrik gibi sunulmaz.
+- müteahhit yetki belge no;
+- SGK işyeri / belediye / dosya referansları;
+- elektrik / su abonelik veya sayaç no;
+- yapı denetim sicil/ilgili kayıt no;
+- diğer proje bazlı resmî referanslar.
 
-#### AP-09 — İş Gücü kartını gerçek personel listesine bağla
+Bu alanların hiçbiri kullanıcıya ilk proje oluştururken zorunlu form yığını olarak dayatılmaz.
 
-İş Gücü kartına dokunulduğunda aktif projedeki saha personeli açılır. Bugünkü saha durumu önceliklidir. Liste gerektiğinde kişi, **Taşeron / İşveren** ve mevcut günlük durum bilgisini gösterebilir. Kullanıcı yalnız listeyi görmek için Sicil → ekip → Puantaj arasında gereksiz ekran dolaşımına zorlanmaz. Q04 first-class İş Gücü/Günlük Puantaj alanı tamamlandığında bu kart aynı shared destination/context'e derin link verir; ikinci bir bağımsız personel akışı oluşturmaz.
+#### AP-09 — Saha Referansları
 
-#### AP-10 — İş Gücü için doğru empty state'ler
+Projeye özgü saha bilgileri için esnek kategori korunur. Örnekler:
 
-İki durum ayrılır:
+- `Temel topraklama — A Blok 170 m / B Blok 180 m`;
+- trafo gücü;
+- su deposu;
+- vinç kapasitesi;
+- geçici giriş/yol;
+- malzeme indirme alanı;
+- projeye özel kritik ölçü/notlar.
 
-1. **Hiç firma/personel kaydı yok:** `Henüz saha personeli eklenmedi.` → ana eylem `Taşeron / İşveren ekle`.
-2. **Personel kayıtlı fakat bugün saha/Puantaj durumu yok:** `Bugün için saha personeli henüz işaretlenmedi.` → ana eylem `Puantaja git`.
+Bu alanlar sistemin önceden tüm şantiyeler için tahmin etmesi gereken fixed schema değildir.
 
-Bu iki durum aynı mesaj veya aynı CTA ile gösterilmez.
+#### AP-10 — Her kategori ekranından bilgi eklenebilir
 
-#### AP-11 — Ana sayfa yoğunluk kontrolü
+Kullanıcı yalnız `Saha Referansları` veya eski tek bir `Özel alan` bölümünden değil, **her kategori ekranından** yeni proje bilgisi ekleyebilir.
 
-Bütün proje alanları aynı anda açık bir form yığınına dönüştürülmez. Hedef hiyerarşi:
+Görünür kategori eylemleri örneğin:
 
-`Aktif proje → Proje Özeti → Bloklar → Mahaller / İş Gücü → Ayrıntılı proje bilgileri → Özel Alanlar`
+- `+ Proje bilgisi ekle`
+- `+ Konum / adres bilgisi ekle`
+- `+ Kişi ekle`
+- `+ Teknik bilgi ekle`
+- `+ Resmî bilgi ekle`
+- `+ Saha bilgisi ekle`
 
-Dashboard hâlâ canlı proje kontrol merkezi olmalı; bakım/form yoğunluğu günlük saha bilgisini bastırmamalıdır.
+User-added alanlar sistem alanlarından ayrı ikinci sınıf bir listeye atılmaz; aynı kategori içinde doğal biçimde görünür. Ancak kullanıcı tarafından eklenen kayıtlar güvenli edit/delete capability'sine sahip olur; canonical/system alanların lifecycle davranışı ayrı kalır.
+
+#### AP-11 — Kategoriye göre doğru veri giriş formu
+
+Her yerde aynı generic `Başlık + Değer` formu dayatılmaz. Form semantiği kategoriye uyar:
+
+- **Kişi:** ad, firma, rol, telefon, WhatsApp/iletişim, not;
+- **Teknik:** başlık, değer, birim, not;
+- **Resmî:** bilgi/belge adı, numara, tarih, kurum, not;
+- **Konum:** başlık, adres, konum/koordinat, not;
+- **Saha:** başlık, değer, birim, açıklama.
+
+İlk görünüm minimum gerekli alanlarla kalır; ayrıntılar progressive disclosure olabilir.
+
+#### AP-12 — Kopyalama, paylaşım ve aksiyon davranışı first-class
+
+Şefin değeri elle seçmesi beklenmez.
+
+- uygun numara/değere dokunma veya görünür kopyala eylemi → exact değeri panoya alır;
+- işlem sonrası kısa, insan-okunur snackbar/toast: ör. `Ada / Parsel kopyalandı`;
+- gizli long-press ana etkileşim değildir;
+- kişi verisinde **Ara / WhatsApp**;
+- konumda **Haritada aç / Paylaş**;
+- adres/numara/değerde **Kopyala** doğrudan eylemdir.
+
+Kopyalanan içerik kullanıcıya sürpriz yapmaz; exact değer ile `Etiket: Değer` biçimli kopyalama ayrımı gerekiyorsa görünür seçenekle yapılır.
+
+#### AP-13 — Ana Sayfaya sabitleme / Hızlı Bilgiler yönetimi
+
+Her uygun proje bilgisi `Ana sayfada göster` / pin-star davranışıyla Hızlı Bilgiler alanına alınabilir veya çıkarılabilir.
+
+- varsayılan başlangıç setini uygulama verir; kullanıcı setup yapmak zorunda değildir;
+- her proje kendi sabitlenmiş bilgi setine sahip olabilir;
+- user-added bilgi de system alanı gibi sabitlenebilir;
+- Hızlı Bilgiler alanı sınırsız büyümez; bounded görsel düzen korunur;
+- sabitleme source bilgiyi kopyalamaz, yalnız presentation preference/read-model ilişkisi kurar.
+
+#### AP-14 — İlk proje oluşturmayı ağırlaştırma
+
+Zengin proje hafızası, yeni proje oluşturmayı onlarca zorunlu alana dönüştürmez. İlk proje minimum bilgilerle oluşturulabilir kalır; ayrıntılar daha sonra Proje Profili / ilgili kategori üzerinden eklenir.
+
+#### AP-15 — İş Gücü / Mahal ve mevcut güçlü yüzeyleri kaybetme
+
+Q05 yeni bilgi merkezi olurken mevcut ürün kabiliyetlerini ikinci bir stack olarak yeniden yaratmaz:
+
+- **Mahaller** current `Proje → Blok → Kat → Mahal` source'una gider;
+- **İş Gücü** Q04 shared İş Gücü/Sicil/Puantaj destination/context'ine derin link verir;
+- kayıtlı personel ile bugün gerçekten sahada bulunan personel aynı metrik gibi gösterilmez;
+- kişi/firma bilgisi Q05 içinde gösterilse bile canonical workforce identity ikinci kez oluşturulmaz.
+
+#### AP-16 — Q05 kapsam sınırı ve Acceptance
+
+Q05'in işi hızlı proje hafızası ve referans bilgisi katmanıdır. `Bugün / Kritik işler / Geciken işler` yaşayan dashboard verilerinin geniş redesign'ı bu Q içine çekilmez; yalnız üst bilgi katmanıyla birlikte yaşayacak alan korunur.
+
+Owner Acceptance en az şu gerçek cihaz davranışlarını kapsar:
+
+- Ana Sayfada aktif proje + bounded Hızlı Bilgiler;
+- proje bilgisini tek dokunuşla kopyalama;
+- şantiye konumunu haritada açma ve paylaşma;
+- Tüm Proje Bilgileri içinde kategori geçişi ve global arama;
+- kategori içinden yeni bilgi ekleme, düzenleme ve user-added kayıt silme;
+- kişi için Ara/WhatsApp gibi supported aksiyonlar;
+- herhangi uygun bilgiyi Ana Sayfaya sabitleme/kaldırma;
+- aktif proje değişiminde başka projenin bilgilerinin karışmaması;
+- mevcut Blok/Mahal/İş Gücü source ilişkilerinin korunması;
+- 320/390 px, yüksek text scale, back/keyboard/empty-state davranışı.
 
 **Q05 bitiş tanımı:**
 
-- proje genel bilgisi tek profilden okunabilir;
-- çok bloklu projede bloklar ayrı incelenebilir;
-- semantik olarak güvenli proje toplamları tekrar veri girişi olmadan türetilebilir;
-- Mahaller doğrudan proje profilinden erişilebilir;
-- bugünkü saha personeli ile kayıtlı personel ayrımı anlaşılır;
-- İş Gücü kartı Q04 shared İş Gücü/Günlük Puantaj alanına gider;
-- empty state doğru ilk eylemi sunar;
-- standart bilgiler için `Özel alan` oluşturmaya gerek kalmaz;
-- ilk proje oluşturma onlarca zorunlu alana dönüşmez;
+- Ana Sayfa aktif projeyi güçlü fakat kompakt gösterir;
+- yaklaşık 4–6 Hızlı Bilgi kopyalanabilir ve projeye göre özelleştirilebilir;
+- şantiye konumu doğrudan `Haritada aç / Konumu paylaş` capability'sine sahiptir;
+- `Tüm proje bilgileri` tek girişinden Proje, Konum, Önemli Kişiler, Teknik, Resmî ve Saha kategorileri açılır;
+- kategori merkezi supported bilgilerde ortak arama sunar;
+- her kategori kendi semantiğine uygun `+ Bilgi ekle` capability'sine sahiptir;
+- user-added bilgi sistem alanlarıyla aynı kategori içinde doğal görünür, fakat düzenle/sil sınırı açıktır;
+- numara/değerler görünür biçimde kopyalanabilir; kişi ve konum verileri doğrudan aksiyon üretir;
+- uygun her bilgi Ana Sayfaya sabitlenebilir; pinning source veriyi duplicate etmez;
+- Bloklar, Mahaller ve İş Gücü canonical mevcut kaynaklarına bağlı kalır;
+- ilk proje oluşturma ağır zorunlu forma dönüşmez;
+- current source'ta olmayan alanlar uydurulmaz;
 - schema/stable identity/persistence değişikliği gerekiyorsa ayrı CRITICAL yetki olmadan yapılmaz.
 
-#### Q05 owner disposition sonrası ilk multi-feature pilot geçişi
+#### Q05 owner-priority geçiş kuralı
 
-Q04'ün tamamlanmış current GitHub disposition'ı ve Q05 Dashboard/Profile UI'ın yukarıdaki owner-deferred disposition'ı sonrasında, bu ROADMAP truth-sync'i merge edildiğinde sıradaki yürütülebilir geçiş Issue #760 altındaki ilk gerçek `MULTI_FEATURE_PARALLEL` pilotunun ayrı aktivasyonudur. Owner-approved ilk pilot roster'ı ve parent ilişki sınıfları şöyledir:
-
-| Queue maddesi | Parent ilişkisi |
-| --- | --- |
-| Q06 — Envanter / Kroki hedefli interaction refinement | `INDEPENDENT` |
-| Q07 — KKD hızlı seçim | `COORDINATION_REQUIRED` |
-| Q09 — Malzemeler ortak UI/UX sistem uyumu | `INDEPENDENT` |
-
-Parent coordination authority Issue #760'tır. Bu ROADMAP kaydı yalnız kanonik yürütme sırasını gösterir; parent lock, feature roster durumu veya çalışma kanıtı tutmaz ve kendi başına pilotu ya da production child'ları aktive etmez. Truth-sync merge'inden sonra current master yeniden okunur ve exact parent/feature lock'ları ayrı yetkiyle oluşturulur. Q08, bu üçlü pilotin ardından yürütülür.
+13 Eylül 2026 owner kararıyla eski `Q05 owner disposition sonrası ilk multi-feature pilot geçişi` yönü Q05'in yürütme önceliği bakımından supersede edilmiştir. Q13 PR #795 master'a merge edilip production işi kapandığından, current GitHub gerçeği yeniden doğrulandıktan sonra sıradaki yeni Q05 child **AP-01 model/persistence audit** olur. Bu karar tamamlanmış tarihsel pilot/Issue/PR kanıtlarını geri almaz ve yeniden çalıştırmaz.
 
 ### Q06 — Envanter / Kroki hedefli interaction refinement
 
@@ -737,8 +866,8 @@ Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günl�
 
 ### Q13 — Puantaj tamamlanınca Ajanda'ya otomatik kayıt
 
-**Kaynak:** #617 owner decision `Puantaj → Ajanda automatic completion record`  
-**Durum:** `QUEUED — CRITICAL`
+**Kaynak:** #617 owner decision `Puantaj → Ajanda automatic completion record`; Issue #794; PR #795  
+**Durum:** `COMPLETE` — PR #795 master'a merge edildi; Q13 CRITICAL implementation kapandı.
 
 - yalnız kullanıcı Puantaj gününü açıkça tamamladığında;
 - generated Ajanda kaydı exact proje/gün/Puantaj source'una traceable;
