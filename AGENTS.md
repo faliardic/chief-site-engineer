@@ -1,6 +1,8 @@
-# CSE Codex Repository Instructions
+# CSE Repository Execution Agent Instructions
 
 Bu dosya repository kökünde bütün CSE çalışmalarına uygulanır ve günlük execution için tek zorunlu giriş noktasıdır.
+
+Bu belgede tanımlanan **Repository Execution Agent** (kısaca: **Execution Agent**), repository-local terminal, dosya değişikliği, test, analyzer, build ve local Git/commit/push işlerini yürüten provider-neutral roldür. Bu rolün **current provider'ı Claude Code**'dur; Claude'a özgü bootstrap/adapter ayrıntıları repository root'undaki `CLAUDE.md` ve varsa `.claude/` sınırında tutulur. **Codex**, aynı role geri bağlanabilecek uyumlu bir gelecek provider'dır; bu belgedeki yetki, risk lane, topology, validation, Git ve publication kuralları provider değişiminde aynı kalır. Provider adı bu belgede tek başına yetki veya kural değişikliği üretmez.
 
 ## 1. Güncel gerçek ve kaynak otoritesi
 
@@ -13,6 +15,7 @@ Bu dosya repository kökünde bütün CSE çalışmalarına uygulanır ve günl�
 - Test/gate ayrıntıları: `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`.
 - AI-assisted execution çekirdeği: [pinned ADS CORE](.agents/ads/CORE.md);
   kabul edilmiş kaynak revision kaydı: [ADS SOURCE](.agents/ads/SOURCE.md).
+- Claude Code current provider bootstrap/adapter'ı: repository root `CLAUDE.md`.
 
 CSE, repo içine source-pinned alınmış ADS sistemini kullanır. Önce bu `AGENTS.md`,
 ardından `.agents/ads/CORE.md` ve göreve uygun `.agents/skills/ads-*/SKILL.md`
@@ -20,6 +23,13 @@ okunur. Çelişkide CSE kuralları üstündür: ADS; CSE ürün kararlarını,
 `FAST | STANDARD | CRITICAL` risk lane'ini, veri güvenliği sınırlarını,
 validation/manual-device acceptance, zorunlu ChatGPT/owner review veya
 publication/release kapılarını gevşetemez.
+
+Pinned ADS CORE, kaynak reposunda geçmiş provider adını (`Codex`) rol sahipliği
+örneği olarak kullanır. Bu source-pinned metin, yalnızca provider adı farklı diye
+fork edilmez veya sessizce yeniden yazılmaz. CSE, ADS'nin `Builder/WRITE`,
+`Scout/READ`, `Reviewer/READ` rollerini bu belgedeki `Execution Agent`
+(current: Claude Code) ile provider-neutral biçimde eşler; bu yalnızca bir CSE
+katmanı adlandırma alias'ıdır ve ADS authority veya içeriğini değiştirmez.
 
 CSE'ye source-pinned kopyalanmış ADS skill'lerindeki kaynak-repo bağlamlı
 `CORE.md` referansı bu repository'de `.agents/ads/CORE.md` olarak çözülür;
@@ -35,10 +45,11 @@ README, eski Issue/PR, `.cse/state`, task/result, ZIP, handoff, podcast veya soh
 Yeni görevde zorunlu okuma:
 
 1. `AGENTS.md`
-2. [pinned ADS CORE](.agents/ads/CORE.md) ve görevde ilgili ADS skill'i
-3. current GitHub `master`, açık Issue/PR ve aktif görev
-4. `ROADMAP.md` içindeki ilk genel yayın öncesi Q01–Q26 kanonik yürütme kuyruğu
-5. yalnız değişen sözleşmenin gerektirdiği koşullu kaynak
+2. current provider bootstrap'ı (Claude Code için repository root `CLAUDE.md`)
+3. [pinned ADS CORE](.agents/ads/CORE.md) ve görevde ilgili ADS skill'i
+4. current GitHub `master`, açık Issue/PR ve aktif görev
+5. `ROADMAP.md` içindeki ilk genel yayın öncesi Q01–Q26 kanonik yürütme kuyruğu
+6. yalnız değişen sözleşmenin gerektirdiği koşullu kaynak
 
 Koşullu okuma:
 
@@ -49,7 +60,7 @@ Koşullu okuma:
 - test/gate kararı: Minimum Validation;
 - STANDARD/CRITICAL publication: Workflow Acceleration;
 - kritik model/review ihtiyacı: Model Routing;
-- kalıcı kritik handoff: Codex Instruction Comment Protocol.
+- kalıcı kritik handoff: Execution Agent Instruction Comment Protocol (dosya: `CSE_CODEX_INSTRUCTION_COMMENT_PROTOCOL.md`).
 
 Aynı görev resume ediliyorsa değişmeyen uzun kaynaklar tekrar okunmaz. Kullanıcı `devam` dediğinde current GitHub durumu bulunur ve sıradaki gerçek işlem yapılır.
 
@@ -80,11 +91,11 @@ Owner talebi AGENTS.md veya canonical çalışma kuralını değiştiriyorsa as�
 ChatGPT/Work Mode her kullanıcı talebinde execution başlamadan önce sıradaki tek işi ve sorumlu aktörü belirler:
 
 - **ChatGPT:** current GitHub okuma, planlama, Issue/PR koordinasyonu, review, gate doğrulaması ve standing owner yetkisiyle otomatik Ready/squash merge;
-- **Codex:** repository-local terminal, automated test, analyzer, build/APK hazırlığı, dosya değişikliği, format/diff ve local Git/commit/push;
+- **Execution Agent (current provider: Claude Code):** repository-local terminal, automated test, analyzer, build/APK hazırlığı, dosya değişikliği, format/diff ve local Git/commit/push;
 - **Fatih:** yalnız manuel ürün/device kabulü ve nihai görsel/davranış PASS/FAIL kararı; PowerShell/terminal komutu çalıştırmaz;
-- **Codex device exception:** Fatih exact package, cihaz ve veri-koruma sınırıyla açıkça devrederse emulator/ADB/device işlemi ChatGPT'nin göreve özel verdiği execution time budget içinde Codex'e geçebilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
+- **Execution Agent device exception:** Fatih exact package, cihaz ve veri-koruma sınırıyla açıkça devrederse emulator/ADB/device işlemi ChatGPT'nin göreve özel verdiği execution time budget içinde Execution Agent'a geçebilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
 
-Repository veya local execution gerekiyorsa ChatGPT, kullanıcının `Codex ile çalış` demesini beklemez. Açıkça `Sıradaki aktör: Codex` der ve current Issue/kuralları tekrar etmeyen, 10–15 satırı geçmeyen exact handoff verir. `CSE_PROJECT_INSTRUCTIONS.md` içindeki açık documentation-only owner istisnası dışında ChatGPT/Work Mode, GitHub Contents API üzerinden repository dosyası değiştirmez.
+Repository veya local execution gerekiyorsa ChatGPT, kullanıcının `Execution Agent ile çalış` demesini beklemez. Açıkça `Sıradaki aktör: Execution Agent` der ve current Issue/kuralları tekrar etmeyen, 10–15 satırı geçmeyen exact handoff verir. `CSE_PROJECT_INSTRUCTIONS.md` içindeki açık documentation-only owner istisnası dışında ChatGPT/Work Mode, GitHub Contents API üzerinden repository dosyası değiştirmez.
 
 ChatGPT/koordinatör task başında birbirinden ayrı olarak CSE risk lane'ini,
 ADS execution topology'sini ve lane routing'ini seçer. `SINGLE`, tek
@@ -92,6 +103,10 @@ ADS execution topology'sini ve lane routing'ini seçer. `SINGLE`, tek
 1 `Scout/READ` + 1 `Reviewer/READ` kullanır; yalnız Builder production writer'dır.
 Scout ve Reviewer aynı task'ın read-only lane'leridir, ek production işi veya
 branch/PR değildir. Ayrıntılı davranış pinned ADS CORE ve ilgili skill'den okunur.
+Bu üç lane rolü, Execution Agent'ın current provider'ı Claude Code subagent
+desteğini kullanıyorsa dahi aynı sınırla bağlıdır: yalnız Builder production
+writer'dır; Scout ve Reviewer subagent olarak çalıştırılsa bile kesin READ-only
+kalır ve production WRITE yetkisi kazanmaz.
 
 `SINGLE | PARALLEL_READ` feature-içi topology'dir. Varsayılan parent mode
 `NONE` ve tek feature execution'ıdır. `MULTI_FEATURE_PARALLEL` yalnız ayrı owner
@@ -102,20 +117,20 @@ açık feature sayısına dahildir. Her feature ayrı Issue, canonical-repo-deri
 worktree, branch, Draft PR, scope/allowlist/protected path, routing/topology lock
 ve tek Builder/WRITE taşır.
 
-Her Codex handoff'u ChatGPT'nin göreve özel belirlediği açık `Execution time budget: <süre>` alanını taşır. Bütçe; kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre seçilir.
+Her Execution Agent handoff'u ChatGPT'nin göreve özel belirlediği açık `Execution time budget: <süre>` alanını taşır. Bütçe; kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre seçilir.
 
 ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istemeden yürütülür. Kullanıcıya teslim edilen her sonuç şu satırla biter:
 
-`Sıradaki aksiyon — <ChatGPT|Codex|Fatih|Yok>: <tek uygulanabilir talimat>.`
+`Sıradaki aksiyon — <ChatGPT|Execution Agent|Fatih|Yok>: <tek uygulanabilir talimat>.`
 
 Bir aksiyon tamamlandığında yalnız sonraki işin adı söylenmez; aynı yanıtta başlamaya hazır talimat da hazırlanır:
 
-- **Codex:** `Hazır Codex talimatı:` altında current kaynakları tekrar etmeyen, kopyalanabilir 10–15 satırlık exact görev;
+- **Execution Agent:** `Hazır Execution Agent talimatı:` altında current kaynakları tekrar etmeyen, kopyalanabilir 10–15 satırlık exact görev;
 - **Fatih:** `Hazır Fatih talimatı:` altında yalnız kısa manuel ürün/device kontrolü ve beklenen sonuç; terminal komutu verilmez;
 - **ChatGPT:** mevcut owner yetkisi varsa sonraki koordinasyon işlemini kendiliğinden yürütür; yeni yetki gerekiyorsa yalnız gerekli tek onay cümlesini verir;
 - **Yok:** devam işi veya hazırlanacak talimat bulunmadığını açıklar.
 
-Kullanıcıdan sıradaki prompt'u yazması, `devam` demesi veya Codex talimatını ayrıca istemesi beklenmez. Hazır talimat, seçilen aktörün ek açıklama istemeden başlayabileceği kadar self-contained olur.
+Kullanıcıdan sıradaki prompt'u yazması, `devam` demesi veya Execution Agent talimatını ayrıca istemesi beklenmez. Hazır talimat, seçilen aktörün ek açıklama istemeden başlayabileceği kadar self-contained olur.
 
 Devam işi kalmadığında `Sıradaki aksiyon — Yok: İş tamamlandı.` yazılır; yapay yeni iş üretilmez.
 
@@ -124,7 +139,8 @@ Devam işi kalmadığında `Sıradaki aksiyon — Yok: İş tamamlandı.` yazıl
 Her iş yalnız bir CSE risk lane'i kullanır: `FAST | STANDARD | CRITICAL`.
 Execution topology ayrıca ve bağımsız olarak ADS'ye göre `SINGLE | PARALLEL_READ`
 seçilir; `Builder | Scout | Reviewer` ise agent rolüdür. Bu üç kavram birbirinin
-yerine kullanılamaz.
+yerine kullanılamaz. Provider adı (Claude Code, Codex) da bu üç kavramın yerine
+geçmez veya bunları yeniden yorumlamaz.
 
 FAST/STANDARD için varsayılan one-pass akışı:
 
@@ -132,7 +148,7 @@ FAST/STANDARD için varsayılan one-pass akışı:
 
 Doğrudan, tekrarlanabilir owner/device kanıtı ve yeterince belirlenmiş source root cause varsa düzeltme öncesi deterministic automated FAIL zorunlu değildir. Owner/device kanıtı, hatayı temsil edemeyen yapay test harness'inden üstündür; widget/fake test PASS'i cihazdaki hatayı geçersiz kılmaz. Bir başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir; kararı değiştirmeyen diagnostic/test döngüleri yapılmaz.
 
-Focused validation yeterliyse analyzer yalnız material ihtiyaçta, manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde yapılır. Manuel/device kabul gerekmeyen non-CRITICAL işte Codex automated PASS sonrası commit/push manuel PASS beklemez. Gereken kabulde Fatih PASS/FAIL kapısı korunur; gerekli kontrol FAIL/PENDING ise publication kapalı kalır. Required review ile task-specific validation/manual kapıları PASS veya açıkça GEREKMİYOR olduktan ve blocker, REQUEST_CHANGES, scope/allowlist/base/head drift, conflict veya mergeability sorunu bulunmadıktan sonra ChatGPT standing owner yetkisiyle PR'yi ayrıca Fatih'e sormadan otomatik Ready yapar ve squash merge eder. CRITICAL PR'de bu yetki ancak Issue'ya özel bütün validation/compatibility/manual kapıları geçtikten sonra kullanılır; release/store ve destructive production/device/data işlemleri ayrı açık owner onayı ister.
+Focused validation yeterliyse analyzer yalnız material ihtiyaçta, manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde yapılır. Manuel/device kabul gerekmeyen non-CRITICAL işte Execution Agent automated PASS sonrası commit/push manuel PASS beklemez. Gereken kabulde Fatih PASS/FAIL kapısı korunur; gerekli kontrol FAIL/PENDING ise publication kapalı kalır. Required review ile task-specific validation/manual kapıları PASS veya açıkça GEREKMİYOR olduktan ve blocker, REQUEST_CHANGES, scope/allowlist/base/head drift, conflict veya mergeability sorunu bulunmadıktan sonra ChatGPT standing owner yetkisiyle PR'yi ayrıca Fatih'e sormadan otomatik Ready yapar ve squash merge eder. CRITICAL PR'de bu yetki ancak Issue'ya özel bütün validation/compatibility/manual kapıları geçtikten sonra kullanılır; release/store ve destructive production/device/data işlemleri ayrı açık owner onayı ister.
 
 ### FAST
 
@@ -145,10 +161,10 @@ FAST varsayılanı:
 - ChatGPT'nin açıkça belirlediği göreve özel execution time budget;
 - Issue, `.cse` task/result ve routing YAML yok;
 - current GitHub `master` ruleset'i PR istiyorsa tek kısa ömürlü branch ve tek minimal Draft PR; bu zorunluluk işi STANDARD'a yükseltmez;
-- Codex format, changed-path review, `git diff --check` ve minimum yeterli automated doğrulamayı yapar;
+- Execution Agent format, changed-path review, `git diff --check` ve minimum yeterli automated doğrulamayı yapar;
 - bağımsız review, geniş CI, full suite ve cihaz kontrolü yalnız somut ihtiyaç varsa;
-- test/analyzer/build execution Codex'te, manuel ürün/device kabulü Fatih'tedir;
-- gereken manuel/device kabulde Fatih `PASS` bildirmeden commit veya push yapılmaz; kabul gerekmiyorsa Codex automated PASS yeterlidir;
+- test/analyzer/build execution Execution Agent'ta, manuel ürün/device kabulü Fatih'tedir;
+- gereken manuel/device kabulde Fatih `PASS` bildirmeden commit veya push yapılmaz; kabul gerekmiyorsa Execution Agent automated PASS yeterlidir;
 - gerekli doğrulama/kabul FAIL/PENDING durumundayken yeni işe geçilmez.
 
 ### STANDARD
@@ -160,7 +176,7 @@ STANDARD varsayılanı:
 - tek kısa Issue veya self-contained görev özeti;
 - tek kısa ömürlü branch;
 - açık execution time budget içinde mümkünse inceleme, fix, focused validation ve yetkili commit/push tek adımda;
-- test/analyzer/build execution Codex'te, manuel ürün/device kabulü Fatih'te;
+- test/analyzer/build execution Execution Agent'ta, manuel ürün/device kabulü Fatih'te;
 - `.cse` ve routing YAML varsayılan olarak yok;
 - bağımsız diff review değer üretiyorsa tek Draft PR;
 - mevcut iş master'a alınmadan yeni production branch açılmaz;
@@ -183,17 +199,17 @@ Somut CRITICAL trigger yoksa iş ağır sürece yükseltilmez.
 
 ## 5. Göreve özel süre bütçesi ve test sahipliği
 
-Her Codex execution/correction/commit görevi, handoff'ta ChatGPT tarafından açıkça verilen execution time budget ile sınırlıdır. Global sabit süre varsayılanı yoktur. Yetkili kapsam ve süreye sığan inceleme, düzenleme, focused validation ve commit/push gereksiz ayrı mikro adımlara bölünmez; publication kapıları korunur.
+Her Execution Agent execution/correction/commit görevi, handoff'ta ChatGPT tarafından açıkça verilen execution time budget ile sınırlıdır. Global sabit süre varsayılanı yoktur. Yetkili kapsam ve süreye sığan inceleme, düzenleme, focused validation ve commit/push gereksiz ayrı mikro adımlara bölünmez; publication kapıları korunur.
 
-Bütçe dolduğunda Codex durur:
+Bütçe dolduğunda Execution Agent durur:
 
 - yeni yaklaşım başlatılmaz;
 - kapsam genişletilmez;
 - mevcut çalışma güvenle korunur; tamamlanan değişiklik, exact blocker ve kalan tek adım raporlanır.
 
-Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
+Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Execution Agent tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
 
-Codex kaynak düzenleme, format, diff ve Git kapsam kontrollerini yapar; automated execution sonuçlarını raporlar. Fatih'e yalnız manuel kabul adımları verilir; nihai davranış kabulü Codex'e devredilmez.
+Execution Agent kaynak düzenleme, format, diff ve Git kapsam kontrollerini yapar; automated execution sonuçlarını raporlar. Fatih'e yalnız manuel kabul adımları verilir; nihai davranış kabulü Execution Agent'a devredilmez.
 
 Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro adımda değil, birleşik milestone veya release kapısında çalıştırılır.
 
@@ -209,10 +225,11 @@ Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro a
 - Gerekli review/validation/manual kapısı FAIL/PENDING iken veya blocker, REQUEST_CHANGES, scope/allowlist/base/head drift, conflict ya da mergeability sorunu varken Ready/merge yapılmaz.
 - Gate'ler PASS/GEREKMİYOR olduğunda ChatGPT standing owner yetkisiyle Ready/squash merge'i otomatik yürütür; Fatih bu standing yetkiyi sonraki bir owner talimatıyla iptal edebilir veya askıya alabilir.
 - Release/store ve destructive production/device/data işlemleri standing Ready/merge yetkisinin dışındadır ve ayrı açık owner onayı gerektirir.
+- Repository defaults blanket permission bypass (ör. `--dangerously-skip-permissions` veya eşdeğeri) kullanmaz; provider-specific izin/hook/setting yalnız o provider'ın adapter sınırında (Claude Code için `.claude/`) tutulur ve CSE'nin genel authority modeli sayılmaz.
 
 ## 7. Git, publication ve Issue disposition
 
-- FAST: Codex automated PASS ve gerekiyorsa Fatih manuel/device PASS sonrası tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa tek minimal Draft PR, required review/gate PASS sonrası ChatGPT'nin otomatik Ready/squash merge'i ve `master` sync.
+- FAST: Execution Agent automated PASS ve gerekiyorsa Fatih manuel/device PASS sonrası tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa tek minimal Draft PR, required review/gate PASS sonrası ChatGPT'nin otomatik Ready/squash merge'i ve `master` sync.
 - STANDARD: parent mode `NONE` iken en fazla bir aktif production branch/PR; squash merge varsayılanı.
 - CRITICAL: Issue'ya özel branch/PR/review zinciri.
 - `PARALLEL_READ` lane'leri aynı task ve tek production branch/PR içinde kalır;
@@ -246,8 +263,8 @@ FAST completion en fazla şu bilgileri taşır:
 ```text
 Değişen davranış: <tek cümle>
 Değişen dosyalar: <liste>
-Codex kontrolleri: format / diff-check
-Codex automated validation: PENDING | PASS | FAIL
+Execution Agent kontrolleri: format / diff-check
+Execution Agent automated validation: PENDING | PASS | FAIL
 Fatih manuel kabulü: GEREKMİYOR (<gerekçe>) | PENDING | PASS | FAIL
 Commit/push: yapılmadı | <sha>
 PR: GEREKMİYOR | <numara>
@@ -266,13 +283,13 @@ ChatGPT kullanıcıya teslim ettiği her yanıtta önce sade Türkçeyle şunlar
 
 Bağlayıcı anlatım kuralı:
 
-- Fatih'e verilen her bilgi, durum özeti, test sonucu, blocker açıklaması, Codex sonucu ve teknik karar her zaman onun tek okumada anlayacağı sade Türkçeyle anlatılır.
+- Fatih'e verilen her bilgi, durum özeti, test sonucu, blocker açıklaması, Execution Agent sonucu ve teknik karar her zaman onun tek okumada anlayacağı sade Türkçeyle anlatılır.
 - Yanıt teknik jargonla başlamaz. Teknik terim gerekiyorsa aynı cümlede veya hemen ardından günlük dilde ne anlama geldiği açıklanır.
 - SHA, branch, divergence, allowlist, test harness, YAML ve benzeri teknik kanıtlar ana anlatımın yerine geçmez; sade açıklamadan sonra ikinci katmanda verilir.
-- Fatih açıkça ham teknik çıktı istemedikçe ham Codex/test çıktısı ana cevap olarak kopyalanmaz; sonuç önce anlamı ve etkisiyle açıklanır.
+- Fatih açıkça ham teknik çıktı istemedikçe ham Execution Agent/test çıktısı ana cevap olarak kopyalanmaz; sonuç önce anlamı ve etkisiyle açıklanır.
 
-SHA, branch, divergence, allowlist, YAML ve benzeri teknik kanıtlar bu açıklamadan sonra ikinci katmanda verilir. Teknik terim gerekliyse hemen günlük dilde karşılığı açıklanır. Ham Codex çıktısı ana cevap olarak kopyalanmaz; ChatGPT sonucu owner'ın tek okumada anlayacağı dile çevirir. Kısalık, anlaşılabilirliği bozacak kadar bilgi eksiltme gerekçesi değildir.
+SHA, branch, divergence, allowlist, YAML ve benzeri teknik kanıtlar bu açıklamadan sonra ikinci katmanda verilir. Teknik terim gerekliyse hemen günlük dilde karşılığı açıklanır. Ham Execution Agent çıktısı ana cevap olarak kopyalanmaz; ChatGPT sonucu owner'ın tek okumada anlayacağı dile çevirir. Kısalık, anlaşılabilirliği bozacak kadar bilgi eksiltme gerekçesi değildir.
 
 ## 9. Ana karar
 
-> Non-CRITICAL işte göreve özel süre bütçesiyle one-pass teslim, tek focused validation ve yalnız gereken manuel kabul; publication current GitHub ruleset'inin izin verdiği en hafif branch/PR yoluyla yürür. Required gate'ler geçince ChatGPT standing owner yetkisiyle Ready/squash merge'i ve açık `Closes` disposition'ını otomatik yürütür; gerçek veri/release ve destructive işlem riskinde ayrı owner onayıyla tam güvenlik süreci uygulanır. Sıradaki pre-release iş her zaman ROADMAP Q01–Q26 kuyruğundan, current GitHub gerçeğiyle birlikte seçilir.
+> Non-CRITICAL işte göreve özel süre bütçesiyle one-pass teslim, tek focused validation ve yalnız gereken manuel kabul; publication current GitHub ruleset'inin izin verdiği en hafif branch/PR yoluyla yürür. Required gate'ler geçince ChatGPT standing owner yetkisiyle Ready/squash merge'i ve açık `Closes` disposition'ını otomatik yürütür; gerçek veri/release ve destructive işlem riskinde ayrı owner onayıyla tam güvenlik süreci uygulanır. Sıradaki pre-release iş her zaman ROADMAP Q01–Q26 kuyruğundan, current GitHub gerçeğiyle birlikte seçilir. Repository Execution Agent rolü provider-neutral kalır; current provider Claude Code'dan uyumlu bir gelecek provider'a (ör. Codex) geçiş bu belgedeki authority, risk lane, topology, Git ve publication kurallarını değiştirmez.

@@ -5,7 +5,9 @@
 **Durum:** Tracked kanonik ürün kaynağı; dinamik çalışma durumu içermez
 **Kanonik repo yolu:** `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
 
-Bu belge, CHIEF SITE ENGINEER exe projesinin kalıcı ürün yönünü, veri ilkelerini, saha modelini ve tarihsel sözleşmelerini birleştirir. Değişken repository durumu ile GitHub/Codex çalışma kuralları burada kopyalanmaz; `AGENTS.md` ve onun yönlendirdiği güncel protokollerden okunur.
+Bu belge, CHIEF SITE ENGINEER exe projesinin kalıcı ürün yönünü, veri ilkelerini, saha modelini ve tarihsel sözleşmelerini birleştirir. Değişken repository durumu ile GitHub/Execution Agent çalışma kuralları burada kopyalanmaz; `AGENTS.md` ve onun yönlendirdiği güncel protokollerden okunur.
+
+Bu belgedeki **Execution Agent** (Repository Execution Agent), `AGENTS.md`'de tanımlanan provider-neutral repository-local execution rolüdür. Current provider Claude Code'dur (bootstrap: repository root `CLAUDE.md`); Codex uyumlu bir gelecek provider olarak kalır.
 
 Eski belgeler tarihsel ve destekleyici kaynak olarak korunur. Ürün ve veri ilkelerinde bu belge; execution ve current-state konularında `AGENTS.md`, kanonik protokoller ve güncel GitHub kanıtı esas alınır.
 
@@ -34,7 +36,7 @@ Bu kaynak hazırlanırken aşağıdaki proje kaynakları birlikte incelenmiştir
 - Güncel proje talimatı: çalışma ve yönetişim kurallarının temelidir.
 - Chat Handoff paketi: sohbet devri için tarihsel protokol kaynağıdır; içindeki bazı kurallar güncelliğini yitirmiştir.
 - Step 204 talimatı: tamamlanmış bir adıma ait tarihsel uygulama kaydıdır; kalıcı proje talimatı değildir.
-- Bu sohbetin son kararları: Codex çağırma, toplu çalışma ve post-merge senkronizasyon politikasının güncel kaynağıdır.
+- Bu sohbetin son kararları: Execution Agent çağırma, toplu çalışma ve post-merge senkronizasyon politikasının güncel kaynağıdır.
 
 ---
 
@@ -491,7 +493,7 @@ CSE, ürün geliştirmeyi uygulamalı öğrenmeyle açıklar; ancak öğrenme ç
 - Python ve yazılım geliştirme
 - Şantiye şefliği ve saha yönetimi
 - Yapı denetim/EBİS/YDS
-- Git/GitHub/Codex çalışma disiplini
+- Git/GitHub/Execution Agent çalışma disiplini
 
 ### Öğrenme dosyası ilkesi
 
@@ -526,7 +528,7 @@ Sabit adım aralığı, dosya sayısı veya podcast üretim zorunluluğu yoktur.
 | --- | --- |
 | Kalıcı ürün amacı ve veri ilkeleri | Bu belge |
 | Başlangıç ve kaynak sırası | `AGENTS.md` |
-| Git/GitHub/Codex execution kuralları | `CSE_PROJECT_INSTRUCTIONS.md`, `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` |
+| Git/GitHub/Execution Agent execution kuralları | `CSE_PROJECT_INSTRUCTIONS.md`, `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` |
 | Doğrulama sahipliği ve minimum yeterli test | `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` |
 | Değişken repository durumu | Güncel GitHub `master`, Issue, PR, branch ve commit kanıtı |
 | Aktif işin dar kapsamı | Owner'ın güncel yetkisi ve risk şeridi gerektiriyorsa ilgili Issue |
@@ -556,10 +558,10 @@ Sabit yerel yol, SHA, schema, version, aktif Issue veya sıradaki iş bu belgede
 
 - Güncel GitHub durumunu inceler.
 - Uygun risk şeridini ve tek güvenli sonraki adımı belirler.
-- Codex'e dar ve kesin görev verir; her handoff'ta kapsam/risk, beklenen validation/build/device işi ve blocker'a göre açık `Execution time budget: <süre>` atar.
+- Execution Agent'a dar ve kesin görev verir; her handoff'ta kapsam/risk, beklenen validation/build/device işi ve blocker'a göre açık `Execution time budget: <süre>` atar.
 - Kanıtı ve diff'i owner açısından sade biçimde raporlar.
 
-### Codex
+### Execution Agent (current provider: Claude Code)
 
 - Yalnız açıkça yetkilendirilen mikro-adımı uygular.
 - Her görevde ChatGPT'nin handoff'ta açıkça verdiği execution time budget'a uyar.
@@ -569,11 +571,11 @@ Sabit yerel yol, SHA, schema, version, aktif Issue veya sıradaki iş bu belgede
 
 ---
 
-## 18. Codex Çağırma Politikası
+## 18. Execution Agent Çağırma Politikası
 
-Codex yalnız yerel dosya değişikliği, statik kontrol, commit/push veya başka mekanik repository işlemi gerektiğinde çağrılır. Planlama, GitHub incelemesi, ürün kararı ve salt-okunur analiz için yeni Codex turu zorunlu değildir.
+Execution Agent yalnız yerel dosya değişikliği, statik kontrol, commit/push veya başka mekanik repository işlemi gerektiğinde çağrılır. Planlama, GitHub incelemesi, ürün kararı ve salt-okunur analiz için yeni Execution Agent turu zorunlu değildir.
 
-Her Codex handoff'u ChatGPT'nin göreve özel belirlediği açık execution time budget'ı taşır; global sabit süre varsayılanı yoktur. Yetkili inceleme, edit/fix, focused validation ve commit/push bu bütçeye sığıyorsa tek adımda birleştirilir. Bütçe dolduğunda Codex durur, mevcut çalışmayı güvenle korur; kapsam genişletilmez, yeni yaklaşım veya retry zinciri başlatılmaz, exact blocker ve kalan tek aksiyon raporlanır. Süre bütçesi CRITICAL validation ve güvenlik kapılarını değiştirmez.
+Her Execution Agent handoff'u ChatGPT'nin göreve özel belirlediği açık execution time budget'ı taşır; global sabit süre varsayılanı yoktur. Yetkili inceleme, edit/fix, focused validation ve commit/push bu bütçeye sığıyorsa tek adımda birleştirilir. Bütçe dolduğunda Execution Agent durur, mevcut çalışmayı güvenle korur; kapsam genişletilmez, yeni yaklaşım veya retry zinciri başlatılmaz, exact blocker ve kalan tek aksiyon raporlanır. Süre bütçesi CRITICAL validation ve güvenlik kapılarını değiştirmez.
 
 ---
 
@@ -610,7 +612,7 @@ Non-CRITICAL one-pass akışı:
 
 1. Güncel durum ve owner'ın yetkilendirdiği kapsam doğrulanır; handoff'ta açık execution time budget bulunur.
 2. Mevcut doğrudan repro kanıtı kullanılır veya bir kez reproduce edilir; fix/implement yapılır.
-3. Codex statik kapsam kontrolünü ve tek focused automated validation'ı yapar; analyzer yalnız material ihtiyaçta eklenir.
+3. Execution Agent statik kapsam kontrolünü ve tek focused automated validation'ı yapar; analyzer yalnız material ihtiyaçta eklenir.
 4. Manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde yapılır; gereken kabulde Fatih PASS/FAIL kararını verir.
 5. Automated PASS ve gerekiyorsa Fatih PASS sonrası yetkili commit/push aynı execution içinde yapılabilir; kabul gerekmiyorsa manuel PASS beklenmez.
 6. Ready/merge/close yalnız ayrı açık owner yetkisiyle ilerler.
@@ -639,9 +641,9 @@ Beklenmeyen worktree değişikliği kullanıcıya ait kabul edilir ve korunur.
 
 ## 22. Test ve Kalite Kontrol
 
-Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
+Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Execution Agent tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
 
-Codex automated execution yanında şu statik kontrolleri yapar:
+Execution Agent automated execution yanında şu statik kontrolleri yapar:
 
 - dokunulan dosyalarda gerekli format;
 - tam diff ve exact changed-path incelemesi;
@@ -671,7 +673,7 @@ Kayıtlar gerçekleşmemiş işi tamamlanmış gösteremez ve güncel GitHub dur
 ## 24. Branch, PR ve Merge
 
 - Stacked branch/PR oluşturulmaz.
-- FAST iş, Codex automated PASS ve yalnız gerekiyorsa Fatih manuel/device PASS sonrasında doğrudan `master`a commit/push edilebilir.
+- FAST iş, Execution Agent automated PASS ve yalnız gerekiyorsa Fatih manuel/device PASS sonrasında doğrudan `master`a commit/push edilebilir.
 - STANDARD tek bağımsız kısa branch/PR kullanır.
 - CRITICAL Draft PR, review ve provenance kapılarını kullanır.
 - Draft durumu merge yetkisi değildir.
@@ -682,7 +684,7 @@ Kayıtlar gerçekleşmemiş işi tamamlanmış gösteremez ve güncel GitHub dur
 
 ## 25. GitHub Actions ve CI
 
-CI, mevcut olduğu ve çalışabildiği ölçüde ek kanıt sağlar. Codex'in test süresini uzatmak veya owner testini bekletmek için zorunlu çalışma adımı değildir.
+CI, mevcut olduğu ve çalışabildiği ölçüde ek kanıt sağlar. Execution Agent'ın test süresini uzatmak veya owner testini bekletmek için zorunlu çalışma adımı değildir.
 
 CI başarısızlığı görmezden gelinmez; kök neden ayrıştırılmadan Ready/merge yapılmaz. Billing, runner veya platform durumu değişken GitHub bilgisidir ve bu belgede sabitlenmez.
 
@@ -696,7 +698,7 @@ ZIP, source bundle, export veya handoff paketi yalnız owner açıkça istediği
 
 ## 27. Yayınlama ve Saha Testi
 
-Yayın ve gerçek cihaz kabulü owner-led'dir. Codex açık yetki olmadan build, install, ADB, emulator, cihaz veya gerçek veri işlemi yapmaz.
+Yayın ve gerçek cihaz kabulü owner-led'dir. Execution Agent açık yetki olmadan build, install, ADB, emulator, cihaz veya gerçek veri işlemi yapmaz.
 
 Saha testinde sentetik veri, veri koruma, backup/restore, başarısızlıkta durma ve dürüst PASS/PARTIAL/FAIL kaydı esastır. Public/store release veya production readiness yalnız ayrı kanıt ve owner kararıyla ilan edilir.
 
