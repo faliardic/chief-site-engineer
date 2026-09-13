@@ -517,38 +517,58 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
         : snapshot.statusFor(section.source!);
     return Card(
       key: ValueKey('project-information-section-${section.key}'),
-      child: ExpansionTile(
-        initiallyExpanded: section.initiallyExpanded,
-        leading: Icon(section.icon),
-        title: Text(section.title),
-        subtitle: status?.state == ProjectInformationReadState.failed
-            ? const Text('Bu kaynaktaki bilgiler okunamadı.')
-            : section.entries.isEmpty
-            ? Text(section.emptyMessage)
-            : null,
-        trailing: section.addLabel == null
-            ? null
-            : TextButton.icon(
-                key: ValueKey('project-information-add-${section.key}'),
-                onPressed: () => unawaited(_openCreate(section.category!)),
-                icon: const Icon(Icons.add_rounded),
-                label: Text(section.addLabel!),
-              ),
-        children: section.entries.isEmpty
-            ? [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      status?.state == ProjectInformationReadState.failed
-                          ? 'Kayıtlar değiştirilmedi. Daha sonra tekrar deneyin.'
-                          : section.emptyMessage,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compactAdd = constraints.maxWidth < 360;
+          return ExpansionTile(
+            initiallyExpanded: section.initiallyExpanded,
+            leading: Icon(section.icon),
+            title: Text(
+              section.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: status?.state == ProjectInformationReadState.failed
+                ? const Text('Bu kaynaktaki bilgiler okunamadı.')
+                : section.entries.isEmpty
+                ? Text(section.emptyMessage)
+                : null,
+            trailing: section.addLabel == null
+                ? null
+                : compactAdd
+                ? IconButton(
+                    key: ValueKey('project-information-add-${section.key}'),
+                    tooltip: section.addLabel,
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
                     ),
+                    onPressed: () => unawaited(_openCreate(section.category!)),
+                    icon: const Icon(Icons.add_rounded),
+                  )
+                : TextButton.icon(
+                    key: ValueKey('project-information-add-${section.key}'),
+                    onPressed: () => unawaited(_openCreate(section.category!)),
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(section.addLabel!),
                   ),
-                ),
-              ]
-            : [for (final entry in section.entries) _entryTile(entry)],
+            children: section.entries.isEmpty
+                ? [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          status?.state == ProjectInformationReadState.failed
+                              ? 'Kayıtlar değiştirilmedi. Daha sonra tekrar deneyin.'
+                              : section.emptyMessage,
+                        ),
+                      ),
+                    ),
+                  ]
+                : [for (final entry in section.entries) _entryTile(entry)],
+          );
+        },
       ),
     );
   }

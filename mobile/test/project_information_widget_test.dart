@@ -963,6 +963,37 @@ void main() {
 
     expect(find.text('Harita açılamadı.'), findsOneWidget);
   });
+
+  testWidgets(
+    'Konum ve Adres header stays on one line at narrow width and high text scale',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard();
+      source.metadataByProject[_projectA] = _metadata(
+        _projectA,
+        address: 'Merkez Mahallesi 42',
+      );
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(_testApp(source, textScale: 1.3));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Konum ve Adres'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      expect(
+        find.byKey(const ValueKey('project-information-add-address')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('project-information-add-address')),
+          matching: find.byType(Icon),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }
 
 Widget _testApp(
@@ -972,7 +1003,14 @@ Widget _testApp(
   ProjectInformationTextAction? shareText,
   ProjectInformationUriAction? launchUri,
   ProjectInformationMutationApplication? mutations,
+  double textScale = 1,
 }) => MaterialApp(
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(
+      context,
+    ).copyWith(textScaler: TextScaler.linear(textScale)),
+    child: child!,
+  ),
   home: ProjectInformationPage(
     application: ProjectInformationApplication(
       source: source,
