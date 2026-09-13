@@ -764,6 +764,205 @@ void main() {
     expect(mutations.entries.single.value.text, 'SR-42');
     expect(mutations.entries.single.revision, 1);
   });
+
+  testWidgets(
+    'location entry exposes map/share-location actions with expected URI',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard();
+      source.metadataByProject[_projectA] = _metadata(
+        _projectA,
+        address: 'Merkez Mahallesi 42',
+      );
+      final launches = <Uri>[];
+      final shared = <String>[];
+      await tester.pumpWidget(
+        _testApp(
+          source,
+          shareText: (text) async => shared.add(text),
+          launchUri: (uri) async {
+            launches.add(uri);
+            return true;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('project-information-section-address')),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Konum ve Adres'));
+      await tester.pumpAndSettle();
+
+      final mapButton = find.byKey(
+        const ValueKey('project-information-map-address'),
+      );
+      expect(mapButton, findsOneWidget);
+      await tester.tap(mapButton);
+      await tester.pumpAndSettle();
+      expect(launches, hasLength(1));
+      expect(launches.single.host, 'www.google.com');
+      expect(launches.single.queryParameters['query'], 'Merkez Mahallesi 42');
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('project-information-share-location-address'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(shared.single, contains('Merkez Mahallesi 42'));
+      expect(shared.single, contains('www.google.com'));
+    },
+  );
+
+  testWidgets(
+    'structured contact entry exposes call/WhatsApp with sanitized numbers',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard();
+      final mutations = _InformationMutations()
+        ..entries.add(
+          _userEntry(
+            'contact-entry',
+            'Saha sorumlusu',
+            archived: false,
+            category: ProjectInformationCategory.contact,
+            value: const ProjectInformationEntryValue.contact(
+              ProjectInformationContact(
+                name: 'Ahmet Yılmaz',
+                phone: '0532 123 45 67',
+                whatsAppNumber: '+90 532 123 45 67',
+                referenceId: 'internal-record-id-should-not-leak',
+              ),
+            ),
+          ),
+        );
+      final launches = <Uri>[];
+      final copied = <String>[];
+      await tester.pumpWidget(
+        _testApp(
+          source,
+          mutations: mutations,
+          copyText: (text) async => copied.add(text),
+          launchUri: (uri) async {
+            launches.add(uri);
+            return true;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('project-information-section-parties')),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Önemli Kişiler'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('project-information-call-user-contact-entry'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(launches.single.scheme, 'tel');
+      expect(
+        launches.single.path,
+        '0532123456'
+        '7',
+      );
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('project-information-whatsapp-user-contact-entry'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(launches.last.host, 'wa.me');
+      expect(launches.last.path, '/905321234567');
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('project-information-copy-user-contact-entry'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        copied.single,
+        isNot(contains('internal-record-id-should-not-leak')),
+      );
+    },
+  );
+
+  testWidgets('missing or malformed values hide direct actions safely', (
+    tester,
+  ) async {
+    final source = _FakeProjectInformationSource.standard();
+    final mutations = _InformationMutations()
+      ..entries.add(
+        _userEntry(
+          'bad-contact',
+          'Belirsiz kişi',
+          archived: false,
+          category: ProjectInformationCategory.contact,
+          value: const ProjectInformationEntryValue.contact(
+            ProjectInformationContact(name: 'İsim Yok Numara', phone: 'abc'),
+          ),
+        ),
+      );
+    await tester.pumpWidget(_testApp(source, mutations: mutations));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('project-information-map-address')),
+      findsNothing,
+    );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('project-information-section-parties')),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Önemli Kişiler'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('project-information-call-user-bad-contact')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        const ValueKey('project-information-whatsapp-user-bad-contact'),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('failed launch reports safe human-readable feedback', (
+    tester,
+  ) async {
+    final source = _FakeProjectInformationSource.standard();
+    source.metadataByProject[_projectA] = _metadata(
+      _projectA,
+      address: 'Merkez Mahallesi 42',
+    );
+    await tester.pumpWidget(_testApp(source, launchUri: (uri) async => false));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('project-information-section-address')),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Konum ve Adres'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('project-information-map-address')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Harita açılamadı.'), findsOneWidget);
+  });
 }
 
 Widget _testApp(
@@ -771,6 +970,7 @@ Widget _testApp(
   ProjectProfileApplication? profileApplication,
   ProjectInformationTextAction? copyText,
   ProjectInformationTextAction? shareText,
+  ProjectInformationUriAction? launchUri,
   ProjectInformationMutationApplication? mutations,
 }) => MaterialApp(
   home: ProjectInformationPage(
@@ -782,6 +982,7 @@ Widget _testApp(
     profileApplication: profileApplication,
     copyText: copyText,
     shareText: shareText,
+    launchUri: launchUri,
   ),
 );
 
@@ -791,12 +992,15 @@ ProjectInformationEntry _userEntry(
   required bool archived,
   ProjectInformationCategory category =
       ProjectInformationCategory.siteReference,
+  ProjectInformationEntryValue value = const ProjectInformationEntryValue.text(
+    'SR-42',
+  ),
 }) => ProjectInformationEntry(
   id: id,
   projectId: _projectA,
   category: category,
   label: label,
-  value: const ProjectInformationEntryValue.text('SR-42'),
+  value: value,
   revision: 1,
   createdAt: '2026-09-13T09:00:00.000Z',
   updatedAt: '2026-09-13T09:00:00.000Z',
