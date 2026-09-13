@@ -884,6 +884,18 @@ class ReminderDetail {
   final NotificationBinding notification;
 }
 
+class AgendaAttendanceSource {
+  const AgendaAttendanceSource({
+    required this.attendanceDayId,
+    required this.projectId,
+    required this.localDate,
+  });
+
+  final String attendanceDayId;
+  final String projectId;
+  final String localDate;
+}
+
 class AgendaLogDetail {
   const AgendaLogDetail({
     required this.log,
@@ -892,6 +904,7 @@ class AgendaLogDetail {
     this.photos = const [],
     this.events = const [],
     this.managedConcretePourId,
+    this.managedAttendanceSource,
     this.phoneCallContext,
     this.isPhoneCallResult = false,
   });
@@ -902,6 +915,7 @@ class AgendaLogDetail {
   final List<AgendaLogPhoto> photos;
   final List<AppendOnlyEvent> events;
   final String? managedConcretePourId;
+  final AgendaAttendanceSource? managedAttendanceSource;
   final AgendaPhoneCallContext? phoneCallContext;
   final bool isPhoneCallResult;
 }

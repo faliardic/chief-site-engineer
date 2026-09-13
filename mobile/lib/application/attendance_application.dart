@@ -109,6 +109,9 @@ class SqliteAttendanceApplication implements AttendanceApplication {
     MobileOperationCoordinator? coordinator,
     AttendanceExportGateway? exportGateway,
     this.beforeAttendanceEventInsert,
+    this.beforeManagedAgendaBaseInsert,
+    this.beforeManagedAgendaEventInsert,
+    this.beforeManagedAgendaLinkInsert,
   }) : coordinator = coordinator ?? MobileOperationCoordinator(),
        exportGateway =
            exportGateway ?? const UnavailableAttendanceExportGateway();
@@ -120,6 +123,9 @@ class SqliteAttendanceApplication implements AttendanceApplication {
   final MobileOperationCoordinator coordinator;
   final AttendanceExportGateway exportGateway;
   final AttendanceTransactionHook? beforeAttendanceEventInsert;
+  final AttendanceTransactionHook? beforeManagedAgendaBaseInsert;
+  final AttendanceTransactionHook? beforeManagedAgendaEventInsert;
+  final AttendanceTransactionHook? beforeManagedAgendaLinkInsert;
 
   @override
   Future<List<Subcontractor>> listSubcontractors(
@@ -2114,6 +2120,14 @@ class SqliteAttendanceApplication implements AttendanceApplication {
             );
           }
         }
+        await _syncManagedAttendanceAgenda(
+          transaction,
+          day: day,
+          transition: command.transition,
+          acceptedTransitionId: command.dayEventId,
+          resultingRevision: day.revision + 1,
+          occurredAt: timestamp,
+        );
       });
     });
     await _safeReconcileNotifications(
@@ -2684,6 +2698,83 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       'occurred_at': occurredAt,
       'payload_json': jsonEncode(payload),
     });
+  }
+
+  Future<void> _syncManagedAttendanceAgenda(
+    Transaction transaction, {
+    required AttendanceDay day,
+    required AttendanceTransition transition,
+    required String acceptedTransitionId,
+    required int resultingRevision,
+    required String occurredAt,
+  }) async {
+    final links = await transaction.query(
+      'attendance_day_agenda_links',
+      columns: ['project_id', 'agenda_log_id'],
+      where: 'attendance_day_id = ?',
+      whereArgs: [day.id],
+      limit: 1,
+    );
+    String agendaLogId;
+    if (links.isEmpty) {
+      if (transition != AttendanceTransition.complete) return;
+      agendaLogId = _stableUuid('attendance-managed-agenda:${day.id}');
+      await beforeManagedAgendaBaseInsert?.call(transaction);
+      await transaction.insert('field_observations', {
+        'id': agendaLogId,
+        'project_id': day.projectId,
+        'observed_at': occurredAt,
+        'created_at': occurredAt,
+        'updated_at': occurredAt,
+        'category': 'general_note',
+        'description': 'Puantaj gün tamamlama kaydı',
+        'location': null,
+        'location_id': null,
+        'notes': 'Bu kayıt tamamlanan Puantaj gününden otomatik oluşturuldu.',
+        'revision': 1,
+        'archived_at': null,
+      });
+    } else {
+      final link = links.single;
+      if (link['project_id'] != day.projectId) {
+        throw const AgendaValidationFailure(
+          'Puantaj Ajanda bağlantısının proje kapsamı geçersizdir.',
+        );
+      }
+      agendaLogId = link['agenda_log_id']! as String;
+    }
+
+    await beforeManagedAgendaEventInsert?.call(transaction);
+    await transaction.insert('observation_events', {
+      'id': _stableUuid(
+        'attendance-managed-agenda-event:$acceptedTransitionId',
+      ),
+      'observation_id': agendaLogId,
+      'project_id': day.projectId,
+      'event_type': switch (transition) {
+        AttendanceTransition.complete => 'attendance_day.completed',
+        AttendanceTransition.noWork => 'attendance_day.no_work',
+        AttendanceTransition.reopen => 'attendance_day.reopened',
+      },
+      'occurred_at': occurredAt,
+      'payload_json': jsonEncode({
+        'attendance_day_id': day.id,
+        'project_id': day.projectId,
+        'source_local_date': day.localDate,
+        'accepted_transition_id': acceptedTransitionId,
+        'attendance_revision': resultingRevision,
+      }),
+    });
+
+    if (links.isEmpty) {
+      await beforeManagedAgendaLinkInsert?.call(transaction);
+      await transaction.insert('attendance_day_agenda_links', {
+        'attendance_day_id': day.id,
+        'project_id': day.projectId,
+        'agenda_log_id': agendaLogId,
+        'created_at': occurredAt,
+      });
+    }
   }
 
   Future<void> _insertReminderEvent(

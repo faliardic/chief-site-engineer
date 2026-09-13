@@ -1665,6 +1665,49 @@ void main() {
     },
   );
 
+  testWidgets(
+    'attendance-managed Agenda shows source and keeps reminder access',
+    (tester) async {
+      final managed = AgendaLogDetail(
+        log: log(),
+        reminders: const [],
+        managedAttendanceSource: const AgendaAttendanceSource(
+          attendanceDayId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          projectId: projectId,
+          localDate: '2026-07-19',
+        ),
+      );
+      final fake = FakeAgendaApplication(
+        projects: [project()],
+        logs: [log()],
+        logDetail: managed,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LogDetailPage(agenda: fake, logId: logId),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('managed-attendance-agenda')),
+        findsOneWidget,
+      );
+      expect(find.text('Puantaj tarafından yönetiliyor'), findsOneWidget);
+      expect(
+        find.textContaining('Kaynak Puantaj günü: 19.07.2026'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('agenda-concrete-detail-suggestion')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('edit-agenda-log')), findsNothing);
+      expect(find.byKey(const Key('archive-agenda-log')), findsNothing);
+      expect(find.byKey(const Key('detail-reminder-action')), findsOneWidget);
+    },
+  );
+
   testWidgets('Agenda drag fling and direction change do not churn queries', (
     tester,
   ) async {
@@ -2965,6 +3008,7 @@ class _CatalogAgendaFake extends FakeAgendaApplication
       photos: [...current.photos, photo],
       events: current.events,
       managedConcretePourId: current.managedConcretePourId,
+      managedAttendanceSource: current.managedAttendanceSource,
     );
     logs = [updatedLog];
     return logDetail!;
