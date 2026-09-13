@@ -25,7 +25,7 @@ CSE owner-only, local-first ve mobile-first kişisel saha asistanıdır. V1 saha
 
 Frictionless Release Readiness programı Issue #617 ile yürür. UI/UX sözleşmesi, adaptive shell, ortak aktif proje, 48×48 erişilebilirlik tabanı, form/primary-action standardı, temel search/filter/error state altyapısı ve visual-first dönüşümün ana dilimleri merged durumdadır.
 
-Son Inventory refinement zinciri #709/#710 → #711/#712 → #713/#714 tamamlanmış ve owner manuel kabulünden geçmiştir. 6 Eylül owner saha kullanım geri bildirimleriyle İş Gücü/Sicil first-class alanı, Firma → Personel sadeleştirmesi ve Günlük Puantaj yeniden bilgi mimarisi Q04 olarak; Proje Profili genişletmesi Q05 olarak; dar Kroki/interaction refinement istisnası Q06 olarak kanonik kuyruğa alınmıştır. 13 Eylül owner ürün toplantısında Q05, **Ana Sayfa / Proje Hafızası ve Hızlı Proje Bilgileri** yönüyle yeniden kilitlenmiş ve current açık Q13 production gate'leri tamamlandıktan sonraki öncelikli ürün işi olarak belirlenmiştir. DWG Viewer / Issue #523 ilk genel yayın için blocker değildir ve `POST-RELEASE / DEFERRED` kalır.
+Son Inventory refinement zinciri #709/#710 → #711/#712 → #713/#714 tamamlanmış ve owner manuel kabulünden geçmiştir. 6 Eylül owner saha kullanım geri bildirimleriyle İş Gücü/Sicil first-class alanı, Firma → Personel sadeleştirmesi ve Günlük Puantaj yeniden bilgi mimarisi Q04 olarak; Proje Profili genişletmesi Q05 olarak; dar Kroki/interaction refinement istisnası Q06 olarak kanonik kuyruğa alınmıştır. Q13 CRITICAL Puantaj→Ajanda işi PR #795 ile 13 Eylül 2026'da master'a merge edilmiştir. Aynı gün owner ürün toplantısında Q05, **Ana Sayfa / Proje Hafızası ve Hızlı Proje Bilgileri** yönüyle yeniden kilitlenmiş ve sıradaki öncelikli ürün işi olarak belirlenmiştir. DWG Viewer / Issue #523 ilk genel yayın için blocker değildir ve `POST-RELEASE / DEFERRED` kalır.
 
 Değişmeyen teknik baseline değerleri ilgili source/protokol ve current master'dan okunur; bu dosya sabit master SHA tutmaz.
 
@@ -310,7 +310,7 @@ Bitiş tanımı:
 ### Q04 — İş Gücü / Sicil first-class alanı + Firma → Personel + Günlük Puantaj sadeleştirmesi
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimleri — `İş Gücü / Saha Rehberi / Sicil` ve `Puantaj` başlıkları; #617 daily-core ve progressive-disclosure ilkeleri; current `WorkforceDirectoryPage`, `WorkforcePage`, `AttendancePage`, `AttendanceDayPage` baseline'ı.  
-**Durum:** `NEXT`
+**Durum:** `COMPLETE` — current GitHub implementation/review/acceptance chain completed before the Q05 audit and subsequent Q13 work.
 
 Amaç; İş Gücü'nü yalnız Puantaj ön-koşulu veya gizli yardımcı akış olmaktan çıkarıp aktif projenin first-class günlük insan kaynağı alanı haline getirmek, mevcut güçlü Saha Rehberi/Sicil yeteneklerini korumak, ilk kayıt yolunu `Firma → Personel` seviyesine indirmek ve Günlük Puantaj'ı firma/ekip navigasyonu yerine doğrudan personel durum girişi yüzeyi haline getirmektir.
 
@@ -494,9 +494,9 @@ Mevcut değerler edit sırasında korunur; kapalı `Diğer` bölümü existing d
 ### Q05 — Ana Sayfa / Proje Hafızası ve Hızlı Proje Bilgileri
 
 **Kaynak:** 6 Eylül 2026 owner uygulama kullanım geri bildirimi; 13 Eylül 2026 Ana Sayfa / Proje Bilgileri ürün toplantısı  
-**Durum:** `NEXT — OWNER-PRIORITIZED AFTER CURRENT OPEN Q13 PRODUCTION GATES`
+**Durum:** `NEXT — OWNER-PRIORITIZED`
 
-**Owner kararı — 13 Eylül 2026:** Önceki `OWNER-DEFERRED` Dashboard/Profile UI disposition'ı supersede edilmiştir. Mevcut açık Q13 production Issue/PR required review, validation ve owner Acceptance gate'leri her durumda önce tamamlanır. Q13 kapandıktan sonra yeni production iş olarak Q05 başlatılır. Bu karar, daha önce merged #766/#767 proje metadata + party-role ve #768/#769 blok metadata + Floor↔Mahal relation temellerini geri almaz; yalnız Q05'in user-facing bilgi mimarisi, önceliği ve kabul hedefini yeniden kilitler.
+**Owner kararı — 13 Eylül 2026:** Önceki `OWNER-DEFERRED` Dashboard/Profile UI disposition'ı supersede edilmiştir. Q13 CRITICAL Puantaj→Ajanda işi PR #795 ile master'a merge edilip kapandığından Q05 artık sıradaki yeni owner-prioritized ürün işidir. Bu karar, daha önce merged #766/#767 proje metadata + party-role ve #768/#769 blok metadata + Floor↔Mahal relation temellerini geri almaz; yalnız Q05'in user-facing bilgi mimarisi, önceliği ve kabul hedefini yeniden kilitler.
 
 Amaç; Ana Sayfa'yı veri yığınına veya klasik yönetim paneline çevirmeden şantiye şefinin **aktif proje için birkaç saniyede bilgi bulduğu, kopyaladığı, paylaştığı ve aksiyon aldığı proje hafızası + hızlı saha kontrol yüzeyi** haline getirmektir. Ana Sayfa ileride `Bugün / Kritik / Geciken` gibi yaşayan dashboard verilerine alan bırakır; Q05 bu canlı operasyon katmanını yeniden tasarlamaz, onun üstündeki hızlı proje bilgi katmanını kurar.
 
@@ -743,7 +743,7 @@ Owner Acceptance en az şu gerçek cihaz davranışlarını kapsar:
 
 #### Q05 owner-priority geçiş kuralı
 
-13 Eylül 2026 owner kararıyla eski `Q05 owner disposition sonrası ilk multi-feature pilot geçişi` yönü Q05'in yürütme önceliği bakımından supersede edilmiştir. Current açık Q13 production Issue/PR required gate'leri kapanmadan yeni Q05 production child açılmaz. Q13 kapandıktan ve current GitHub gerçeği yeniden doğrulandıktan sonra ilk Q05 child **AP-01 model/persistence audit** olur. Bu karar tamamlanmış tarihsel pilot/Issue/PR kanıtlarını geri almaz ve yeniden çalıştırmaz.
+13 Eylül 2026 owner kararıyla eski `Q05 owner disposition sonrası ilk multi-feature pilot geçişi` yönü Q05'in yürütme önceliği bakımından supersede edilmiştir. Q13 PR #795 master'a merge edilip production işi kapandığından, current GitHub gerçeği yeniden doğrulandıktan sonra sıradaki yeni Q05 child **AP-01 model/persistence audit** olur. Bu karar tamamlanmış tarihsel pilot/Issue/PR kanıtlarını geri almaz ve yeniden çalıştırmaz.
 
 ### Q06 — Envanter / Kroki hedefli interaction refinement
 
@@ -866,8 +866,8 @@ Kısa, skip edilebilir ve değer odaklı: CSE nedir → ilk proje → ana günl�
 
 ### Q13 — Puantaj tamamlanınca Ajanda'ya otomatik kayıt
 
-**Kaynak:** #617 owner decision `Puantaj → Ajanda automatic completion record`  
-**Durum:** `QUEUED — CRITICAL`
+**Kaynak:** #617 owner decision `Puantaj → Ajanda automatic completion record`; Issue #794; PR #795  
+**Durum:** `COMPLETE` — PR #795 master'a merge edildi; Q13 CRITICAL implementation kapandı.
 
 - yalnız kullanıcı Puantaj gününü açıkça tamamladığında;
 - generated Ajanda kaydı exact proje/gün/Puantaj source'una traceable;
