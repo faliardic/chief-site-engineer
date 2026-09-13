@@ -813,6 +813,136 @@ void main() {
     expect(find.text('Pin 2'), findsOneWidget);
     expect(find.text('Pin 1'), findsNothing);
   });
+
+  testWidgets(
+    'Konum/Paylaş/Profil actions use canonical address and launch safely',
+    (tester) async {
+      final project = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Kuzey');
+      final fixture = _Fixture(projects: [project]);
+      addTearDown(fixture.dispose);
+      fixture.source.metadataByProject[project.id] = _metadata(
+        project.id,
+        address: 'İnönü Caddesi 12',
+      );
+      final launches = <Uri>[];
+      final shared = <String>[];
+
+      await tester.pumpWidget(
+        fixture.app(
+          launchUri: (uri) async {
+            launches.add(uri);
+            return true;
+          },
+          shareText: (text) async => shared.add(text),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('dashboard-action-location')));
+      await tester.pumpAndSettle();
+      expect(launches, hasLength(1));
+      expect(launches.single.queryParameters['query'], 'İnönü Caddesi 12');
+
+      await tester.tap(find.byKey(const Key('dashboard-action-share')));
+      await tester.pumpAndSettle();
+      expect(shared.single, contains('Kuzey'));
+      expect(shared.single, contains('İnönü Caddesi 12'));
+
+      await tester.tap(find.byKey(const Key('dashboard-action-profile')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('project-profile-editor')), findsOneWidget);
+    },
+  );
+
+  testWidgets('missing address disables Konum without inventing a value', (
+    tester,
+  ) async {
+    final project = _project('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Güney');
+    final fixture = _Fixture(projects: [project]);
+    addTearDown(fixture.dispose);
+
+    await tester.pumpWidget(fixture.app());
+    await tester.pumpAndSettle();
+
+    final locationButton = tester.widget<InkWell>(
+      find.byKey(const Key('dashboard-action-location')),
+    );
+    expect(locationButton.onTap, isNull);
+  });
+
+  testWidgets('failed map launch reports safe feedback without mutation', (
+    tester,
+  ) async {
+    final project = _project('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'Doğu');
+    final fixture = _Fixture(projects: [project]);
+    addTearDown(fixture.dispose);
+    fixture.source.metadataByProject[project.id] = _metadata(
+      project.id,
+      address: 'Sahil Yolu 5',
+    );
+
+    await tester.pumpWidget(fixture.app(launchUri: (uri) async => false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('dashboard-action-location')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Harita açılamadı.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'project switch clears quick actions before enabling new project',
+    (tester) async {
+      final first = _project('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'Kuzey');
+      final second = _project('ffffffff-ffff-4fff-8fff-ffffffffffff', 'Güney');
+      final fixture = _Fixture(projects: [first, second]);
+      addTearDown(fixture.dispose);
+      fixture.source.metadataByProject[first.id] = _metadata(
+        first.id,
+        address: 'Kuzey Adresi',
+      );
+      final launches = <Uri>[];
+
+      await tester.pumpWidget(
+        fixture.app(
+          launchUri: (uri) async {
+            launches.add(uri);
+            return true;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      fixture.session.select(second.id, [first, second]);
+      await tester.pumpAndSettle();
+
+      final locationButton = tester.widget<InkWell>(
+        find.byKey(const Key('dashboard-action-location')),
+      );
+      expect(locationButton.onTap, isNull);
+      expect(launches, isEmpty);
+    },
+  );
+
+  testWidgets('quick actions fit 320px width without overflow', (tester) async {
+    final project = _project('99999999-9999-4999-8999-999999999999', 'Kuzey');
+    final fixture = _Fixture(projects: [project]);
+    addTearDown(fixture.dispose);
+    fixture.source.metadataByProject[project.id] = _metadata(
+      project.id,
+      address: 'İnönü Caddesi 12',
+    );
+    tester.view.physicalSize = const Size(320, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(fixture.app(textScale: 1.3));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('dashboard-action-location')), findsOneWidget);
+    expect(find.byKey(const Key('dashboard-action-share')), findsOneWidget);
+    expect(find.byKey(const Key('dashboard-action-profile')), findsOneWidget);
+  });
 }
 
 ProjectInformationEntry _dashboardUserEntry(String projectId, int index) =>
@@ -897,6 +1027,8 @@ class _Fixture {
     DashboardProjectAction? onOpenProjectAlbum,
     DashboardProjectAction? onOpenCatalog,
     DashboardProjectAction? onOpenProjectInformation,
+    DashboardTextAction? shareText,
+    DashboardUriAction? launchUri,
     double textScale = 1,
   }) => MaterialApp(
     builder: (context, child) => MediaQuery(
@@ -922,6 +1054,8 @@ class _Fixture {
         onOpenProjectAlbum: onOpenProjectAlbum,
         onOpenCatalog: onOpenCatalog,
         onOpenProjectInformation: onOpenProjectInformation,
+        shareText: shareText,
+        launchUri: launchUri,
         clock: () => DateTime.utc(2026, 9, 4, 9),
       ),
     ),

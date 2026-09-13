@@ -12,6 +12,11 @@ import 'package:chief_site_engineer/domain/project_information_models.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart' as url_launcher_pkg;
+
+typedef DashboardTextAction = Future<void> Function(String text);
+typedef DashboardUriAction = Future<bool> Function(Uri uri);
 
 typedef DashboardCaptureAction =
     Future<bool> Function(String projectId, String localDay);
@@ -39,11 +44,15 @@ class ProjectDashboardPage extends StatefulWidget {
     this.onOpenCatalog,
     this.onOpenProjectInformation,
     this.onFirstSuccessfulProjectRead,
+    this.shareText,
+    this.launchUri,
     DateTime Function()? clock,
     super.key,
   }) : clock = clock ?? _systemUtcClock;
 
   final AgendaApplication agenda;
+  final DashboardTextAction? shareText;
+  final DashboardUriAction? launchUri;
   final ProjectInformationApplication? projectInformation;
   final DailyLogApplicationPort? dailyLog;
   final ConstructionLivingPlanApplicationPort livingPlan;
@@ -88,6 +97,57 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   bool _mutating = false;
   bool _reportedFirstSuccessfulProjectRead = false;
   EdgeDraggingAutoScroller? _fieldAutoScroller;
+  BuildContext? _profileEditorContext;
+
+  String? _canonicalAddress(MobileProject project) {
+    final info = _information;
+    if (info == null || info.projectId != project.id) return null;
+    final value = info.metadata?.address?.trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  Future<void> _openLocation(MobileProject project) async {
+    final address = _canonicalAddress(project);
+    if (address == null) return;
+    final uri = Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': address,
+    });
+    var ok = false;
+    try {
+      ok = await (widget.launchUri ?? _defaultLaunchUri)(uri);
+    } on Object {
+      ok = false;
+    }
+    if (!mounted || ok) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Harita açılamadı.')));
+  }
+
+  Future<void> _shareProject(MobileProject project) async {
+    final address = _canonicalAddress(project);
+    final text = address == null ? project.name : '${project.name}\n$address';
+    try {
+      await (widget.shareText ?? _defaultShareText)(text);
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Proje paylaşılamadı.')));
+    }
+  }
+
+  void _focusProfile() {
+    final editorContext = _profileEditorContext;
+    if (editorContext == null || !editorContext.mounted) return;
+    unawaited(
+      Scrollable.ensureVisible(
+        editorContext,
+        duration: const Duration(milliseconds: 200),
+      ),
+    );
+  }
 
   ProjectProfileApplication? get _profileApplication =>
       widget.agenda is ProjectProfileApplication
@@ -775,56 +835,98 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           key: const Key('project-profile-header'),
           child: Padding(
             padding: const EdgeInsets.all(8),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: _mutating || _projectLifecycle == null
-                        ? null
-                        : () => unawaited(_editProjectName(project)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Aktif Proje',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelLarge,
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: _mutating || _projectLifecycle == null
+                            ? null
+                            : () => unawaited(_editProjectName(project)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Aktif Proje',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.labelLarge,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                project.name,
+                                key: const Key('project-profile-name'),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            project.name,
-                            key: const Key('project-profile-name'),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                    IconButton(
+                      key: const Key('project-profile-create-project'),
+                      tooltip: 'Yeni Proje',
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
+                      ),
+                      onPressed: widget.onCreateProject,
+                      icon: const Icon(Icons.add_business_rounded),
+                    ),
+                    IconButton(
+                      key: const Key('project-profile-tools'),
+                      tooltip: 'Araçlar',
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
+                      ),
+                      onPressed: () => _openTools(project),
+                      icon: const Icon(Icons.widgets_outlined),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  key: const Key('project-profile-create-project'),
-                  tooltip: 'Yeni Proje',
-                  constraints: const BoxConstraints(
-                    minWidth: 48,
-                    minHeight: 48,
-                  ),
-                  onPressed: widget.onCreateProject,
-                  icon: const Icon(Icons.add_business_rounded),
-                ),
-                IconButton(
-                  key: const Key('project-profile-tools'),
-                  tooltip: 'Araçlar',
-                  constraints: const BoxConstraints(
-                    minWidth: 48,
-                    minHeight: 48,
-                  ),
-                  onPressed: () => _openTools(project),
-                  icon: const Icon(Icons.widgets_outlined),
+                const Divider(height: 16),
+                Wrap(
+                  alignment: WrapAlignment.spaceEvenly,
+                  children: [
+                    _quickAction(
+                      key: const Key('dashboard-action-location'),
+                      icon: Icons.map_outlined,
+                      label: 'Konum',
+                      onPressed: _canonicalAddress(project) == null
+                          ? null
+                          : () => unawaited(_openLocation(project)),
+                    ),
+                    _quickAction(
+                      key: const Key('dashboard-action-share'),
+                      icon: Icons.share_outlined,
+                      label: 'Paylaş',
+                      onPressed: () => unawaited(_shareProject(project)),
+                    ),
+                    _quickAction(
+                      key: const Key('dashboard-action-profile'),
+                      icon: Icons.badge_outlined,
+                      label: 'Profil',
+                      onPressed:
+                          _profileApplication != null &&
+                              _informationStatus == _LoadStatus.ready &&
+                              _information?.projectId == project.id &&
+                              _information!
+                                      .statusFor(
+                                        ProjectInformationSource.profile,
+                                      )
+                                      .state !=
+                                  ProjectInformationReadState.failed
+                          ? _focusProfile
+                          : null,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -866,6 +968,55 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     );
   }
 
+  Widget _quickAction({
+    required Key key,
+    required IconData icon,
+    required String label,
+    required VoidCallback? onPressed,
+  }) => SizedBox(
+    width: 96,
+    child: InkWell(
+      key: key,
+      onTap: onPressed,
+      customBorder: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+      ),
+      child: Semantics(
+        button: true,
+        label: label,
+        enabled: onPressed != null,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  color: onPressed == null
+                      ? Theme.of(context).disabledColor
+                      : Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: onPressed == null
+                        ? Theme.of(context).disabledColor
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
   Widget _buildProfileEditor(
     MobileProject project,
     ProjectInformationSnapshot snapshot,
@@ -873,73 +1024,82 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     final fields = snapshot.profileFields
         .where((field) => !field.isArchived)
         .toList(growable: false);
-    return Card(
-      key: const Key('project-profile-editor'),
-      child: ExpansionTile(
-        leading: const Icon(Icons.edit_note_rounded),
-        title: const Text('Profil alanlarını düzenle'),
-        subtitle: const Text('Mevcut alanları düzenle, ekle veya sırala'),
-        childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 520 ? 3 : 2;
-              final width =
-                  (constraints.maxWidth - (columns - 1) * 8) / columns;
-              final height = 64 + MediaQuery.textScalerOf(context).scale(52);
-              return Wrap(
-                key: const Key('project-profile-fields'),
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (var index = 0; index < fields.length; index++)
-                    SizedBox(
-                      key: ValueKey(
-                        'project-profile-field-${fields[index].id}',
-                      ),
-                      width: width,
-                      height: height,
-                      child: _buildFieldCell(
-                        project,
-                        fields,
-                        index,
-                        width,
-                        height,
-                      ),
-                    ),
-                  SizedBox(
-                    width: width,
-                    height: height,
-                    child: Tooltip(
-                      message: 'Özel alan ekle',
-                      child: OutlinedButton(
-                        key: const Key('project-profile-add-field'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.all(8),
+    return Builder(
+      builder: (context) {
+        _profileEditorContext = context;
+        return Card(
+          key: const Key('project-profile-editor-card'),
+          child: ExpansionTile(
+            key: const Key('project-profile-editor'),
+            leading: const Icon(Icons.edit_note_rounded),
+            title: const Text('Profil alanlarını düzenle'),
+            subtitle: const Text('Mevcut alanları düzenle, ekle veya sırala'),
+            childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 520 ? 3 : 2;
+                  final width =
+                      (constraints.maxWidth - (columns - 1) * 8) / columns;
+                  final height =
+                      64 + MediaQuery.textScalerOf(context).scale(52);
+                  return Wrap(
+                    key: const Key('project-profile-fields'),
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (var index = 0; index < fields.length; index++)
+                        SizedBox(
+                          key: ValueKey(
+                            'project-profile-field-${fields[index].id}',
+                          ),
+                          width: width,
+                          height: height,
+                          child: _buildFieldCell(
+                            project,
+                            fields,
+                            index,
+                            width,
+                            height,
+                          ),
                         ),
-                        onPressed: _mutating ? null : () => _addField(project),
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add_rounded),
-                            SizedBox(height: 4),
-                            Text(
-                              'Özel alan ekle',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
+                      SizedBox(
+                        width: width,
+                        height: height,
+                        child: Tooltip(
+                          message: 'Özel alan ekle',
+                          child: OutlinedButton(
+                            key: const Key('project-profile-add-field'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.all(8),
                             ),
-                          ],
+                            onPressed: _mutating
+                                ? null
+                                : () => _addField(project),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_rounded),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Özel alan ekle',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ],
-              );
-            },
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1471,5 +1631,16 @@ class _ProjectStateSurface extends StatelessWidget {
         ],
       ),
     ),
+  );
+}
+
+Future<bool> _defaultLaunchUri(Uri uri) => url_launcher_pkg.launchUrl(
+  uri,
+  mode: url_launcher_pkg.LaunchMode.externalApplication,
+);
+
+Future<void> _defaultShareText(String text) async {
+  await SharePlus.instance.share(
+    ShareParams(title: 'Proje bilgisi', subject: 'Proje bilgisi', text: text),
   );
 }
