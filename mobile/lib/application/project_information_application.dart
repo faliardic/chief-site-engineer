@@ -3,11 +3,16 @@ import 'dart:convert';
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/application/inventory_application.dart';
+import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
+import 'package:chief_site_engineer/core/record_id.dart';
+import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/domain/project_information_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
+import 'package:chief_site_engineer/storage/app_database.dart';
+import 'package:sqflite/sqflite.dart';
 
 abstract interface class ProjectInformationReadSource {
   Future<MobileProject> getProject(String projectId);
@@ -139,12 +144,49 @@ class CanonicalProjectInformationReadSource
 }
 
 class ProjectInformationApplication {
-  const ProjectInformationApplication({required this.source});
+  const ProjectInformationApplication({required this.source, this.mutations});
 
   final ProjectInformationReadSource source;
+  final ProjectInformationMutationApplication? mutations;
 
   ProjectInformationSession createSession() =>
       ProjectInformationSession._(this);
+
+  ProjectInformationMutationApplication get _mutations =>
+      mutations ??
+      (throw const ProjectInformationFailure('mutation_store_unavailable'));
+
+  Future<List<ProjectInformationEntry>> listUserEntries(
+    String projectId, {
+    ProjectInformationArchiveFilter archiveFilter =
+        ProjectInformationArchiveFilter.active,
+  }) => _mutations.listUserEntries(projectId, archiveFilter: archiveFilter);
+
+  Future<ProjectInformationEntry> createUserEntry(
+    CreateProjectInformationEntryCommand command,
+  ) => _mutations.createUserEntry(command);
+
+  Future<ProjectInformationEntry> updateUserEntry(
+    UpdateProjectInformationEntryCommand command,
+  ) => _mutations.updateUserEntry(command);
+
+  Future<ProjectInformationEntry> setUserEntryArchived(
+    SetProjectInformationEntryArchiveCommand command,
+  ) => _mutations.setUserEntryArchived(command);
+
+  Future<List<ProjectInformationPin>> listPins(String projectId) =>
+      _mutations.listPins(projectId);
+
+  Future<ProjectInformationPin> setPin(
+    SetProjectInformationPinCommand command,
+  ) => _mutations.setPin(command);
+
+  Future<List<ProjectInformationPin>> reorderPins(
+    ReorderProjectInformationPinsCommand command,
+  ) => _mutations.reorderPins(command);
+
+  Future<void> removePin(RemoveProjectInformationPinCommand command) =>
+      _mutations.removePin(command);
 
   Future<ProjectInformationLoadResult> _loadProject({
     required String projectId,
@@ -1092,3 +1134,862 @@ int _compareText(String left, String right) {
   final folded = left.toLowerCase().compareTo(right.toLowerCase());
   return folded != 0 ? folded : left.compareTo(right);
 }
+
+abstract interface class ProjectInformationMutationApplication {
+  Future<List<ProjectInformationEntry>> listUserEntries(
+    String projectId, {
+    ProjectInformationArchiveFilter archiveFilter,
+  });
+  Future<ProjectInformationEntry> createUserEntry(
+    CreateProjectInformationEntryCommand command,
+  );
+  Future<ProjectInformationEntry> updateUserEntry(
+    UpdateProjectInformationEntryCommand command,
+  );
+  Future<ProjectInformationEntry> setUserEntryArchived(
+    SetProjectInformationEntryArchiveCommand command,
+  );
+  Future<List<ProjectInformationPin>> listPins(String projectId);
+  Future<ProjectInformationPin> setPin(SetProjectInformationPinCommand command);
+  Future<List<ProjectInformationPin>> reorderPins(
+    ReorderProjectInformationPinsCommand command,
+  );
+  Future<void> removePin(RemoveProjectInformationPinCommand command);
+}
+
+class SqliteProjectInformationMutationApplication
+    implements ProjectInformationMutationApplication {
+  SqliteProjectInformationMutationApplication({
+    required this.databasePath,
+    required this.databaseFactory,
+    required this.clock,
+    MobileOperationCoordinator? coordinator,
+  }) : coordinator = coordinator ?? MobileOperationCoordinator();
+
+  final String databasePath;
+  final DatabaseFactory databaseFactory;
+  final UtcClock clock;
+  final MobileOperationCoordinator coordinator;
+
+  @override
+  Future<List<ProjectInformationEntry>> listUserEntries(
+    String projectId, {
+    ProjectInformationArchiveFilter archiveFilter =
+        ProjectInformationArchiveFilter.active,
+  }) {
+    _requireUuid(projectId, 'invalid_project_id');
+    return _withDatabase((database, _) async {
+      final archiveClause = switch (archiveFilter) {
+        ProjectInformationArchiveFilter.active => 'archived_at IS NULL',
+        ProjectInformationArchiveFilter.archived => 'archived_at IS NOT NULL',
+        ProjectInformationArchiveFilter.all => '1 = 1',
+      };
+      final rows = await database.query(
+        'project_information_entries',
+        where: 'project_id = ? AND $archiveClause',
+        whereArgs: [projectId],
+        orderBy: 'category ASC, label COLLATE NOCASE ASC, id ASC',
+      );
+      return rows.map(_entryFromRow).toList(growable: false);
+    });
+  }
+
+  @override
+  Future<ProjectInformationEntry> createUserEntry(
+    CreateProjectInformationEntryCommand command,
+  ) {
+    _requireUuid(command.id, 'invalid_entry_id');
+    _requireUuid(command.eventId, 'invalid_event_id');
+    _requireUuid(command.projectId, 'invalid_project_id');
+    final values = _validatedEntryValues(
+      category: command.category,
+      label: command.label,
+      value: command.value,
+      unit: command.unit,
+      note: command.note,
+    );
+    return _withDatabase(
+      (database, timestamp) => database.transaction((transaction) async {
+        await _requireActiveProject(transaction, command.projectId);
+        await _validateContactReference(transaction, command.projectId, values);
+        try {
+          await transaction.insert('project_information_entries', {
+            'id': command.id,
+            'project_id': command.projectId,
+            ...values,
+            'revision': 1,
+            'created_at': timestamp,
+            'updated_at': timestamp,
+          });
+          await _insertEntryEvent(
+            transaction,
+            id: command.eventId,
+            entryId: command.id,
+            projectId: command.projectId,
+            sequence: 1,
+            eventType: 'entry.created',
+            occurredAt: timestamp,
+          );
+        } on DatabaseException catch (error) {
+          throw ProjectInformationFailure(
+            error.isUniqueConstraintError()
+                ? 'duplicate_identity'
+                : 'constraint_violation',
+          );
+        }
+        return _loadEntry(transaction, command.projectId, command.id);
+      }),
+    );
+  }
+
+  @override
+  Future<ProjectInformationEntry> updateUserEntry(
+    UpdateProjectInformationEntryCommand command,
+  ) {
+    _requireUuid(command.id, 'invalid_entry_id');
+    _requireUuid(command.eventId, 'invalid_event_id');
+    _requireUuid(command.projectId, 'invalid_project_id');
+    if (command.expectedRevision < 1) {
+      throw const ProjectInformationFailure('invalid_expected_revision');
+    }
+    final values = _validatedEntryValues(
+      category: command.category,
+      label: command.label,
+      value: command.value,
+      unit: command.unit,
+      note: command.note,
+    );
+    return _withDatabase(
+      (database, timestamp) => database.transaction((transaction) async {
+        final current = await _loadEntry(
+          transaction,
+          command.projectId,
+          command.id,
+        );
+        if (current.revision != command.expectedRevision) {
+          throw const ProjectInformationRevisionConflict();
+        }
+        if (current.category != command.category ||
+            current.value.kind != command.value.kind) {
+          throw const ProjectInformationFailure('entry_semantics_immutable');
+        }
+        await _validateContactReference(transaction, command.projectId, values);
+        final changed = await transaction.update(
+          'project_information_entries',
+          {
+            ...values,
+            'revision': current.revision + 1,
+            'updated_at': timestamp,
+          },
+          where: 'id = ? AND project_id = ? AND revision = ?',
+          whereArgs: [command.id, command.projectId, command.expectedRevision],
+        );
+        if (changed != 1) throw const ProjectInformationRevisionConflict();
+        await _insertEntryEvent(
+          transaction,
+          id: command.eventId,
+          entryId: command.id,
+          projectId: command.projectId,
+          sequence: current.revision + 1,
+          eventType: 'entry.updated',
+          occurredAt: timestamp,
+        );
+        return _loadEntry(transaction, command.projectId, command.id);
+      }),
+    );
+  }
+
+  @override
+  Future<ProjectInformationEntry> setUserEntryArchived(
+    SetProjectInformationEntryArchiveCommand command,
+  ) {
+    _requireUuid(command.id, 'invalid_entry_id');
+    _requireUuid(command.eventId, 'invalid_event_id');
+    _requireUuid(command.projectId, 'invalid_project_id');
+    return _withDatabase(
+      (database, timestamp) => database.transaction((transaction) async {
+        final current = await _loadEntry(
+          transaction,
+          command.projectId,
+          command.id,
+        );
+        if (current.revision != command.expectedRevision) {
+          throw const ProjectInformationRevisionConflict();
+        }
+        if (current.isArchived == command.archived) return current;
+        await transaction.update(
+          'project_information_entries',
+          {
+            'revision': current.revision + 1,
+            'updated_at': timestamp,
+            'archived_at': command.archived ? timestamp : null,
+          },
+          where: 'id = ? AND project_id = ? AND revision = ?',
+          whereArgs: [command.id, command.projectId, command.expectedRevision],
+        );
+        await _insertEntryEvent(
+          transaction,
+          id: command.eventId,
+          entryId: command.id,
+          projectId: command.projectId,
+          sequence: current.revision + 1,
+          eventType: command.archived ? 'entry.archived' : 'entry.restored',
+          occurredAt: timestamp,
+        );
+        return _loadEntry(transaction, command.projectId, command.id);
+      }),
+    );
+  }
+
+  @override
+  Future<List<ProjectInformationPin>> listPins(String projectId) {
+    _requireUuid(projectId, 'invalid_project_id');
+    return _withDatabase((database, _) async {
+      final rows = await database.query(
+        'project_information_pins',
+        where: 'project_id = ? AND archived_at IS NULL',
+        whereArgs: [projectId],
+        orderBy: 'sort_order ASC, id ASC',
+      );
+      final result = <ProjectInformationPin>[];
+      for (final row in rows) {
+        result.add(
+          _pinFromRow(
+            row,
+            await _sourceAvailable(
+              database,
+              projectId,
+              row['source_space']! as String,
+              row['source_id']! as String,
+            ),
+          ),
+        );
+      }
+      return List.unmodifiable(result);
+    });
+  }
+
+  @override
+  Future<ProjectInformationPin> setPin(
+    SetProjectInformationPinCommand command,
+  ) {
+    _requireUuid(command.id, 'invalid_pin_id');
+    _requireUuid(command.eventId, 'invalid_event_id');
+    _requireUuid(command.projectId, 'invalid_project_id');
+    final sourceId = _required(command.key.id, 'invalid_source_id', 240);
+    final sourceSpace = _keySpaceToDb(command.key.space);
+    return _withDatabase(
+      (database, timestamp) => database.transaction((transaction) async {
+        await _requireActiveProject(transaction, command.projectId);
+        if (!await _sourceAvailable(
+          transaction,
+          command.projectId,
+          sourceSpace,
+          sourceId,
+        )) {
+          throw const ProjectInformationFailure('pin_source_unavailable');
+        }
+        final matches = await transaction.query(
+          'project_information_pins',
+          where: 'project_id = ? AND source_space = ? AND source_id = ?',
+          whereArgs: [command.projectId, sourceSpace, sourceId],
+          orderBy: 'created_at ASC, id ASC',
+        );
+        final active = matches
+            .where((row) => row['archived_at'] == null)
+            .toList();
+        if (active.isNotEmpty) {
+          if (active.single['id'] != command.id) {
+            throw const ProjectInformationFailure('duplicate_active_pin');
+          }
+          return _pinFromRow(active.single, true);
+        }
+        if (matches.isNotEmpty) {
+          final row = matches.last;
+          if (row['id'] != command.id) {
+            throw const ProjectInformationFailure('pin_identity_mismatch');
+          }
+          final revision = row['revision']! as int;
+          final nextOrder = await _nextPinOrder(transaction, command.projectId);
+          await transaction.update(
+            'project_information_pins',
+            {
+              'sort_order': nextOrder,
+              'revision': revision + 1,
+              'updated_at': timestamp,
+              'archived_at': null,
+            },
+            where: 'id = ? AND project_id = ? AND revision = ?',
+            whereArgs: [command.id, command.projectId, revision],
+          );
+          await _insertPinEvent(
+            transaction,
+            '${command.eventId}:${command.id}',
+            command.id,
+            command.projectId,
+            revision + 1,
+            'pin.restored',
+            timestamp,
+          );
+        } else {
+          await transaction.insert('project_information_pins', {
+            'id': command.id,
+            'project_id': command.projectId,
+            'source_space': sourceSpace,
+            'source_id': sourceId,
+            'sort_order': await _nextPinOrder(transaction, command.projectId),
+            'revision': 1,
+            'created_at': timestamp,
+            'updated_at': timestamp,
+          });
+          await _insertPinEvent(
+            transaction,
+            command.eventId,
+            command.id,
+            command.projectId,
+            1,
+            'pin.created',
+            timestamp,
+          );
+        }
+        final row = (await transaction.query(
+          'project_information_pins',
+          where: 'id = ? AND project_id = ?',
+          whereArgs: [command.id, command.projectId],
+          limit: 1,
+        )).single;
+        return _pinFromRow(row, true);
+      }),
+    );
+  }
+
+  @override
+  Future<List<ProjectInformationPin>> reorderPins(
+    ReorderProjectInformationPinsCommand command,
+  ) {
+    _requireUuid(command.eventId, 'invalid_event_id');
+    _requireUuid(command.projectId, 'invalid_project_id');
+    return _withDatabase(
+      (database, timestamp) => database.transaction((transaction) async {
+        final rows = await transaction.query(
+          'project_information_pins',
+          where: 'project_id = ? AND archived_at IS NULL',
+          whereArgs: [command.projectId],
+          orderBy: 'sort_order ASC, id ASC',
+        );
+        final ids = rows.map((row) => row['id']! as String).toSet();
+        if (command.orderedPinIds.length != ids.length ||
+            command.orderedPinIds.toSet().length != ids.length ||
+            !command.orderedPinIds.toSet().containsAll(ids)) {
+          throw const ProjectInformationFailure(
+            'pin_order_must_cover_active_set',
+          );
+        }
+        if (command.expectedRevisions.keys.toSet().length != ids.length ||
+            !command.expectedRevisions.keys.toSet().containsAll(ids)) {
+          throw const ProjectInformationFailure('pin_revision_set_mismatch');
+        }
+        final byId = {for (final row in rows) row['id']! as String: row};
+        for (var index = 0; index < command.orderedPinIds.length; index++) {
+          final id = command.orderedPinIds[index];
+          final row = byId[id]!;
+          final revision = row['revision']! as int;
+          if (command.expectedRevisions[id] != revision) {
+            throw const ProjectInformationRevisionConflict();
+          }
+          if (row['sort_order'] == index) continue;
+          final changed = await transaction.update(
+            'project_information_pins',
+            {
+              'sort_order': index,
+              'revision': revision + 1,
+              'updated_at': timestamp,
+            },
+            where: 'id = ? AND project_id = ? AND revision = ?',
+            whereArgs: [id, command.projectId, revision],
+          );
+          if (changed != 1) throw const ProjectInformationRevisionConflict();
+          await _insertPinEvent(
+            transaction,
+            '${command.eventId}:$id',
+            id,
+            command.projectId,
+            revision + 1,
+            'pin.reordered',
+            timestamp,
+          );
+        }
+        return listPinsInTransaction(transaction, command.projectId);
+      }),
+    );
+  }
+
+  @override
+  Future<void> removePin(RemoveProjectInformationPinCommand command) {
+    _requireUuid(command.id, 'invalid_pin_id');
+    _requireUuid(command.eventId, 'invalid_event_id');
+    _requireUuid(command.projectId, 'invalid_project_id');
+    return _withDatabase(
+      (database, timestamp) => database.transaction((transaction) async {
+        final rows = await transaction.query(
+          'project_information_pins',
+          where: 'id = ? AND project_id = ? AND archived_at IS NULL',
+          whereArgs: [command.id, command.projectId],
+          limit: 1,
+        );
+        if (rows.isEmpty) {
+          throw const ProjectInformationFailure('pin_not_found');
+        }
+        final revision = rows.single['revision']! as int;
+        if (revision != command.expectedRevision) {
+          throw const ProjectInformationRevisionConflict();
+        }
+        final changed = await transaction.update(
+          'project_information_pins',
+          {
+            'revision': revision + 1,
+            'updated_at': timestamp,
+            'archived_at': timestamp,
+          },
+          where: 'id = ? AND project_id = ? AND revision = ?',
+          whereArgs: [command.id, command.projectId, revision],
+        );
+        if (changed != 1) throw const ProjectInformationRevisionConflict();
+        await _insertPinEvent(
+          transaction,
+          command.eventId,
+          command.id,
+          command.projectId,
+          revision + 1,
+          'pin.removed',
+          timestamp,
+        );
+      }),
+    );
+  }
+
+  Future<List<ProjectInformationPin>> listPinsInTransaction(
+    DatabaseExecutor database,
+    String projectId,
+  ) async {
+    final rows = await database.query(
+      'project_information_pins',
+      where: 'project_id = ? AND archived_at IS NULL',
+      whereArgs: [projectId],
+      orderBy: 'sort_order ASC, id ASC',
+    );
+    final result = <ProjectInformationPin>[];
+    for (final row in rows) {
+      result.add(
+        _pinFromRow(
+          row,
+          await _sourceAvailable(
+            database,
+            projectId,
+            row['source_space']! as String,
+            row['source_id']! as String,
+          ),
+        ),
+      );
+    }
+    return List.unmodifiable(result);
+  }
+
+  Future<T> _withDatabase<T>(
+    Future<T> Function(Database database, String timestamp) action,
+  ) {
+    final operationTime = clock();
+    final encoded = CseTimeCodec.encodeUtc(operationTime);
+    final fixedTime = CseTimeCodec.decodeCanonicalUtc(encoded);
+    return coordinator.run(() async {
+      final appDatabase = AppDatabase(
+        path: databasePath,
+        factory: databaseFactory,
+        clock: () => fixedTime,
+      );
+      try {
+        await appDatabase.open();
+        return await action(appDatabase.database, encoded);
+      } finally {
+        await appDatabase.close();
+      }
+    });
+  }
+}
+
+void _requireUuid(String value, String code) {
+  if (!RecordId.isUuid(value)) throw ProjectInformationFailure(code);
+}
+
+String _required(String value, String code, int maxLength) {
+  final normalized = value.trim();
+  if (normalized.isEmpty || normalized.length > maxLength) {
+    throw ProjectInformationFailure(code);
+  }
+  return normalized;
+}
+
+String? _optional(String? value, String code, int maxLength) {
+  if (value == null || value.trim().isEmpty) return null;
+  return _required(value, code, maxLength);
+}
+
+Map<String, Object?> _validatedEntryValues({
+  required ProjectInformationCategory category,
+  required String label,
+  required ProjectInformationEntryValue value,
+  required String? unit,
+  required String? note,
+}) {
+  if ((category == ProjectInformationCategory.contact) !=
+      (value.kind == ProjectInformationValueKind.contact)) {
+    throw const ProjectInformationFailure('contact_category_kind_mismatch');
+  }
+  if (value.kind == ProjectInformationValueKind.contact &&
+      note != null &&
+      note.trim().isNotEmpty) {
+    throw const ProjectInformationFailure('contact_note_must_be_structured');
+  }
+  final result = <String, Object?>{
+    'category': _categoryToDb(category),
+    'semantic_kind': _kindToDb(value.kind),
+    'label': _required(label, 'invalid_label', 160),
+    'unit': value.kind == ProjectInformationValueKind.number
+        ? _optional(unit, 'invalid_unit', 40)
+        : null,
+    'note': value.kind == ProjectInformationValueKind.contact
+        ? null
+        : _optional(note, 'invalid_note', 4000),
+  };
+  if (unit != null && value.kind != ProjectInformationValueKind.number) {
+    throw const ProjectInformationFailure('unit_requires_number');
+  }
+  switch (value.kind) {
+    case ProjectInformationValueKind.text:
+      result['text_value'] = _required(value.text ?? '', 'invalid_text', 4000);
+    case ProjectInformationValueKind.number:
+      final number = value.number;
+      if (number == null || !number.isFinite) {
+        throw const ProjectInformationFailure('invalid_number');
+      }
+      result['number_value'] = number;
+    case ProjectInformationValueKind.date:
+      final date = value.date ?? '';
+      final parsed = DateTime.tryParse(date);
+      if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date) ||
+          parsed == null ||
+          parsed.toIso8601String().substring(0, 10) != date) {
+        throw const ProjectInformationFailure('invalid_date');
+      }
+      result['date_value'] = date;
+    case ProjectInformationValueKind.boolean:
+      final boolean = value.boolean;
+      if (boolean == null) {
+        throw const ProjectInformationFailure('invalid_boolean');
+      }
+      result['boolean_value'] = boolean ? 1 : 0;
+    case ProjectInformationValueKind.contact:
+      final contact = value.contact;
+      if (contact == null) {
+        throw const ProjectInformationFailure('invalid_contact');
+      }
+      final hasType = contact.referenceType != null;
+      final hasId = contact.referenceId != null;
+      if (hasType != hasId) {
+        throw const ProjectInformationFailure('incomplete_contact_reference');
+      }
+      if (hasId) {
+        _requireUuid(contact.referenceId!, 'invalid_contact_reference');
+      }
+      result.addAll({
+        'contact_name': _required(contact.name, 'invalid_contact_name', 160),
+        'contact_company': _optional(
+          contact.company,
+          'invalid_contact_company',
+          160,
+        ),
+        'contact_role': _optional(contact.role, 'invalid_contact_role', 160),
+        'contact_phone': _optional(contact.phone, 'invalid_contact_phone', 80),
+        'contact_whatsapp': _optional(
+          contact.whatsAppNumber,
+          'invalid_contact_whatsapp',
+          80,
+        ),
+        'contact_note': _optional(contact.note, 'invalid_contact_note', 4000),
+        'workforce_member_id':
+            contact.referenceType ==
+                ProjectInformationReferenceType.workforceMember
+            ? contact.referenceId
+            : null,
+        'subcontractor_id':
+            contact.referenceType ==
+                ProjectInformationReferenceType.subcontractor
+            ? contact.referenceId
+            : null,
+      });
+  }
+  return result;
+}
+
+Future<void> _requireActiveProject(
+  DatabaseExecutor database,
+  String projectId,
+) async {
+  final rows = await database.query(
+    'projects',
+    columns: ['id'],
+    where: 'id = ? AND archived_at IS NULL',
+    whereArgs: [projectId],
+    limit: 1,
+  );
+  if (rows.isEmpty) throw const ProjectInformationFailure('project_not_found');
+}
+
+Future<void> _validateContactReference(
+  DatabaseExecutor database,
+  String projectId,
+  Map<String, Object?> values,
+) async {
+  final workforceId = values['workforce_member_id'] as String?;
+  final subcontractorId = values['subcontractor_id'] as String?;
+  if (workforceId == null && subcontractorId == null) return;
+  final table = workforceId != null ? 'workforce_members' : 'subcontractors';
+  final id = workforceId ?? subcontractorId!;
+  final rows = await database.query(
+    table,
+    columns: ['id'],
+    where: 'id = ? AND project_id = ?',
+    whereArgs: [id, projectId],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    throw const ProjectInformationFailure('contact_reference_not_in_project');
+  }
+}
+
+Future<ProjectInformationEntry> _loadEntry(
+  DatabaseExecutor database,
+  String projectId,
+  String id,
+) async {
+  final rows = await database.query(
+    'project_information_entries',
+    where: 'id = ? AND project_id = ?',
+    whereArgs: [id, projectId],
+    limit: 1,
+  );
+  if (rows.isEmpty) throw const ProjectInformationFailure('entry_not_found');
+  return _entryFromRow(rows.single);
+}
+
+ProjectInformationEntry _entryFromRow(Map<String, Object?> row) {
+  final kind = _kindFromDb(row['semantic_kind']! as String);
+  final value = switch (kind) {
+    ProjectInformationValueKind.text => ProjectInformationEntryValue.text(
+      row['text_value']! as String,
+    ),
+    ProjectInformationValueKind.number => ProjectInformationEntryValue.number(
+      (row['number_value']! as num).toDouble(),
+    ),
+    ProjectInformationValueKind.date => ProjectInformationEntryValue.date(
+      row['date_value']! as String,
+    ),
+    ProjectInformationValueKind.boolean => ProjectInformationEntryValue.boolean(
+      row['boolean_value']! as int == 1,
+    ),
+    ProjectInformationValueKind.contact => ProjectInformationEntryValue.contact(
+      ProjectInformationContact(
+        name: row['contact_name']! as String,
+        company: row['contact_company'] as String?,
+        role: row['contact_role'] as String?,
+        phone: row['contact_phone'] as String?,
+        whatsAppNumber: row['contact_whatsapp'] as String?,
+        note: row['contact_note'] as String?,
+        referenceType: row['workforce_member_id'] != null
+            ? ProjectInformationReferenceType.workforceMember
+            : row['subcontractor_id'] != null
+            ? ProjectInformationReferenceType.subcontractor
+            : null,
+        referenceId:
+            (row['workforce_member_id'] ?? row['subcontractor_id']) as String?,
+      ),
+    ),
+  };
+  return ProjectInformationEntry(
+    id: row['id']! as String,
+    projectId: row['project_id']! as String,
+    category: _categoryFromDb(row['category']! as String),
+    label: row['label']! as String,
+    value: value,
+    unit: row['unit'] as String?,
+    note: row['note'] as String?,
+    revision: row['revision']! as int,
+    createdAt: row['created_at']! as String,
+    updatedAt: row['updated_at']! as String,
+    archivedAt: row['archived_at'] as String?,
+  );
+}
+
+Future<void> _insertEntryEvent(
+  DatabaseExecutor database, {
+  required String id,
+  required String entryId,
+  required String projectId,
+  required int sequence,
+  required String eventType,
+  required String occurredAt,
+}) => database.insert('project_information_entry_events', {
+  'id': id,
+  'entry_id': entryId,
+  'project_id': projectId,
+  'sequence': sequence,
+  'event_type': eventType,
+  'occurred_at': occurredAt,
+  'payload_json': jsonEncode({'revision': sequence}),
+});
+
+Future<void> _insertPinEvent(
+  DatabaseExecutor database,
+  String id,
+  String pinId,
+  String projectId,
+  int sequence,
+  String eventType,
+  String occurredAt,
+) => database.insert('project_information_pin_events', {
+  'id': id,
+  'pin_id': pinId,
+  'project_id': projectId,
+  'sequence': sequence,
+  'event_type': eventType,
+  'occurred_at': occurredAt,
+  'payload_json': jsonEncode({'revision': sequence}),
+});
+
+Future<int> _nextPinOrder(DatabaseExecutor database, String projectId) async {
+  final value = Sqflite.firstIntValue(
+    await database.rawQuery(
+      'SELECT MAX(sort_order) FROM project_information_pins '
+      'WHERE project_id = ? AND archived_at IS NULL',
+      [projectId],
+    ),
+  );
+  return (value ?? -1) + 1;
+}
+
+Future<bool> _sourceAvailable(
+  DatabaseExecutor database,
+  String projectId,
+  String sourceSpace,
+  String sourceId,
+) async {
+  if (sourceSpace == 'system_value') {
+    if (sourceId == ProjectInformationSystemValue.projectName.storageKey) {
+      final rows = await database.query(
+        'projects',
+        columns: ['id'],
+        where: 'id = ? AND archived_at IS NULL AND length(trim(name)) > 0',
+        whereArgs: [projectId],
+        limit: 1,
+      );
+      return rows.isNotEmpty;
+    }
+    final column = _metadataColumnForSystemKey(sourceId);
+    final rows = await database.query(
+      'project_metadata',
+      columns: ['project_id'],
+      where: 'project_id = ? AND $column IS NOT NULL',
+      whereArgs: [projectId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+  final table = switch (sourceSpace) {
+    'profile_field' => 'project_profile_fields',
+    'party_assignment' => 'project_party_assignments',
+    'inventory_block' => 'inventory_blocks',
+    'inventory_floor' => 'inventory_floors',
+    'location' => 'project_locations',
+    'user_entry' => 'project_information_entries',
+    _ => throw const ProjectInformationFailure('unknown_pin_source_space'),
+  };
+  final rows = await database.query(
+    table,
+    columns: ['id'],
+    where: 'id = ? AND project_id = ? AND archived_at IS NULL',
+    whereArgs: [sourceId, projectId],
+    limit: 1,
+  );
+  return rows.isNotEmpty;
+}
+
+String _metadataColumnForSystemKey(String sourceId) => switch (sourceId) {
+  'metadata.address' => 'address',
+  'metadata.permit_number' => 'permit_number',
+  'metadata.permit_date' => 'permit_date',
+  'metadata.cadastral_block' => 'cadastral_block',
+  'metadata.cadastral_parcel' => 'cadastral_parcel',
+  'metadata.project_start_date' => 'project_start_date',
+  'metadata.target_finish_date' => 'target_finish_date',
+  'metadata.usage_type' => 'usage_type',
+  'metadata.structural_system' => 'structural_system',
+  _ => throw const ProjectInformationFailure('unknown_system_value_key'),
+};
+
+ProjectInformationPin _pinFromRow(Map<String, Object?> row, bool available) =>
+    ProjectInformationPin(
+      id: row['id']! as String,
+      projectId: row['project_id']! as String,
+      key: ProjectInformationKey(
+        space: _keySpaceFromDb(row['source_space']! as String),
+        id: row['source_id']! as String,
+      ),
+      sortOrder: row['sort_order']! as int,
+      revision: row['revision']! as int,
+      createdAt: row['created_at']! as String,
+      updatedAt: row['updated_at']! as String,
+      sourceAvailable: available,
+    );
+
+String _categoryToDb(ProjectInformationCategory value) => switch (value) {
+  ProjectInformationCategory.project => 'project',
+  ProjectInformationCategory.location => 'location',
+  ProjectInformationCategory.technical => 'technical',
+  ProjectInformationCategory.official => 'official',
+  ProjectInformationCategory.siteReference => 'site_reference',
+  ProjectInformationCategory.contact => 'contact',
+};
+ProjectInformationCategory _categoryFromDb(String value) => switch (value) {
+  'project' => ProjectInformationCategory.project,
+  'location' => ProjectInformationCategory.location,
+  'technical' => ProjectInformationCategory.technical,
+  'official' => ProjectInformationCategory.official,
+  'site_reference' => ProjectInformationCategory.siteReference,
+  'contact' => ProjectInformationCategory.contact,
+  _ => throw const ProjectInformationFailure('unknown_category'),
+};
+String _kindToDb(ProjectInformationValueKind value) => value.name;
+ProjectInformationValueKind _kindFromDb(String value) =>
+    ProjectInformationValueKind.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => throw const ProjectInformationFailure('unknown_value_kind'),
+    );
+String _keySpaceToDb(ProjectInformationKeySpace value) => switch (value) {
+  ProjectInformationKeySpace.systemValue => 'system_value',
+  ProjectInformationKeySpace.profileField => 'profile_field',
+  ProjectInformationKeySpace.partyAssignment => 'party_assignment',
+  ProjectInformationKeySpace.inventoryBlock => 'inventory_block',
+  ProjectInformationKeySpace.inventoryFloor => 'inventory_floor',
+  ProjectInformationKeySpace.location => 'location',
+  ProjectInformationKeySpace.userEntry => 'user_entry',
+};
+ProjectInformationKeySpace _keySpaceFromDb(String value) => switch (value) {
+  'system_value' => ProjectInformationKeySpace.systemValue,
+  'profile_field' => ProjectInformationKeySpace.profileField,
+  'party_assignment' => ProjectInformationKeySpace.partyAssignment,
+  'inventory_block' => ProjectInformationKeySpace.inventoryBlock,
+  'inventory_floor' => ProjectInformationKeySpace.inventoryFloor,
+  'location' => ProjectInformationKeySpace.location,
+  'user_entry' => ProjectInformationKeySpace.userEntry,
+  _ => throw const ProjectInformationFailure('unknown_pin_source_space'),
+};

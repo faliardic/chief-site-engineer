@@ -86,8 +86,71 @@ void main() {
       {'version': 24, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 25, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 26, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 27, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
+
+  test(
+    'schema 26 to 27 is additive and leaves legacy profile untouched',
+    () async {
+      const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7';
+      const fieldId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb7';
+      const timestamp = '2026-07-19T08:00:00Z';
+      final schemaTwentySix = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(26).toList(),
+      );
+      await schemaTwentySix.open();
+      await schemaTwentySix.database.insert('projects', {
+        'id': projectId,
+        'name': 'Legacy profil projesi',
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await schemaTwentySix.database.insert('project_profile_fields', {
+        'id': fieldId,
+        'project_id': projectId,
+        'field_kind': 'custom',
+        'label': 'Eski özel alan',
+        'value': 'Korunan değer',
+        'sort_order': 4,
+        'revision': 2,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+        'archived_at': timestamp,
+      });
+      final before = await schemaTwentySix.database.query(
+        'project_profile_fields',
+      );
+      await schemaTwentySix.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await upgraded.database.rawQuery('PRAGMA user_version'),
+        ),
+        27,
+      );
+      expect(await upgraded.database.query('project_profile_fields'), before);
+      for (final table in const [
+        'project_information_entries',
+        'project_information_entry_events',
+        'project_information_pins',
+        'project_information_pin_events',
+      ]) {
+        expect(await upgraded.database.query(table), isEmpty);
+      }
+      await upgraded.close();
+    },
+  );
 
   test(
     'schema 25 to 26 is additive and enforces attendance Agenda link integrity',
@@ -175,7 +238,7 @@ void main() {
       final db = upgraded.database;
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        26,
+        27,
       );
       expect(await db.query('attendance_days'), attendanceBefore);
       expect(

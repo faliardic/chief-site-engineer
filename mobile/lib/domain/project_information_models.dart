@@ -235,3 +235,259 @@ class ProjectInformationSnapshot {
   ProjectInformationSourceStatus statusFor(ProjectInformationSource source) =>
       sourceStatuses.singleWhere((status) => status.source == source);
 }
+
+enum ProjectInformationCategory {
+  project,
+  location,
+  technical,
+  official,
+  siteReference,
+  contact,
+}
+
+enum ProjectInformationValueKind { text, number, date, boolean, contact }
+
+enum ProjectInformationArchiveFilter { active, archived, all }
+
+enum ProjectInformationReferenceType { workforceMember, subcontractor }
+
+class ProjectInformationContact {
+  const ProjectInformationContact({
+    required this.name,
+    this.company,
+    this.role,
+    this.phone,
+    this.whatsAppNumber,
+    this.note,
+    this.referenceType,
+    this.referenceId,
+  });
+  final String name;
+  final String? company;
+  final String? role;
+  final String? phone;
+  final String? whatsAppNumber;
+  final String? note;
+  final ProjectInformationReferenceType? referenceType;
+  final String? referenceId;
+}
+
+class ProjectInformationEntryValue {
+  const ProjectInformationEntryValue._({
+    required this.kind,
+    this.text,
+    this.number,
+    this.date,
+    this.boolean,
+    this.contact,
+  });
+  const ProjectInformationEntryValue.text(String value)
+    : this._(kind: ProjectInformationValueKind.text, text: value);
+  const ProjectInformationEntryValue.number(double value)
+    : this._(kind: ProjectInformationValueKind.number, number: value);
+  const ProjectInformationEntryValue.date(String value)
+    : this._(kind: ProjectInformationValueKind.date, date: value);
+  const ProjectInformationEntryValue.boolean(bool value)
+    : this._(kind: ProjectInformationValueKind.boolean, boolean: value);
+  const ProjectInformationEntryValue.contact(ProjectInformationContact value)
+    : this._(kind: ProjectInformationValueKind.contact, contact: value);
+  final ProjectInformationValueKind kind;
+  final String? text;
+  final double? number;
+  final String? date;
+  final bool? boolean;
+  final ProjectInformationContact? contact;
+}
+
+class ProjectInformationEntry {
+  const ProjectInformationEntry({
+    required this.id,
+    required this.projectId,
+    required this.category,
+    required this.label,
+    required this.value,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    this.unit,
+    this.note,
+    this.archivedAt,
+  });
+  final String id;
+  final String projectId;
+  final ProjectInformationCategory category;
+  final String label;
+  final ProjectInformationEntryValue value;
+  final String? unit;
+  final String? note;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+  final String? archivedAt;
+  bool get isArchived => archivedAt != null;
+}
+
+class CreateProjectInformationEntryCommand {
+  const CreateProjectInformationEntryCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.category,
+    required this.label,
+    required this.value,
+    this.unit,
+    this.note,
+  });
+  final String id;
+  final String eventId;
+  final String projectId;
+  final ProjectInformationCategory category;
+  final String label;
+  final ProjectInformationEntryValue value;
+  final String? unit;
+  final String? note;
+}
+
+class UpdateProjectInformationEntryCommand {
+  const UpdateProjectInformationEntryCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.expectedRevision,
+    required this.category,
+    required this.label,
+    required this.value,
+    this.unit,
+    this.note,
+  });
+  final String id;
+  final String eventId;
+  final String projectId;
+  final int expectedRevision;
+  final ProjectInformationCategory category;
+  final String label;
+  final ProjectInformationEntryValue value;
+  final String? unit;
+  final String? note;
+}
+
+class SetProjectInformationEntryArchiveCommand {
+  const SetProjectInformationEntryArchiveCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.expectedRevision,
+    required this.archived,
+  });
+  final String id;
+  final String eventId;
+  final String projectId;
+  final int expectedRevision;
+  final bool archived;
+}
+
+enum ProjectInformationKeySpace {
+  systemValue,
+  profileField,
+  partyAssignment,
+  inventoryBlock,
+  inventoryFloor,
+  location,
+  userEntry,
+}
+
+enum ProjectInformationSystemValue {
+  projectName('project.name'),
+  address('metadata.address'),
+  permitNumber('metadata.permit_number'),
+  permitDate('metadata.permit_date'),
+  cadastralBlock('metadata.cadastral_block'),
+  cadastralParcel('metadata.cadastral_parcel'),
+  projectStartDate('metadata.project_start_date'),
+  targetFinishDate('metadata.target_finish_date'),
+  usageType('metadata.usage_type'),
+  structuralSystem('metadata.structural_system');
+
+  const ProjectInformationSystemValue(this.storageKey);
+  final String storageKey;
+}
+
+class ProjectInformationKey {
+  const ProjectInformationKey({required this.space, required this.id});
+  ProjectInformationKey.system(ProjectInformationSystemValue value)
+    : space = ProjectInformationKeySpace.systemValue,
+      id = value.storageKey;
+  final ProjectInformationKeySpace space;
+  final String id;
+}
+
+class ProjectInformationPin {
+  const ProjectInformationPin({
+    required this.id,
+    required this.projectId,
+    required this.key,
+    required this.sortOrder,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.sourceAvailable,
+  });
+  final String id;
+  final String projectId;
+  final ProjectInformationKey key;
+  final int sortOrder;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+  final bool sourceAvailable;
+}
+
+class SetProjectInformationPinCommand {
+  const SetProjectInformationPinCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.key,
+  });
+  final String id;
+  final String eventId;
+  final String projectId;
+  final ProjectInformationKey key;
+}
+
+class ReorderProjectInformationPinsCommand {
+  const ReorderProjectInformationPinsCommand({
+    required this.eventId,
+    required this.projectId,
+    required this.orderedPinIds,
+    required this.expectedRevisions,
+  });
+  final String eventId;
+  final String projectId;
+  final List<String> orderedPinIds;
+  final Map<String, int> expectedRevisions;
+}
+
+class RemoveProjectInformationPinCommand {
+  const RemoveProjectInformationPinCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.expectedRevision,
+  });
+  final String id;
+  final String eventId;
+  final String projectId;
+  final int expectedRevision;
+}
+
+class ProjectInformationFailure implements Exception {
+  const ProjectInformationFailure(this.code);
+  final String code;
+  @override
+  String toString() => 'ProjectInformationFailure($code)';
+}
+
+class ProjectInformationRevisionConflict extends ProjectInformationFailure {
+  const ProjectInformationRevisionConflict() : super('revision_conflict');
+}

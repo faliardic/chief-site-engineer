@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 26;
+  static const schemaVersion = 27;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2913,6 +2913,7 @@ class AppDatabase {
       apply: _applyBlockLocationFoundationMigration,
     ),
     DatabaseMigration(version: 26, apply: _applyAttendanceAgendaLinkMigration),
+    DatabaseMigration(version: 27, apply: _applyProjectInformationMigration),
   ];
 
   final String path;
@@ -7587,6 +7588,202 @@ Future<void> _applyAttachmentFoundationMigration(
   );
   await transaction.execute('DROP TABLE agenda_log_attachments');
   await transaction.execute('DROP TABLE concrete_attachments');
+}
+
+Future<void> _applyProjectInformationMigration(Transaction transaction) async {
+  await transaction.execute('''
+    CREATE TABLE project_information_entries (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      category TEXT NOT NULL CHECK (category IN (
+        'project', 'location', 'technical', 'official',
+        'site_reference', 'contact'
+      )),
+      semantic_kind TEXT NOT NULL CHECK (semantic_kind IN (
+        'text', 'number', 'date', 'boolean', 'contact'
+      )),
+      label TEXT NOT NULL CHECK (length(trim(label)) > 0),
+      text_value TEXT,
+      number_value REAL,
+      date_value TEXT,
+      boolean_value INTEGER CHECK (boolean_value IN (0, 1)),
+      unit TEXT,
+      note TEXT,
+      contact_name TEXT,
+      contact_company TEXT,
+      contact_role TEXT,
+      contact_phone TEXT,
+      contact_whatsapp TEXT,
+      contact_note TEXT,
+      workforce_member_id TEXT,
+      subcontractor_id TEXT,
+      revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE (id, project_id),
+      FOREIGN KEY (workforce_member_id, project_id)
+        REFERENCES workforce_members(id, project_id),
+      FOREIGN KEY (subcontractor_id, project_id)
+        REFERENCES subcontractors(id, project_id),
+      CHECK ((category = 'contact') = (semantic_kind = 'contact')),
+      CHECK (workforce_member_id IS NULL OR subcontractor_id IS NULL),
+      CHECK (
+        (semantic_kind = 'text' AND text_value IS NOT NULL
+          AND number_value IS NULL AND date_value IS NULL
+          AND boolean_value IS NULL AND contact_name IS NULL)
+        OR (semantic_kind = 'number' AND text_value IS NULL
+          AND number_value IS NOT NULL AND date_value IS NULL
+          AND boolean_value IS NULL AND contact_name IS NULL)
+        OR (semantic_kind = 'date' AND text_value IS NULL
+          AND number_value IS NULL AND date_value IS NOT NULL
+          AND boolean_value IS NULL AND contact_name IS NULL)
+        OR (semantic_kind = 'boolean' AND text_value IS NULL
+          AND number_value IS NULL AND date_value IS NULL
+          AND boolean_value IS NOT NULL AND contact_name IS NULL)
+        OR (semantic_kind = 'contact' AND text_value IS NULL
+          AND number_value IS NULL AND date_value IS NULL
+          AND boolean_value IS NULL AND length(trim(contact_name)) > 0
+          AND unit IS NULL AND note IS NULL)
+      ),
+      CHECK (
+        semantic_kind = 'contact'
+        OR (contact_company IS NULL AND contact_role IS NULL
+          AND contact_phone IS NULL AND contact_whatsapp IS NULL
+          AND contact_note IS NULL AND workforce_member_id IS NULL
+          AND subcontractor_id IS NULL)
+      ),
+      CHECK (semantic_kind = 'number' OR unit IS NULL)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_project_information_entries_project
+    ON project_information_entries(project_id, archived_at, category, label, id)
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_information_entry_events (
+      id TEXT PRIMARY KEY,
+      entry_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (event_type IN (
+        'entry.created', 'entry.updated', 'entry.archived', 'entry.restored'
+      )),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      FOREIGN KEY (entry_id, project_id)
+        REFERENCES project_information_entries(id, project_id),
+      UNIQUE (entry_id, sequence)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_information_pins (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      source_space TEXT NOT NULL CHECK (source_space IN (
+        'system_value', 'profile_field', 'party_assignment',
+        'inventory_block', 'inventory_floor', 'location', 'user_entry'
+      )),
+      source_id TEXT NOT NULL CHECK (length(trim(source_id)) > 0),
+      sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+      revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE (id, project_id),
+      CHECK (
+        source_space != 'system_value' OR source_id IN (
+          'project.name', 'metadata.address', 'metadata.permit_number',
+          'metadata.permit_date', 'metadata.cadastral_block',
+          'metadata.cadastral_parcel', 'metadata.project_start_date',
+          'metadata.target_finish_date', 'metadata.usage_type',
+          'metadata.structural_system'
+        )
+      )
+    )
+  ''');
+  await transaction.execute('''
+    CREATE UNIQUE INDEX uq_project_information_pins_active_source
+    ON project_information_pins(project_id, source_space, source_id)
+    WHERE archived_at IS NULL
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_information_pin_events (
+      id TEXT PRIMARY KEY,
+      pin_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (event_type IN (
+        'pin.created', 'pin.restored', 'pin.reordered', 'pin.removed'
+      )),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      FOREIGN KEY (pin_id, project_id)
+        REFERENCES project_information_pins(id, project_id),
+      UNIQUE (pin_id, sequence)
+    )
+  ''');
+  for (final table in [
+    'project_information_entries',
+    'project_information_pins',
+  ]) {
+    await transaction.execute('''
+      CREATE TRIGGER ${table}_no_physical_delete
+      BEFORE DELETE ON $table BEGIN
+        SELECT RAISE(ABORT, 'physical delete is not allowed');
+      END
+    ''');
+    await transaction.execute('''
+      CREATE TRIGGER ${table}_revision_guard
+      BEFORE UPDATE ON $table
+      WHEN NEW.revision != OLD.revision + 1 BEGIN
+        SELECT RAISE(ABORT, 'revision mismatch');
+      END
+    ''');
+  }
+  await transaction.execute('''
+    CREATE TRIGGER project_information_entries_identity_immutable
+    BEFORE UPDATE OF id, project_id, category, semantic_kind
+    ON project_information_entries
+    WHEN NEW.id != OLD.id OR NEW.project_id != OLD.project_id
+      OR NEW.category != OLD.category
+      OR NEW.semantic_kind != OLD.semantic_kind BEGIN
+      SELECT RAISE(ABORT, 'project information identity is immutable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_information_pins_identity_immutable
+    BEFORE UPDATE OF id, project_id, source_space, source_id
+    ON project_information_pins
+    WHEN NEW.id != OLD.id OR NEW.project_id != OLD.project_id
+      OR NEW.source_space != OLD.source_space
+      OR NEW.source_id != OLD.source_id BEGIN
+      SELECT RAISE(ABORT, 'project information pin identity is immutable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_information_pins_user_entry_project_insert
+    BEFORE INSERT ON project_information_pins
+    WHEN NEW.source_space = 'user_entry' AND NOT EXISTS (
+      SELECT 1 FROM project_information_entries entry
+      WHERE entry.id = NEW.source_id AND entry.project_id = NEW.project_id
+    ) BEGIN
+      SELECT RAISE(ABORT, 'pin source must belong to pin project');
+    END
+  ''');
+  for (final table in [
+    'project_information_entry_events',
+    'project_information_pin_events',
+  ]) {
+    for (final operation in ['update', 'delete']) {
+      await transaction.execute('''
+        CREATE TRIGGER ${table}_append_only_$operation
+        BEFORE ${operation.toUpperCase()} ON $table BEGIN
+          SELECT RAISE(ABORT, 'append-only event history');
+        END
+      ''');
+    }
+  }
 }
 
 Future<void> _applyAttendanceAgendaLinkMigration(

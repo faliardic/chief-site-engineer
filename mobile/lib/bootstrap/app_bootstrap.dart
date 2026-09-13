@@ -342,6 +342,12 @@ class AppBootstrap {
         coordinator: coordinator,
       );
       final projectInformation = ProjectInformationApplication(
+        mutations: SqliteProjectInformationMutationApplication(
+          databasePath: directories.databaseFile,
+          databaseFactory: databaseFactory,
+          clock: clock,
+          coordinator: coordinator,
+        ),
         source: CanonicalProjectInformationReadSource(
           projects: agenda,
           metadata: agenda,

@@ -473,6 +473,141 @@ void main() {
   });
 
   test(
+    'Q05 S3 backup round-trip preserves typed contact and pin identity',
+    () async {
+      const project = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8';
+      const company = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb8';
+      const entry = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc8';
+      const pin = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd8';
+      final database = await _openRaw(directories);
+      await database.transaction((transaction) async {
+        await transaction.insert('projects', {
+          'id': project,
+          'name': 'Q05 S3',
+          'revision': 1,
+          'created_at': _now,
+          'updated_at': _now,
+        });
+        await transaction.insert('subcontractors', {
+          'id': company,
+          'project_id': project,
+          'name': 'Açık kimlik şirketi',
+          'name_normalized': 'açık kimlik şirketi',
+          'status': 'active',
+          'revision': 1,
+          'created_at': _now,
+          'updated_at': _now,
+        });
+        await transaction.insert('project_information_entries', {
+          'id': entry,
+          'project_id': project,
+          'category': 'contact',
+          'semantic_kind': 'contact',
+          'label': 'Şantiye şefi',
+          'contact_name': 'Fatih',
+          'contact_company': 'CSE',
+          'contact_phone': '555',
+          'contact_whatsapp': '555',
+          'subcontractor_id': company,
+          'revision': 3,
+          'created_at': _now,
+          'updated_at': _now,
+          'archived_at': _now,
+        });
+        await transaction.insert('project_information_entry_events', {
+          'id': 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee8',
+          'entry_id': entry,
+          'project_id': project,
+          'sequence': 3,
+          'event_type': 'entry.archived',
+          'occurred_at': _now,
+          'payload_json': '{"revision":3}',
+        });
+        await transaction.insert('project_information_pins', {
+          'id': pin,
+          'project_id': project,
+          'source_space': 'user_entry',
+          'source_id': entry,
+          'sort_order': 2,
+          'revision': 2,
+          'created_at': _now,
+          'updated_at': _now,
+        });
+        await transaction.insert('project_information_pin_events', {
+          'id': 'ffffffff-ffff-4fff-8fff-fffffffffff8',
+          'pin_id': pin,
+          'project_id': project,
+          'sequence': 2,
+          'event_type': 'pin.reordered',
+          'occurred_at': _now,
+          'payload_json': '{"revision":2}',
+        });
+      });
+      await database.close();
+
+      final application = _application(directories, gateway: gateway);
+      final created = await application.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      final preflight = await application.preflightBackup(
+        created.package,
+        _password,
+      );
+      await application.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: created.package,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+
+      final restored = await _openRaw(directories);
+      final restoredEntry = (await restored.query(
+        'project_information_entries',
+        where: 'id = ?',
+        whereArgs: [entry],
+      )).single;
+      final restoredPin = (await restored.query(
+        'project_information_pins',
+        where: 'id = ?',
+        whereArgs: [pin],
+      )).single;
+      expect(restoredEntry['semantic_kind'], 'contact');
+      expect(restoredEntry['contact_name'], 'Fatih');
+      expect(restoredEntry['subcontractor_id'], company);
+      expect(restoredEntry['revision'], 3);
+      expect(restoredEntry['archived_at'], _now);
+      expect(restoredPin['source_space'], 'user_entry');
+      expect(restoredPin['source_id'], entry);
+      expect(restoredPin['sort_order'], 2);
+      expect(restoredPin['revision'], 2);
+      expect(
+        Sqflite.firstIntValue(
+          await restored.rawQuery(
+            'SELECT count(*) FROM project_information_entry_events '
+            'WHERE entry_id = ?',
+            [entry],
+          ),
+        ),
+        1,
+      );
+      expect(
+        Sqflite.firstIntValue(
+          await restored.rawQuery(
+            'SELECT count(*) FROM project_information_pin_events WHERE pin_id = ?',
+            [pin],
+          ),
+        ),
+        1,
+      );
+      await restored.close();
+    },
+  );
+
+  test(
     'Q04-A2 unchanged-schema backup round-trip preserves technical linkage and event',
     () async {
       const project = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
@@ -955,7 +1090,7 @@ void main() {
   test(
     'format 1 backup restores populated Inventory with exact replayable truth',
     () async {
-      expect(AppDatabase.schemaVersion, 26);
+      expect(AppDatabase.schemaVersion, 27);
       final fixture = await _seedPopulatedInventory(
         directories,
         attachmentGateway: _inventoryPhotoGateway(directories),
@@ -2183,6 +2318,10 @@ void main() {
         'DROP TRIGGER floor_location_active_location_archive_guard',
       );
       for (final table in const [
+        'project_information_pin_events',
+        'project_information_pins',
+        'project_information_entry_events',
+        'project_information_entries',
         'attendance_day_agenda_links',
         'project_floor_location_relation_events',
         'project_floor_location_relations',
