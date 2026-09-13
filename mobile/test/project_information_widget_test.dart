@@ -7,6 +7,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
+import 'package:chief_site_engineer/domain/project_information_models.dart';
 import 'package:chief_site_engineer/features/projects/project_information_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -85,10 +86,13 @@ void main() {
         250,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(
-        find.byKey(const Key('project-information-section-address')),
-      );
+      await tester.tap(find.text('Konum ve Adres'));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('project-information-copy-address')),
+        120,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(
         find.byKey(const ValueKey('project-information-copy-address')),
       );
@@ -104,7 +108,7 @@ void main() {
       for (final category in const [
         ('official', 'Resmî Bilgiler'),
         ('technical', 'Teknik Bilgiler'),
-        ('site', 'Saha Bilgileri'),
+        ('site', 'Saha Referansları'),
         ('custom', 'Özel Alanlar'),
       ]) {
         await tester.scrollUntilVisible(
@@ -360,6 +364,11 @@ void main() {
     await tester.pumpWidget(_testApp(failedSource));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('project-information-search')),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.enterText(
       find.byKey(const Key('project-information-search')),
       'işveren',
@@ -424,9 +433,15 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(
-      find.byKey(const Key('project-information-section-blocks')),
+    await Scrollable.ensureVisible(
+      tester.element(
+        find.byKey(const Key('project-information-section-blocks')),
+      ),
+      alignment: 0.5,
+      duration: Duration.zero,
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bloklar, katlar ve Mahaller'));
     await tester.pumpAndSettle();
     expect(find.text('Çözümlenemeyen yapı kayıtları'), findsOneWidget);
     expect(find.text('Bağsız Kat'), findsOneWidget);
@@ -491,6 +506,264 @@ void main() {
     );
     expect(find.text('Mahal bağlantısı bulunmuyor.'), findsNothing);
   });
+
+  testWidgets('six category actions use typed forms and active-only search', (
+    tester,
+  ) async {
+    final source = _FakeProjectInformationSource.standard();
+    final mutations = _InformationMutations()
+      ..entries.addAll([
+        _userEntry('active-entry', 'Aktif saha kodu', archived: false),
+        _userEntry('archived-entry', 'Arşivli saha kodu', archived: true),
+      ]);
+    await tester.pumpWidget(_testApp(source, mutations: mutations));
+    await tester.pumpAndSettle();
+
+    for (final affordance in const [
+      ('project', '+ Proje bilgisi ekle'),
+      ('address', '+ Konum / adres bilgisi ekle'),
+      ('parties', '+ Kişi ekle'),
+      ('official', '+ Resmî bilgi ekle'),
+      ('technical', '+ Teknik bilgi ekle'),
+      ('site', '+ Saha bilgisi ekle'),
+    ]) {
+      await tester.scrollUntilVisible(
+        find.byKey(ValueKey('project-information-add-${affordance.$1}')),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        find.byKey(ValueKey('project-information-add-${affordance.$1}')),
+        findsOneWidget,
+      );
+      expect(find.text(affordance.$2), findsOneWidget);
+    }
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('project-information-add-technical')),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(
+      find.byKey(const Key('project-information-add-technical')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('project-information-technical-form')),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const Key('project-information-technical-label')),
+      'Beton sınıfı',
+    );
+    await tester.enterText(
+      find.byKey(const Key('project-information-technical-value')),
+      '35',
+    );
+    await tester.enterText(
+      find.byKey(const Key('project-information-technical-unit')),
+      'MPa',
+    );
+    await tester.tap(
+      find.byKey(const Key('project-information-technical-save')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      mutations.created.single.category,
+      ProjectInformationCategory.technical,
+    );
+    expect(
+      mutations.created.single.value.kind,
+      ProjectInformationValueKind.number,
+    );
+    expect(mutations.created.single.unit, 'MPa');
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('project-information-search')),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(
+      find.byKey(const Key('project-information-search')),
+      'saha kodu',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Aktif saha kodu'), findsOneWidget);
+    expect(find.text('Arşivli saha kodu'), findsNothing);
+  });
+
+  testWidgets(
+    'contact form writes structured fields without inferred identity',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard();
+      final mutations = _InformationMutations();
+      await tester.pumpWidget(_testApp(source, mutations: mutations));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('project-information-add-parties')),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(
+        find.byKey(const Key('project-information-add-parties')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('project-information-contact-label')),
+        'Şantiye şefi',
+      );
+      await tester.enterText(
+        find.byKey(const Key('project-information-contact-name')),
+        'Ayşe Kaya',
+      );
+      await tester.enterText(
+        find.byKey(const Key('project-information-contact-phone')),
+        '555 111 22 33',
+      );
+      await tester.enterText(
+        find.byKey(const Key('project-information-contact-whatsapp')),
+        '555 444 55 66',
+      );
+      await tester.tap(
+        find.byKey(const Key('project-information-contact-save')),
+      );
+      await tester.pumpAndSettle();
+
+      final command = mutations.created.single;
+      expect(command.value.kind, ProjectInformationValueKind.contact);
+      expect(command.value.contact!.name, 'Ayşe Kaya');
+      expect(command.value.contact!.phone, '555 111 22 33');
+      expect(command.value.contact!.whatsAppNumber, '555 444 55 66');
+      expect(command.value.contact!.referenceType, isNull);
+      expect(command.value.contact!.referenceId, isNull);
+      expect(command.note, isNull);
+    },
+  );
+
+  testWidgets('user entry edit archive restore and pin use current revisions', (
+    tester,
+  ) async {
+    final source = _FakeProjectInformationSource.standard();
+    final mutations = _InformationMutations()
+      ..entries.add(
+        _userEntry(
+          'editable-entry',
+          'Kapı kodu',
+          archived: false,
+          category: ProjectInformationCategory.project,
+        ),
+      );
+    await tester.pumpWidget(_testApp(source, mutations: mutations));
+    await tester.pumpAndSettle();
+
+    final actions = find.byKey(
+      const ValueKey('project-information-actions-user-editable-entry'),
+    );
+    await tester.tap(actions);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Düzenle'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('project-information-form-value')),
+      'B-19',
+    );
+    await tester.tap(find.byKey(const Key('project-information-form-save')));
+    await tester.pumpAndSettle();
+    expect(mutations.updated.single.expectedRevision, 1);
+
+    await tester.tap(actions);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Arşivle'));
+    await tester.pumpAndSettle();
+    expect(mutations.archived.single.expectedRevision, 2);
+    expect(mutations.archived.single.archived, isTrue);
+
+    final archivedSection = find.byKey(
+      const Key('project-information-archived-user-entries'),
+    );
+    await tester.scrollUntilVisible(
+      archivedSection,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(archivedSection);
+    await tester.pumpAndSettle();
+    final archivedTile = find.byKey(
+      const ValueKey('project-information-user-restore-editable-entry'),
+    );
+    final restoreButton = find.descendant(
+      of: archivedTile,
+      matching: find.byType(TextButton),
+    );
+    await tester.ensureVisible(restoreButton);
+    await tester.pumpAndSettle();
+    await tester.tap(restoreButton);
+    await tester.pumpAndSettle();
+    expect(mutations.archived.last.expectedRevision, 3);
+    expect(mutations.archived.last.archived, isFalse);
+
+    await tester.scrollUntilVisible(
+      actions,
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(actions);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ana sayfada göster'));
+    await tester.pumpAndSettle();
+    expect(
+      mutations.pinned.single.key.space,
+      ProjectInformationKeySpace.userEntry,
+    );
+    expect(mutations.pinned.single.key.id, 'editable-entry');
+
+    await tester.tap(actions);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ana sayfadan kaldır'));
+    await tester.pumpAndSettle();
+    expect(mutations.unpinned.single.expectedRevision, 1);
+  });
+
+  testWidgets('revision conflict preserves entry and explains refresh', (
+    tester,
+  ) async {
+    final source = _FakeProjectInformationSource.standard();
+    final mutations = _InformationMutations()
+      ..failUpdates = true
+      ..entries.add(
+        _userEntry(
+          'conflict-entry',
+          'Korunan bilgi',
+          archived: false,
+          category: ProjectInformationCategory.project,
+        ),
+      );
+    await tester.pumpWidget(_testApp(source, mutations: mutations));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(
+        const ValueKey('project-information-actions-user-conflict-entry'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Düzenle'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('project-information-form-value')),
+      'Kaybolmamalı',
+    );
+    await tester.tap(find.byKey(const Key('project-information-form-save')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Kayıt başka bir işlemde değişti. Güncel halini yeniden açın.'),
+      findsOneWidget,
+    );
+    expect(mutations.updated.single.expectedRevision, 1);
+    expect(mutations.entries.single.value.text, 'SR-42');
+    expect(mutations.entries.single.revision, 1);
+  });
 }
 
 Widget _testApp(
@@ -498,15 +771,166 @@ Widget _testApp(
   ProjectProfileApplication? profileApplication,
   ProjectInformationTextAction? copyText,
   ProjectInformationTextAction? shareText,
+  ProjectInformationMutationApplication? mutations,
 }) => MaterialApp(
   home: ProjectInformationPage(
-    application: ProjectInformationApplication(source: source),
+    application: ProjectInformationApplication(
+      source: source,
+      mutations: mutations,
+    ),
     projectId: _projectA,
     profileApplication: profileApplication,
     copyText: copyText,
     shareText: shareText,
   ),
 );
+
+ProjectInformationEntry _userEntry(
+  String id,
+  String label, {
+  required bool archived,
+  ProjectInformationCategory category =
+      ProjectInformationCategory.siteReference,
+}) => ProjectInformationEntry(
+  id: id,
+  projectId: _projectA,
+  category: category,
+  label: label,
+  value: const ProjectInformationEntryValue.text('SR-42'),
+  revision: 1,
+  createdAt: '2026-09-13T09:00:00.000Z',
+  updatedAt: '2026-09-13T09:00:00.000Z',
+  archivedAt: archived ? '2026-09-13T10:00:00.000Z' : null,
+);
+
+class _InformationMutations implements ProjectInformationMutationApplication {
+  final List<ProjectInformationEntry> entries = [];
+  final List<ProjectInformationPin> pins = [];
+  final List<CreateProjectInformationEntryCommand> created = [];
+  final List<UpdateProjectInformationEntryCommand> updated = [];
+  final List<SetProjectInformationEntryArchiveCommand> archived = [];
+  final List<SetProjectInformationPinCommand> pinned = [];
+  final List<RemoveProjectInformationPinCommand> unpinned = [];
+  bool failUpdates = false;
+
+  @override
+  Future<List<ProjectInformationEntry>> listUserEntries(
+    String projectId, {
+    ProjectInformationArchiveFilter archiveFilter =
+        ProjectInformationArchiveFilter.active,
+  }) async => entries
+      .where((entry) {
+        if (entry.projectId != projectId) return false;
+        return switch (archiveFilter) {
+          ProjectInformationArchiveFilter.active => !entry.isArchived,
+          ProjectInformationArchiveFilter.archived => entry.isArchived,
+          ProjectInformationArchiveFilter.all => true,
+        };
+      })
+      .toList(growable: false);
+
+  @override
+  Future<ProjectInformationEntry> createUserEntry(
+    CreateProjectInformationEntryCommand command,
+  ) async {
+    created.add(command);
+    final entry = ProjectInformationEntry(
+      id: command.id,
+      projectId: command.projectId,
+      category: command.category,
+      label: command.label,
+      value: command.value,
+      unit: command.unit,
+      note: command.note,
+      revision: 1,
+      createdAt: '2026-09-13T09:00:00.000Z',
+      updatedAt: '2026-09-13T09:00:00.000Z',
+    );
+    entries.add(entry);
+    return entry;
+  }
+
+  @override
+  Future<ProjectInformationEntry> updateUserEntry(
+    UpdateProjectInformationEntryCommand command,
+  ) async {
+    updated.add(command);
+    if (failUpdates) throw const ProjectInformationRevisionConflict();
+    final index = entries.indexWhere((entry) => entry.id == command.id);
+    final current = entries[index];
+    final replacement = ProjectInformationEntry(
+      id: current.id,
+      projectId: current.projectId,
+      category: command.category,
+      label: command.label,
+      value: command.value,
+      unit: command.unit,
+      note: command.note,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-09-13T10:00:00.000Z',
+      archivedAt: current.archivedAt,
+    );
+    entries[index] = replacement;
+    return replacement;
+  }
+
+  @override
+  Future<ProjectInformationEntry> setUserEntryArchived(
+    SetProjectInformationEntryArchiveCommand command,
+  ) async {
+    archived.add(command);
+    final index = entries.indexWhere((entry) => entry.id == command.id);
+    final current = entries[index];
+    final replacement = ProjectInformationEntry(
+      id: current.id,
+      projectId: current.projectId,
+      category: current.category,
+      label: current.label,
+      value: current.value,
+      unit: current.unit,
+      note: current.note,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-09-13T10:00:00.000Z',
+      archivedAt: command.archived ? '2026-09-13T10:00:00.000Z' : null,
+    );
+    entries[index] = replacement;
+    return replacement;
+  }
+
+  @override
+  Future<List<ProjectInformationPin>> listPins(String projectId) async =>
+      pins.where((pin) => pin.projectId == projectId).toList(growable: false);
+
+  @override
+  Future<ProjectInformationPin> setPin(
+    SetProjectInformationPinCommand command,
+  ) async {
+    pinned.add(command);
+    final pin = ProjectInformationPin(
+      id: command.id,
+      projectId: command.projectId,
+      key: command.key,
+      sortOrder: pins.length,
+      revision: 1,
+      createdAt: '2026-09-13T10:00:00.000Z',
+      updatedAt: '2026-09-13T10:00:00.000Z',
+      sourceAvailable: true,
+    );
+    pins.add(pin);
+    return pin;
+  }
+
+  @override
+  Future<void> removePin(RemoveProjectInformationPinCommand command) async {
+    unpinned.add(command);
+    pins.removeWhere((pin) => pin.id == command.id);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class _RestoreProfileApplication implements ProjectProfileApplication {
   _RestoreProfileApplication(this.source);
