@@ -1,11 +1,13 @@
-# CSE Workflow Acceleration Protocol — v9
+# CSE Workflow Acceleration Protocol — v10
 
 **Belge türü:** Bağlayıcı execution, correction ve publication protokolü
-**Geçerlilik tarihi:** 2026-09-10
+**Geçerlilik tarihi:** 2026-09-13
 
 Amaç maksimum kanıt üretmek değil, değişen sözleşmenin riskini karşılayan en hafif süreçle güvenli ürünü hızla master'a taşımaktır.
 
 Bu belge workflow lane, correction, evidence ve publication konularında eski ağır Issue/authority tariflerinden önceliklidir. Ürün/veri ilkeleri ve kritik safety sınırları override edilmez.
+
+Bu belgedeki **Execution Agent** (Repository Execution Agent), `AGENTS.md`'de tanımlanan provider-neutral repository-local execution rolüdür. Current provider Claude Code'dur (bootstrap: repository root `CLAUDE.md`); Codex uyumlu bir gelecek provider olarak kalır. Lane, topology, budget ve publication kuralları provider değişiminde aynıdır.
 
 ## 0. Zorunlu aktör dispatch'i
 
@@ -14,12 +16,12 @@ Her talepte lane'den önce sıradaki tek aksiyon ve aktör seçilir:
 | İş | Aktör |
 |---|---|
 | GitHub okuma, plan, Issue/PR koordinasyonu, review, gate doğrulaması ve standing owner yetkisiyle otomatik Ready/squash merge | ChatGPT |
-| Repository/local dosya değişikliği, format/diff, local Git, commit/push | Codex |
-| Repository-local terminal, automated test/analyzer ve build/APK hazırlığı | Codex |
+| Repository/local dosya değişikliği, format/diff, local Git, commit/push | Execution Agent |
+| Repository-local terminal, automated test/analyzer ve build/APK hazırlığı | Execution Agent |
 | Manuel ürün/device kabulü ve nihai davranış PASS/FAIL | Fatih; terminal komutu çalıştırmaz |
-| Emulator/ADB/device execution | Yalnız exact package/device/data-safety owner delegasyonuyla Codex |
+| Emulator/ADB/device execution | Yalnız exact package/device/data-safety owner delegasyonuyla Execution Agent |
 
-Codex gereken işte ChatGPT kullanıcının `Codex ile çalış` demesini beklemez. `Sıradaki aktör: Codex` der ve current Issue/protokolü kopyalamadan yalnız goal, allowlist, stop ve handoff'u içeren 10–15 satırlık exact görev verir.
+Execution Agent gereken işte ChatGPT kullanıcının `Execution Agent ile çalış` demesini beklemez. `Sıradaki aktör: Execution Agent` der ve current Issue/protokolü kopyalamadan yalnız goal, allowlist, stop ve handoff'u içeren 10–15 satırlık exact görev verir.
 
 ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istenmez. Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla biter; kalan iş yoksa aktör `Yok` olur.
 
@@ -86,8 +88,12 @@ Scout ve Reviewer production dosyası, branch'i veya PR'si değiştirmez; commit
 da push yapmaz. Reviewer `CHANGES_REQUIRED` verirse düzeltmeyi aynı task ve
 production branch içinde Builder yapar ve güncel exact revision yeniden incelenir.
 Her iki topology'de de tek production branch, tek Draft PR ve stacked-PR yasağı
-korunur. ADS Reviewer, CSE'nin zorunlu ChatGPT/owner review veya manual/device
-gate'inin yerine geçmez. Ayrıntılı lane davranışı pinned ADS CORE/skill'lerdedir.
+korunur. Execution Agent'ın current provider'ı subagent desteği sunuyorsa
+(ör. Claude Code subagent'ları) bile bu sınır aynen geçerlidir: Scout ve Reviewer
+subagent olarak çalıştırılsa dahi kesin READ-only kalır; hiçbir subagent yalnızca
+provider bu yeteneği desteklediği için production WRITE yetkisi kazanmaz. ADS
+Reviewer, CSE'nin zorunlu ChatGPT/owner review veya manual/device gate'inin
+yerine geçmez. Ayrıntılı lane davranışı pinned ADS CORE/skill'lerdedir.
 
 Varsayılan parent orchestration `NONE`'dır; tek feature execution kuralı değişmez.
 `MULTI_FEATURE_PARALLEL`, üçüncü feature topology değil, yalnız ayrı owner-approved
@@ -130,22 +136,22 @@ merge, device veya release yoktur.
 
 ## 2. Göreve özel execution time budget
 
-Her Codex handoff'u ChatGPT'nin kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre seçtiği açık `Execution time budget: <süre>` alanını içerir. Global sabit süre varsayılanı yoktur. Codex bu bütçe içinde tek bounded outcome üretir; yetkili inceleme, edit/fix, focused validation ve commit/push mümkünse aynı adımda tamamlanır.
+Her Execution Agent handoff'u ChatGPT'nin kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre seçtiği açık `Execution time budget: <süre>` alanını içerir. Global sabit süre varsayılanı yoktur. Execution Agent bu bütçe içinde tek bounded outcome üretir; yetkili inceleme, edit/fix, focused validation ve commit/push mümkünse aynı adımda tamamlanır.
 
 Süre dolduğunda:
 
 - yeni yöntem denenmez;
 - başka davranışa geçilmez;
 - kapsam genişletilmez;
-- Codex durur ve mevcut çalışmayı güvenle korur; tamamlanan iş, exact blocker ve kalan tek adım raporlanır.
+- Execution Agent durur ve mevcut çalışmayı güvenle korur; tamamlanan iş, exact blocker ve kalan tek adım raporlanır.
 
-Görev ancak kapsam veya gerçek süre ihtiyacı gerektiriyorsa açık bütçeli alt adımlara bölünür. Codex bütçeyi kendiliğinden uzatmaz. Her feature envelope'unda yalnız bir production writer yürür; `PARALLEL_READ` içindeki Scout/Reviewer salt-okuma lane'leri aynı task envelope'u içinde paralel olabilir. Parent mode `NONE` iken yalnız bir feature envelope'u aktiftir. Süre bütçesi CRITICAL veya publication kapılarını gevşetmez.
+Görev ancak kapsam veya gerçek süre ihtiyacı gerektiriyorsa açık bütçeli alt adımlara bölünür. Execution Agent bütçeyi kendiliğinden uzatmaz. Her feature envelope'unda yalnız bir production writer yürür; `PARALLEL_READ` içindeki Scout/Reviewer salt-okuma lane'leri aynı task envelope'u içinde paralel olabilir. Parent mode `NONE` iken yalnız bir feature envelope'u aktiftir. Süre bütçesi CRITICAL veya publication kapılarını gevşetmez.
 
 ## 3. Execution ve kabul sahipliği
 
-Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
+Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Execution Agent tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
 
-Codex source edit, format, changed-path review, `git diff --check`, protected drift ve minimum yeterli automated doğrulamayı yapar; sonuçları raporlar. Fatih'e yalnız manuel kabul adımları verilir.
+Execution Agent source edit, format, changed-path review, `git diff --check`, protected drift ve minimum yeterli automated doğrulamayı yapar; sonuçları raporlar. Fatih'e yalnız manuel kabul adımları verilir.
 
 ### Non-CRITICAL one-pass teslim
 
@@ -157,7 +163,7 @@ FAST/STANDARD bug ve küçük/orta feature işinin varsayılanı:
 - Bir başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir. Kararı değiştirmeyen diagnostic, harness ve test döngüleri yasaktır.
 - Owner/device kanıtı, gerçek davranışı temsil edemeyen yapay test harness'inden üstündür. Widget/fake test PASS'i cihaz FAIL'ini geçersiz kılmaz; harness'in hatayı üretememesi tek başına fix blocker'ı olmaz.
 - Düzeltme için tek focused automated validation çalıştırılır; docs-only işte minimum docs kontrolleri bu doğrulamayı karşılar. Analyzer yalnız material ihtiyaç varsa eklenir. Değişmeyen source üzerinde geçen test tekrarlanmaz.
-- Manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde, değişen yol için bir kez yapılır. Gerekmiyorsa gerekçesiyle `GEREKMİYOR` yazılır; Codex automated PASS sonrası yetkili commit/push manuel PASS beklemez.
+- Manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde, değişen yol için bir kez yapılır. Gerekmiyorsa gerekçesiyle `GEREKMİYOR` yazılır; Execution Agent automated PASS sonrası yetkili commit/push manuel PASS beklemez.
 - Gereken manuel/device kabul Fatih'in PASS/FAIL kapısındadır. Gerekli validation/kabul FAIL veya PENDING ise commit/push yapılmaz; düzeltme §7'ye göre yürür. Required review ve task-specific validation/manual kapıları PASS veya açıkça GEREKMİYOR olduktan ve blocker, REQUEST_CHANGES, scope/allowlist/base/head drift, conflict veya mergeability sorunu bulunmadıktan sonra ChatGPT standing owner yetkisiyle PR'yi ayrıca Fatih'e sormadan otomatik Ready yapar ve squash merge eder. CRITICAL evidence ve Issue-specific gate'ler korunur; release/store ile destructive production/device/data işlemleri ayrı açık owner onayı ister.
 
 ## 4. FAST akışı
@@ -187,7 +193,7 @@ FAST için varsayılan olarak yoktur:
 
 Current GitHub `master` ruleset'i PR gerektiriyorsa tek kısa ömürlü branch ve tek minimal Draft PR kullanılır. Bu repository zorunluluğu FAST işi STANDARD'a yükseltmez ve ek Issue/evidence/review töreni doğurmaz.
 
-Codex automated PASS gerekir. Manuel/device kabul gerekiyorsa ayrıca Fatih PASS beklenir; gerekmiyorsa bu kapı publication'ı bekletmez. Gerekli kontrol FAIL/PENDING durumundayken yeni işe geçilmez.
+Execution Agent automated PASS gerekir. Manuel/device kabul gerekiyorsa ayrıca Fatih PASS beklenir; gerekmiyorsa bu kapı publication'ı bekletmez. Gerekli kontrol FAIL/PENDING durumundayken yeni işe geçilmez.
 
 ## 5. STANDARD akışı
 
@@ -251,7 +257,7 @@ Aynı hata için:
 
 - mevcut owner/device ve source kanıtıyla root cause yeterince belirlenir; deterministic automated FAIL önkoşulu konmaz;
 - tek dar correction yapılır;
-- Codex yalnız etkilenen focused doğrulamayı bir kez çalıştırır; analyzer ve Fatih'in manuel/device kabulü yalnız ihtiyaç varsa yeniden değerlendirilir.
+- Execution Agent yalnız etkilenen focused doğrulamayı bir kez çalıştırır; analyzer ve Fatih'in manuel/device kabulü yalnız ihtiyaç varsa yeniden değerlendirilir.
 
 Yeni authority yalnız şu durumlarda gerekir:
 
@@ -269,7 +275,7 @@ FAST minimum:
 changed behavior
 changed paths
 format/diff-check
-Codex automated validation status
+Execution Agent automated validation status
 Fatih manual acceptance status / GEREKMİYOR gerekçesi
 commit/push
 PR: GEREKMİYOR | <numara>
@@ -284,7 +290,7 @@ Aynı bilgi Issue, comment, task, result, state ve PR body içinde tekrarlanmaz.
 
 ## 9. Publication ve Issue disposition
 
-- FAST: Codex automated PASS ve yalnız gerekiyorsa Fatih manuel/device PASS sonrası feature başına tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa feature başına tek minimal Draft PR ve required review/gate PASS sonrası ChatGPT'nin otomatik Ready/squash merge'i.
+- FAST: Execution Agent automated PASS ve yalnız gerekiyorsa Fatih manuel/device PASS sonrası feature başına tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa feature başına tek minimal Draft PR ve required review/gate PASS sonrası ChatGPT'nin otomatik Ready/squash merge'i.
 - STANDARD: feature başına tek branch ve gerekiyorsa tek Draft PR; squash merge varsayılanı.
 - `MULTI_FEATURE_PARALLEL` yalnız parent lock'taki en fazla üç feature PR'ını açık tutabilir; integration yine birer birer ve güncel target-master kanıtıyla yürür.
 - CRITICAL: Issue'ya özel publication ve review zinciri.
@@ -321,13 +327,13 @@ Yalnız STANDARD correction turu tükendiyse `STOP — CORRECTION ESCALATION` ku
 
 ## 11. Başarı ölçütleri
 
-- Her Codex handoff'unda ChatGPT-assigned explicit execution time budget: %100
+- Her Execution Agent handoff'unda ChatGPT-assigned explicit execution time budget: %100
 - FAST Issue/`.cse`/routing YAML: 0
 - FAST publication current master ruleset uyumu: %100
 - FAST short-lived branch/minimal PR: ruleset gerektiriyorsa tam 1
-- Codex manuel ürün kabulü kararı: 0
+- Execution Agent manuel ürün kabulü kararı: 0
 - Fatih'e terminal execution görevi/komutu verme: 0
-- exact owner delegasyonu olmadan Codex emulator/ADB/device invocation: 0
+- exact owner delegasyonu olmadan Execution Agent emulator/ADB/device invocation: 0
 - gerekli automated veya manuel/device PASS olmadan non-CRITICAL commit/push: 0
 - stacked PR: 0
 - parent mode `NONE` iken aynı anda production PR: en fazla 1
@@ -338,4 +344,4 @@ Yalnız STANDARD correction turu tükendiyse `STOP — CORRECTION ESCALATION` ku
 
 ## 12. Ana karar
 
-> Non-CRITICAL varsayılanı one-pass teslim, göreve özel süre bütçesi, tek focused validation ve yalnız gereken manuel/device kabulüdür. Publication current GitHub ruleset'inin izin verdiği en hafif branch/PR yoluyla yürür; required gate'ler geçince standing owner yetkisi Ready/squash merge ve açık `Closes` disposition'ı için otomatik uygulanır. CRITICAL veri/release güvenliği ile ayrı release/store ve destructive işlem onayları korunur.
+> Non-CRITICAL varsayılanı one-pass teslim, göreve özel süre bütçesi, tek focused validation ve yalnız gereken manuel/device kabulüdür. Publication current GitHub ruleset'inin izin verdiği en hafif branch/PR yoluyla yürür; required gate'ler geçince standing owner yetkisi Ready/squash merge ve açık `Closes` disposition'ı için otomatik uygulanır. CRITICAL veri/release güvenliği ile ayrı release/store ve destructive işlem onayları korunur. Execution Agent rolü ve bu protokol provider-neutral kalır; provider (Claude Code, Codex) değişimi lane/topology/publication kurallarını değiştirmez.

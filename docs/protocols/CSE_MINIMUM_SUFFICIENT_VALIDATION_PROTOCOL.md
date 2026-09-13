@@ -1,15 +1,17 @@
-# CSE Minimum Yeterli Doğrulama Protokolü — One-Pass Validation v5
+# CSE Minimum Yeterli Doğrulama Protokolü — One-Pass Validation v6
 
 **Belge türü:** Bağlayıcı validation ve evidence protokolü
-**Geçerlilik tarihi:** 2026-09-10
+**Geçerlilik tarihi:** 2026-09-13
 
 Doğru hedef maksimum test değil, değişen sözleşmenin riskini karşılayan minimum yeterli doğrulamadır.
 
+Bu belgedeki **Execution Agent** (Repository Execution Agent), `AGENTS.md`'de tanımlanan provider-neutral repository-local execution rolüdür. Current provider Claude Code'dur (bootstrap: repository root `CLAUDE.md`); Codex uyumlu bir gelecek provider olarak kalır.
+
 ## 1. Execution ve kabul sahipliği
 
-Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
+Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Execution Agent tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
 
-Codex format, diff, `git diff --check` ve protected drift kontrolünü de yapar. Açık device delegasyonunda yalnız exact komutu çalıştırır; kapsam genişletmez ve retry yapmaz.
+Execution Agent format, diff, `git diff --check` ve protected drift kontrolünü de yapar. Açık device delegasyonunda yalnız exact komutu çalıştırır; kapsam genişletmez ve retry yapmaz.
 
 ## 2. Validation sınıfları
 
@@ -30,7 +32,7 @@ Test/analyzer/build/device gerekmez.
 
 ### narrow-ui
 
-Minimum doğrulama (automated execution Codex, manuel kabul Fatih):
+Minimum doğrulama (automated execution Execution Agent, manuel kabul Fatih):
 
 - değişen behavior için tek focused automated doğrulama;
 - analyzer yalnız değişen Dart sözleşmesi veya statik risk için material ihtiyaç varsa;
@@ -40,7 +42,7 @@ Full suite her mikro adımda çalıştırılmaz.
 
 ### domain
 
-Minimum doğrulama (automated execution Codex, manuel kabul Fatih):
+Minimum doğrulama (automated execution Execution Agent, manuel kabul Fatih):
 
 - ilgili domain/application testleri;
 - etkilenen adapter/persistence testleri;
@@ -74,7 +76,7 @@ Sınıfın zorunlu minimumunu karşılayan stop-on-success sırası:
 5. manuel/device ve gerekiyorsa build — runtime'a özgü davranış veya açık owner talebi varsa;
 6. release gate — yalnız CRITICAL/release.
 
-Sınıfın minimumu karşılandıysa sırf daha fazla güven hissi için sonraki basamak çalıştırılmaz. Gereken manuel/device kabul Fatih'in PASS/FAIL kapısıdır; Codex automated PASS bu kararı vermez. Non-CRITICAL işte bu kabul gerekmiyorsa gerekçesiyle `GEREKMİYOR` kaydedilir ve Codex automated PASS sonrası yetkili commit/push manuel PASS beklemez.
+Sınıfın minimumu karşılandıysa sırf daha fazla güven hissi için sonraki basamak çalıştırılmaz. Gereken manuel/device kabul Fatih'in PASS/FAIL kapısıdır; Execution Agent automated PASS bu kararı vermez. Non-CRITICAL işte bu kabul gerekmiyorsa gerekçesiyle `GEREKMİYOR` kaydedilir ve Execution Agent automated PASS sonrası yetkili commit/push manuel PASS beklemez.
 
 ## 4. Kanıt yeniden kullanımı
 
@@ -104,23 +106,23 @@ artifact işlemi doğrulanmış sayılmaz.
 
 ## 5. Mikro adım doğrulaması
 
-Codex her mikro adım sonunda şunu teslim eder:
+Execution Agent her mikro adım sonunda şunu teslim eder:
 
 ```text
 Changed behavior:
 Changed paths:
 Static checks:
-Codex execution / result:
+Execution Agent execution / result:
 Manual check: GEREKMİYOR (<gerekçe>) | PENDING | PASS | FAIL
 Expected result: <yalnız gereken manuel kontrol için>
 ```
 
-Codex automated sonuçları ve exact hatayı raporlar. Fatih yalnız manuel ürün/device kabulü için `PASS` veya `FAIL` bildirir; kendisine terminal komutu verilmez.
+Execution Agent automated sonuçları ve exact hatayı raporlar. Fatih yalnız manuel ürün/device kabulü için `PASS` veya `FAIL` bildirir; kendisine terminal komutu verilmez.
 
 Non-CRITICAL publication:
 
-- Codex automated PASS ve manuel/device kabul GEREKMİYOR: yetkili commit/push yapılabilir.
-- Manuel/device kabul gerekiyorsa Codex automated PASS yanında Fatih PASS gerekir.
+- Execution Agent automated PASS ve manuel/device kabul GEREKMİYOR: yetkili commit/push yapılabilir.
+- Manuel/device kabul gerekiyorsa Execution Agent automated PASS yanında Fatih PASS gerekir.
 - Gerekli doğrulama/kabul FAIL veya PENDING/PARTIAL: commit/push kapalı kalır; exact hata için same-scope correction kuralı uygulanır.
 - STANDARD işte normalde ilk teslimden sonra en fazla bir same-scope correction turu; sorun sürüyorsa escalation.
 
@@ -128,11 +130,11 @@ CRITICAL publication ve owner Ready/merge/release kapıları değişmez.
 
 ## 6. Süre bütçesi
 
-Her Codex handoff'unda ChatGPT açık `Execution time budget: <süre>` verir. Süre; kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre atanır; global sabit süre varsayılanı yoktur.
+Her Execution Agent handoff'unda ChatGPT açık `Execution time budget: <süre>` verir. Süre; kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre atanır; global sabit süre varsayılanı yoktur.
 
 Repository-local terminal, automated test, analyzer, build ve açıkça devredilen emulator/ADB/device execution bu göreve özel bütçeye dahildir; owner manuel kabulü ayrı değerlendirilir. İnceleme, edit/fix, focused validation ve yetkili commit/push bütçeye sığıyorsa tek adımda birleştirilir.
 
-Bütçe dolunca Codex durur:
+Bütçe dolunca Execution Agent durur:
 
 - yeni yaklaşım veya geniş gate başlatmaz;
 - kapsamı genişletmez;
@@ -145,7 +147,7 @@ Gerekli yeni handoff'un bütçesini ChatGPT belirler. Süre bütçesi CRITICAL v
 - Non-CRITICAL işte kararı değiştirmeyen diagnostic/test/harness döngüleri yasaktır; tek başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir.
 - Aynı failed operation exact düzeltme olmadan tekrarlanmaz.
 - Ortam/toolchain hatası feature kapsamına sessizce alınmaz.
-- Codex exact hata çıktısını kaydeder ve yalnız current scope içindeki dar source correction'ı hazırlar.
+- Execution Agent exact hata çıktısını kaydeder ve yalnız current scope içindeki dar source correction'ı hazırlar.
 - Toolchain, SDK, Gradle, signing veya device setup değişikliği ayrı karar ister.
 
 ## 8. Fiziksel cihaz kabulü
@@ -178,7 +180,7 @@ Test edilmemiş behavior `VERIFIED`, `FIELD_ACCEPTED` veya `RELEASE_READY` diye 
 
 ## 10. Stop kriterleri
 
-Codex şu durumlarda durur:
+Execution Agent şu durumlarda durur:
 
 - handoff'taki açık execution time budget doldu;
 - yeni CRITICAL trigger bulundu;
@@ -189,4 +191,4 @@ Codex şu durumlarda durur:
 
 ## 11. Ana karar
 
-> Non-CRITICAL işte Codex tek focused validation ile ilerler; Fatih yalnız gereken manuel/device kabulünü verir. Göreve özel süre bütçesi, exact device delegasyonu ve veri güvenliği sınırları korunur. Aynı kanıt tekrar üretilmez; CRITICAL ve owner Ready/merge/release kapıları değişmez.
+> Non-CRITICAL işte Execution Agent tek focused validation ile ilerler; Fatih yalnız gereken manuel/device kabulünü verir. Göreve özel süre bütçesi, exact device delegasyonu ve veri güvenliği sınırları korunur. Aynı kanıt tekrar üretilmez; CRITICAL ve owner Ready/merge/release kapıları değişmez. Execution Agent rolü provider-neutral kalır; provider (Claude Code, Codex) değişimi bu doğrulama sözleşmesini değiştirmez.

@@ -1,8 +1,10 @@
-# CSE Owner Communication Standard — Concise v5
+# CSE Owner Communication Standard — Concise v6
 
-**Geçerlilik tarihi:** 2026-09-09
+**Geçerlilik tarihi:** 2026-09-13
 
 CSE'de teknik gerçek saklanmaz; owner'a önce ürünün ve işlemin pratik anlamı anlatılır.
+
+Bu belgedeki **Execution Agent** (Repository Execution Agent), `AGENTS.md`'de tanımlanan provider-neutral repository-local execution rolüdür. Current provider Claude Code'dur (bootstrap: repository root `CLAUDE.md`); Codex uyumlu bir gelecek provider olarak kalır.
 
 ## 0. Her yanıtta anlaşılır dil
 
@@ -14,7 +16,7 @@ ChatGPT kullanıcıya teslim ettiği her sonuçta, teknik kaydı göstermeden ö
 
 Owner'ın Git, Android veya test terimlerini çözerek sonucu çıkarması beklenmez. `fast-forward`, `divergence`, `head`, `allowlist`, `artifact` veya benzeri bir terim kullanılıyorsa günlük dilde karşılığı aynı yerde söylenir.
 
-Ham Codex çıktısı, YAML veya komut dökümü ana açıklamanın yerine geçmez. ChatGPT bunları kısa bir sonuca çevirir; teknik ayrıntıyı yalnız kanıt veya uygulama talimatı olarak ikinci katmanda verir. Dil sade olur ancak risk, başarısızlık veya eksik doğrulama yumuşatılmaz.
+Ham Execution Agent çıktısı, YAML veya komut dökümü ana açıklamanın yerine geçmez. ChatGPT bunları kısa bir sonuca çevirir; teknik ayrıntıyı yalnız kanıt veya uygulama talimatı olarak ikinci katmanda verir. Dil sade olur ancak risk, başarısızlık veya eksik doğrulama yumuşatılmaz.
 
 ## 1. Mikro mesajlar
 
@@ -24,7 +26,7 @@ FAST ve rutin STANDARD ara sonuçları normalde 2–5 cümledir:
 - sonuç veya blocker;
 - sıradaki tek aksiyon, sorumlu aktör ve uygulanabilir talimat.
 
-Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <ChatGPT|Codex|Fatih|Yok>: <tek uygulanabilir talimat>.` satırıyla biter. Devam işi yoksa `Yok: İş tamamlandı.` yazılır; yapay iş üretilmez.
+Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <ChatGPT|Execution Agent|Fatih|Yok>: <tek uygulanabilir talimat>.` satırıyla biter. Devam işi yoksa `Yok: İş tamamlandı.` yazılır; yapay iş üretilmez.
 
 Her mikro adımda altı başlıklı rapor, YAML veya uzun chronology yazılmaz.
 
@@ -90,36 +92,36 @@ SHA, branch, test tally, schema, divergence ve YAML:
 
 verilir.
 
-Salt YAML owner cevabı olamaz. Codex completion metni owner'a doğrudan kopyalanmaz; ChatGPT ürün diline çevirir.
+Salt YAML owner cevabı olamaz. Execution Agent completion metni owner'a doğrudan kopyalanmaz; ChatGPT ürün diline çevirir.
 
 ## 6. Sıradaki aksiyon, publication ve Issue closure
 
 Her sonuçta yalnız owner'ın değil, sıradaki işi kimin yapacağı da açık olmalıdır:
 
 - `Sıradaki aksiyon — Fatih: Manuel ürün kontrolünü yap ve davranış PASS/FAIL kararını bildir.`
-- `Sıradaki aksiyon — Codex: Verilen exact görevi handoff'taki execution time budget içinde uygula.`
+- `Sıradaki aksiyon — Execution Agent: Verilen exact görevi handoff'taki execution time budget içinde uygula.`
 - `Sıradaki aksiyon — ChatGPT: Owner-approved PR işlemini tamamla.`
 - `Sıradaki aksiyon — Yok: İş tamamlandı.`
 
 Bir aksiyon tamamlandıktan sonra sıradaki aksiyonun yalnız adı verilmez. Aynı yanıtta:
 
-- Codex için `Hazır Codex talimatı:` altında kopyalanabilir 10–15 satırlık exact görev ve ChatGPT'nin kapsam/risk, beklenen validation/build/device işi ve blocker'a göre belirlediği açık `Execution time budget: <süre>`;
+- Execution Agent için `Hazır Execution Agent talimatı:` altında kopyalanabilir 10–15 satırlık exact görev ve ChatGPT'nin kapsam/risk, beklenen validation/build/device işi ve blocker'a göre belirlediği açık `Execution time budget: <süre>`;
 - Fatih için `Hazır Fatih talimatı:` altında yalnız manuel ürün/device kontrolü ve beklenen sonuç; terminal komutu verilmez;
 - ChatGPT için mevcut authority içindeyse kendiliğinden execution, değilse gereken tek owner onayı
 
 sunulur.
 
-`PARALLEL_READ` seçildiğinde de owner-facing `Hazır Codex talimatı` **yalnız bir tanedir**. Bu tek talimat ana Codex'i `Builder/WRITE` olarak başlatır ve Builder'ın native Codex collaboration/subagent yeteneğiyle tam 1 `Scout/READ` ve 1 `Reviewer/READ` oluşturup yönetmesini ister. Fatih'e üç ayrı agent prompt'u verilmez; üç ayrı Codex sohbeti/süreci açması veya Scout/Reviewer sonuçlarını Builder'a taşıması istenmez.
+`PARALLEL_READ` seçildiğinde de owner-facing `Hazır Execution Agent talimatı` **yalnız bir tanedir**. Bu tek talimat ana Execution Agent'ı `Builder/WRITE` olarak başlatır ve Builder'ın native collaboration/subagent yeteneğiyle (ör. Claude Code subagent desteği) tam 1 `Scout/READ` ve 1 `Reviewer/READ` oluşturup yönetmesini ister. Fatih'e üç ayrı agent prompt'u verilmez; üç ayrı Execution Agent sohbeti/süreci açması veya Scout/Reviewer sonuçlarını Builder'a taşıması istenmez.
 
 Scout sonucunu Builder kendi tüketir. Builder final exact revision/snapshot'ı Reviewer'a kendisi verir; `CHANGES_REQUIRED` varsa aynı task içinde düzeltir ve Reviewer'a yeniden inceletir. Owner'a ancak gerçek owner/authority veya manuel/device gate'i, native subagent capability için `ROUTING_ESCALATION_REQUIRED`, ya da tek kanonik final sonuç döner.
 
-Native subagent/collaboration yeteneği execution yüzeyinde gerçekten kullanılamıyorsa ChatGPT/Codex bunu üç manuel session'la sessizce telafi etmez ve topology'yi `SINGLE`'a düşürmez. Manuel üç-session çalışma ancak Fatih ayrıca açıkça fallback olarak seçerse kullanılabilir.
+Native subagent/collaboration yeteneği execution yüzeyinde gerçekten kullanılamıyorsa ChatGPT/Execution Agent bunu üç manuel session'la sessizce telafi etmez ve topology'yi `SINGLE`'a düşürmez. Manuel üç-session çalışma ancak Fatih ayrıca açıkça fallback olarak seçerse kullanılabilir.
 
-Repository/local execution gerekiyorsa ChatGPT, owner'ın ayrıca `Codex ile çalış`, `devam` veya `talimat hazırla` demesini beklemez; Codex handoff'unu kendiliğinden verir. ChatGPT'ın yetkili olduğu mevcut owner-approved işlem için ayrıca `devam` istenmez.
+Repository/local execution gerekiyorsa ChatGPT, owner'ın ayrıca `Execution Agent ile çalış`, `devam` veya `talimat hazırla` demesini beklemez; Execution Agent handoff'unu kendiliğinden verir. ChatGPT'ın yetkili olduğu mevcut owner-approved işlem için ayrıca `devam` istenmez.
 
-Fatih'e yalnız gerçekten owner kararı veya manuel/device kabul gerektiren aksiyon verilir. Non-CRITICAL işte manuel/device kabul gerekmiyorsa kısa gerekçeyle `GEREKMİYOR` yazılır; Codex automated PASS sonrası commit/push için manuel PASS istenmez. Gereken manuel/device kabulde Fatih PASS/FAIL kapısı korunur. Automated PASS, manuel PASS veya Ready/merge/release yetkisi gibi sunulmaz.
+Fatih'e yalnız gerçekten owner kararı veya manuel/device kabul gerektiren aksiyon verilir. Non-CRITICAL işte manuel/device kabul gerekmiyorsa kısa gerekçeyle `GEREKMİYOR` yazılır; Execution Agent automated PASS sonrası commit/push için manuel PASS istenmez. Gereken manuel/device kabulde Fatih PASS/FAIL kapısı korunur. Automated PASS, manuel PASS veya Ready/merge/release yetkisi gibi sunulmaz.
 
-Her Codex handoff'unda açık süre bütçesi zorunludur; global sabit süre kullanılmaz. Bütçe dolarsa Codex çalışmayı güvenle koruyup durur, yeni yaklaşım başlatmadan exact blocker ve kalan tek aksiyonu bildirir. CRITICAL ve owner Ready/merge/release kapıları değişmez.
+Her Execution Agent handoff'unda açık süre bütçesi zorunludur; global sabit süre kullanılmaz. Bütçe dolarsa Execution Agent çalışmayı güvenle koruyup durur, yeni yaklaşım başlatmadan exact blocker ve kalan tek aksiyonu bildirir. CRITICAL ve owner Ready/merge/release kapıları değişmez.
 
 Tek amaçlı implementation Issue'su incelenen PR body'de açıkça `Closes #...` ile belirtilmişse owner'ın `merge et` kararı o otomatik kapanışı da kapsar; ikinci bir Issue closure onayı istenmez. Parent, umbrella, manuel acceptance, release veya devam işi `Refs #...` ile açık kalır. PR body disposition'ı belirsizse merge edilmez.
 
@@ -133,4 +135,4 @@ Owner `devam`, `son durum` veya `neden durdu` dediğinde:
 
 ## 8. Ana karar
 
-> Küçük iş küçük anlatılır. Büyük riskte gereken ayrıntı korunur. Owner her zaman projenin nerede olduğunu, merge ile hangi Issue'nun kapanacağını ve kendisinden ne beklendiğini teknik YAML okumadan anlayabilir. `PARALLEL_READ` owner'a tek ana Codex talimatı olarak görünür; Scout ve Reviewer orchestration'ı ana Builder'ın iç işidir.
+> Küçük iş küçük anlatılır. Büyük riskte gereken ayrıntı korunur. Owner her zaman projenin nerede olduğunu, merge ile hangi Issue'nun kapanacağını ve kendisinden ne beklendiğini teknik YAML okumadan anlayabilir. `PARALLEL_READ` owner'a tek ana Execution Agent talimatı olarak görünür; Scout ve Reviewer orchestration'ı ana Builder'ın iç işidir. Execution Agent rolü provider-neutral kalır; current provider Claude Code'dur, Codex uyumlu bir gelecek provider olarak kalır.

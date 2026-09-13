@@ -1,9 +1,11 @@
 # CSE Proje Talimatları — Git ve Veri Güvenliği
 
 **Belge türü:** Bağlayıcı güvenlik ve repository protokolü
-**Güncelleme tarihi:** 2026-09-10
+**Güncelleme tarihi:** 2026-09-13
 
 Bu belge günlük workflow'u tekrar etmez. Günlük lane, süre, test sahipliği ve publication için `AGENTS.md` ile `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` uygulanır. Bu belge kritik Git, kullanıcı verisi ve repository güvenliği için yetkilidir.
+
+Bu belgedeki **Execution Agent** (Repository Execution Agent), `AGENTS.md`'de tanımlanan provider-neutral repository-local execution rolüdür. Current provider Claude Code'dur (bootstrap: repository root `CLAUDE.md`); Codex uyumlu bir gelecek provider olarak kalır. Rol, yetki ve güvenlik sınırları provider değişiminde aynıdır.
 
 ## 1. Ürün ve veri sınırı
 
@@ -118,27 +120,28 @@ Issue exact allowlist, compatibility, rollback, test ve stop koşullarını taş
 ## 7. Workflow ve test yönlendirmesi
 
 - Lane ve publication: `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`.
-- Test/gate seçimi, Codex execution ve owner manuel kabulü: `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`.
+- Test/gate seçimi, Execution Agent execution ve owner manuel kabulü: `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`.
 - Model/review seçimi: `CSE_MODEL_REASONING_ROUTING_POLICY.md`.
 
 Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 
 ## 8. Roller
 
-### Codex
+### Execution Agent (current provider: Claude Code)
 
 - yalnız izinli dosya ve davranışta çalışır;
 - her handoff'ta ChatGPT'nin açıkça atadığı göreve özel execution time budget'a uyar; global sabit süre varsaymaz, bütçe dolunca çalışmayı güvenle koruyup durur ve exact blocker/kalan aksiyonu raporlar;
 - repository-local terminal, automated test, analyzer ve build/APK hazırlığını yetkili görev kapsamında çalıştırır; manuel ürün kabulü vermez;
 - emulator/ADB/device işlemini yalnız Fatih'in exact package/device/data-safety sınırıyla açık delegasyonunda çalıştırabilir;
 - format, diff, scope ve Git güvenliğini kontrol eder;
-- non-CRITICAL işte Codex automated PASS sonrası, manuel/device kabul gerekmiyorsa yetkili commit/push yapabilir; kabul gerekiyorsa ayrıca Fatih PASS bekler;
-- belirsizlik veya yeni CRITICAL trigger'da durur.
+- non-CRITICAL işte Execution Agent automated PASS sonrası, manuel/device kabul gerekmiyorsa yetkili commit/push yapabilir; kabul gerekiyorsa ayrıca Fatih PASS bekler;
+- belirsizlik veya yeni CRITICAL trigger'da durur;
+- provider-specific izin/hook/setting yalnız kendi adapter sınırında (Claude Code için `.claude/`) tutulur ve blanket permission bypass kullanmaz.
 
 ### ChatGPT
 
 - her talepte execution öncesi current GitHub durumunu, lane'i, sıradaki tek aksiyonu ve sorumlu aktörü belirler;
-- repository/local execution gerekiyorsa kullanıcının `Codex ile çalış` demesini beklemeden kısa exact Codex handoff'u verir; Fatih'e terminal/Git/Flutter/test/analyzer/build komutu vermez;
+- repository/local execution gerekiyorsa kullanıcının `Execution Agent ile çalış` demesini beklemeden kısa exact handoff verir; Fatih'e terminal/Git/Flutter/test/analyzer/build komutu vermez;
 - bu belgenin 3. bölümündeki açık documentation-only owner istisnası dışında GitHub Contents API üzerinden repository dosyası değiştirmez;
 - kendi yetkisindeki mevcut owner-approved koordinasyonu ayrıca `devam` istemeden yürütür;
 - kullanıcıya ürün anlamını açıklar ve her teslim edilen sonucu `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla bitirir;
@@ -150,7 +153,7 @@ Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 
 - ürün kapsamı ve nihai risk kararının sahibidir;
 - yalnız manuel ürün/device kabulünü ve nihai davranış PASS/FAIL kararını verir; terminal komutu çalıştırmaz;
-- mekanik emulator/ADB/device execution'ını yalnız exact güvenlik sınırlarıyla Codex'e açıkça devredebilir;
+- mekanik emulator/ADB/device execution'ını yalnız exact güvenlik sınırlarıyla Execution Agent'a açıkça devredebilir;
 - PASS/FAIL ve ürün kabulü kararını kendisi verir;
 - standing yetki yürürlükteyken required gate'leri geçen PR'ler için ChatGPT'den yeni Ready/merge onayı istenmez; Fatih bu yetkiyi sonraki owner talimatıyla iptal edebilir veya askıya alabilir;
 - release/store ve destructive production/device/data işlemlerini ayrı açıkça onaylar;
@@ -158,4 +161,4 @@ Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 
 ## 9. Ana karar
 
-> Repository ve kullanıcı verisi güvenliği değişmez. Günlük çalışma töreni bu belgeye değil `AGENTS.md` içindeki risk-temelli lane'e göre yürür; required gate'ler geçince standing owner yetkisi Ready/squash merge ve açık `Closes` disposition'ı için otomatik uygulanır. Release/store, destructive işlemler ve gerçek kritik sözleşmeler ayrı owner onayıyla ağır güvenlik sürecinde kalır.
+> Repository ve kullanıcı verisi güvenliği değişmez. Günlük çalışma töreni bu belgeye değil `AGENTS.md` içindeki risk-temelli lane'e göre yürür; required gate'ler geçince standing owner yetkisi Ready/squash merge ve açık `Closes` disposition'ı için otomatik uygulanır. Release/store, destructive işlemler ve gerçek kritik sözleşmeler ayrı owner onayıyla ağır güvenlik sürecinde kalır. Execution Agent rolü provider-neutral kalır; provider (Claude Code, Codex) değişimi bu güvenlik sınırlarını değiştirmez.

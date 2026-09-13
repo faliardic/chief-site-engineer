@@ -1,8 +1,10 @@
-# CSE Model ve Reasoning Routing Policy — v3
+# CSE Model ve Reasoning Routing Policy — v4
 
-**Geçerlilik tarihi:** 2026-09-09
+**Geçerlilik tarihi:** 2026-09-13
 
 Bu belge model ve reasoning seçimini yönlendirir; günlük işte metadata töreni üretmez. Güncel model adları ve availability kalıcı repository gerçeği değildir; execution yüzeyindeki mevcut seçeneklerden doğrulanır.
+
+Bu belgedeki risk/reasoning tabanı capability-temelli ve provider-neutral bir sözleşmedir. `AGENTS.md`'de tanımlanan **Execution Agent** rolünün current provider'ı Claude Code'dur; Codex uyumlu bir gelecek provider olarak kalır. Provider-specific model adları bu canonical sözleşmenin parçası yapılmaz; provider adapter katmanı (Claude Code için `CLAUDE.md`/`.claude`) capability etiketlerini o an mevcut Claude veya Codex modellerine eşler.
 
 ## 1. Risk tabanı
 
@@ -67,7 +69,7 @@ Görünür mismatch varsa fail-closed durulur. Runtime metadata görünmüyorsa 
 - CRITICAL için gereken ChatGPT/bağımsız derin-review tabanı ADS Reviewer lane'i
   bulunmasıyla otomatik karşılanmış sayılmaz.
 - `pro`, model veya reasoning seviyesi değildir.
-- Reasoning seçimi, her Codex handoff'unda ChatGPT'nin kapsam/risk, beklenen validation/build/device işi ve blocker'a göre açıkça verdiği execution time budget'ı kaldırmaz; global sabit süre varsayılanı yoktur.
+- Reasoning seçimi, her Execution Agent handoff'unda ChatGPT'nin kapsam/risk, beklenen validation/build/device işi ve blocker'a göre açıkça verdiği execution time budget'ı kaldırmaz; global sabit süre varsayılanı yoktur.
 
 ## 5. Ana karar
 

@@ -1,8 +1,10 @@
-# CSE Codex Instruction Comment Protocol — Risk-Based v5
+# CSE Execution Agent Instruction Comment Protocol — Risk-Based v6
 
-**Geçerlilik tarihi:** 2026-09-10
+**Geçerlilik tarihi:** 2026-09-13
 
 GitHub comment bir amaç değil, kalıcı ve kritik handoff gerektiğinde kullanılan araçtır.
+
+Bu belgedeki **Execution Agent**, `AGENTS.md`'de tanımlanan provider-neutral repository-local execution rolüdür (dosya adı tarihsel nedenle `CSE_CODEX_INSTRUCTION_COMMENT_PROTOCOL.md` olarak kalır). Current provider Claude Code'dur (bootstrap: repository root `CLAUDE.md`); Codex uyumlu bir gelecek provider olarak kalır.
 
 ## 1. FAST
 
@@ -14,7 +16,7 @@ Chat içindeki kısa görev yeterlidir:
 Goal:
 Allowed paths:
 Do not change:
-Execution time budget: <ChatGPT'nin bu görev için verdiği açık süre; her Codex handoff'unda zorunlu>
+Execution time budget: <ChatGPT'nin bu görev için verdiği açık süre; her Execution Agent handoff'unda zorunlu>
 Fatih validation:
 Commit/push boundary:
 ```
@@ -38,7 +40,7 @@ Base/branch:
 Goal:
 Allowed paths:
 Protected contracts:
-Execution time budget: <ChatGPT'nin bu görev için verdiği açık süre; her Codex handoff'unda zorunlu>
+Execution time budget: <ChatGPT'nin bu görev için verdiği açık süre; her Execution Agent handoff'unda zorunlu>
 Fatih validation:
 Stop conditions:
 Publication boundary:
@@ -62,19 +64,20 @@ Comment gerektiği kadar şunları taşır:
 - commit/push/Ready/merge/release sınırı;
 - final provenance beklentisi.
 
-## 4. Feature-içi PARALLEL_READ ortak handoff'u ve tek ana Codex execution'ı
+## 4. Feature-içi PARALLEL_READ ortak handoff'u ve tek ana Execution Agent execution'ı
 
 STANDARD/CRITICAL `PARALLEL_READ` işte tek ortak kanonik task/handoff kaydı;
 ortak base, goal, allowlist, protected contracts, gates, stop conditions,
 topology ve lane routing'lerini taşır. Aynı bilgi Builder, Scout ve Reviewer için
 üç uzun comment olarak tekrarlanmaz.
 
-**Owner-facing varsayılan yalnız bir Codex talimatıdır.** Fatih'e ayrı Builder,
-Scout ve Reviewer prompt'ları verilmez ve üç ayrı Codex sohbeti/süreci açması
-istenmez. CSE Project'in verdiği tek talimat ana Codex'i `Builder/WRITE` olarak
-başlatır. Ana Codex, execution yüzeyindeki native Codex collaboration/subagent
-yeteneğini kullanarak tam olarak 1 `Scout/READ` ve 1 `Reviewer/READ` subagent'ını
-kendisi oluşturur ve yönetir.
+**Owner-facing varsayılan yalnız bir Execution Agent talimatıdır.** Fatih'e ayrı
+Builder, Scout ve Reviewer prompt'ları verilmez ve üç ayrı Execution Agent
+sohbeti/süreci açması istenmez. CSE Project'in verdiği tek talimat ana Execution
+Agent'ı `Builder/WRITE` olarak başlatır. Ana Execution Agent, execution yüzeyindeki
+native collaboration/subagent yeteneğini (ör. Claude Code subagent desteği)
+kullanarak tam olarak 1 `Scout/READ` ve 1 `Reviewer/READ` subagent'ını kendisi
+oluşturur ve yönetir.
 
 Lane-specific rol talimatları owner handoff'u değildir. Bunlar ana Builder'ın
 kendi subagent'larına verdiği iç execution talimatlarıdır ve ortak task/routing
@@ -90,10 +93,11 @@ yapar ve yeni exact revision'ı aynı Reviewer'a yeniden inceletir. Fatih agentl
 arası teknik sonuç taşıyıcısı veya orchestration katmanı değildir.
 
 Native collaboration/subagent yeteneğinin bu execution yüzeyinde gerçekten
-kullanılamadığı gözlenirse üç manuel Codex session'ı varsayılan fallback yapılmaz
-ve topology sessizce `SINGLE`'a düşürülmez. Ana Codex exact capability blocker ile
-`ROUTING_ESCALATION_REQUIRED` döndürür. Manuel üç-session `PARALLEL_READ` yalnız
-Fatih'in ayrıca açıkça seçtiği task-specific fallback kararıyla kullanılabilir.
+kullanılamadığı gözlenirse üç manuel session varsayılan fallback yapılmaz
+ve topology sessizce `SINGLE`'a düşürülmez. Ana Execution Agent exact capability
+blocker ile `ROUTING_ESCALATION_REQUIRED` döndürür. Manuel üç-session
+`PARALLEL_READ` yalnız Fatih'in ayrıca açıkça seçtiği task-specific fallback
+kararıyla kullanılabilir.
 
 ADS Reviewer, zorunlu ChatGPT/owner review veya manual/device gate'inin yerine
 geçmez. CSE'nin feature başına tek production writer, tek task/branch/PR,
@@ -138,7 +142,7 @@ Comment oluşturulduysa kullanıcıya:
 
 verilir. Uzun comment tekrar chat'e yapıştırılmaz; kullanıcı isterse gösterilir.
 
-`PARALLEL_READ` seçildiğinde owner'a verilen `Hazır Codex talimatı` yine tektir;
+`PARALLEL_READ` seçildiğinde owner'a verilen `Hazır Execution Agent talimatı` yine tektir;
 Scout/Reviewer için ek kullanıcı prompt'u üretilmez.
 
 ## 7. GitHub yazma erişimi yoksa
@@ -149,4 +153,4 @@ FAST/uygun STANDARD iş, owner'ın current chat talimatıyla ve diğer güvenlik
 
 ## 8. Ana karar
 
-> GitHub instruction comment FAST için yasak gereksiz törendir, STANDARD için koşullu araçtır, CRITICAL için kalıcı güvenlik sözleşmesidir. `PARALLEL_READ` owner-facing olarak tek ana Codex talimatıyla yürür; Scout ve Reviewer ana Builder'ın native read-only subagent'larıdır.
+> GitHub instruction comment FAST için yasak gereksiz törendir, STANDARD için koşullu araçtır, CRITICAL için kalıcı güvenlik sözleşmesidir. `PARALLEL_READ` owner-facing olarak tek ana Execution Agent talimatıyla yürür; Scout ve Reviewer ana Builder'ın native read-only subagent'larıdır. Bu sözleşme provider-neutral kalır; current provider Claude Code'dur, Codex uyumlu bir gelecek provider olarak kalır.
