@@ -10,8 +10,10 @@ import 'package:chief_site_engineer/domain/project_information_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart' as url_launcher_pkg;
 
 typedef ProjectInformationTextAction = Future<void> Function(String text);
+typedef ProjectInformationUriAction = Future<bool> Function(Uri uri);
 
 class ProjectInformationPage extends StatefulWidget {
   const ProjectInformationPage({
@@ -20,6 +22,7 @@ class ProjectInformationPage extends StatefulWidget {
     this.profileApplication,
     this.copyText,
     this.shareText,
+    this.launchUri,
     super.key,
   });
 
@@ -28,6 +31,7 @@ class ProjectInformationPage extends StatefulWidget {
   final ProjectProfileApplication? profileApplication;
   final ProjectInformationTextAction? copyText;
   final ProjectInformationTextAction? shareText;
+  final ProjectInformationUriAction? launchUri;
 
   @override
   State<ProjectInformationPage> createState() => _ProjectInformationPageState();
@@ -164,6 +168,48 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
       ).showSnackBar(const SnackBar(content: Text('Bilgi paylaşılamadı.')));
     }
   }
+
+  Future<void> _launch(Uri? uri, {required String failureMessage}) async {
+    if (uri == null) return;
+    var ok = false;
+    try {
+      ok = await (widget.launchUri ?? _launchUri)(uri);
+    } on Object {
+      ok = false;
+    }
+    if (!mounted || ok) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(failureMessage)));
+  }
+
+  Future<void> _openMap(_InformationEntry entry) =>
+      _launch(_mapUri(entry.mapQuery), failureMessage: 'Harita açılamadı.');
+
+  Future<void> _shareLocation(_InformationEntry entry) async {
+    final query = entry.mapQuery?.trim();
+    if (query == null || query.isEmpty) return;
+    final mapUri = _mapUri(query);
+    final text = mapUri == null ? query : '$query\n${mapUri.toString()}';
+    try {
+      await (widget.shareText ?? _shareText)(text);
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Konum paylaşılamadı.')));
+    }
+  }
+
+  Future<void> _callEntry(_InformationEntry entry) => _launch(
+    _telUri(entry.phoneNumber),
+    failureMessage: 'Arama başlatılamadı.',
+  );
+
+  Future<void> _openWhatsApp(_InformationEntry entry) => _launch(
+    _whatsAppUri(entry.whatsAppNumber),
+    failureMessage: 'WhatsApp açılamadı.',
+  );
 
   Future<void> _restoreField(ProjectProfileField field) async {
     final application = widget.profileApplication;
@@ -515,6 +561,36 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
         ? Wrap(
             spacing: 0,
             children: [
+              if (_mapUri(entry.mapQuery) != null) ...[
+                IconButton(
+                  key: ValueKey('project-information-map-${entry.key}'),
+                  tooltip: 'Haritada aç',
+                  onPressed: () => unawaited(_openMap(entry)),
+                  icon: const Icon(Icons.map_outlined),
+                ),
+                IconButton(
+                  key: ValueKey(
+                    'project-information-share-location-${entry.key}',
+                  ),
+                  tooltip: 'Konumu paylaş',
+                  onPressed: () => unawaited(_shareLocation(entry)),
+                  icon: const Icon(Icons.location_on_outlined),
+                ),
+              ],
+              if (_telUri(entry.phoneNumber) != null)
+                IconButton(
+                  key: ValueKey('project-information-call-${entry.key}'),
+                  tooltip: 'Ara',
+                  onPressed: () => unawaited(_callEntry(entry)),
+                  icon: const Icon(Icons.call_outlined),
+                ),
+              if (_whatsAppUri(entry.whatsAppNumber) != null)
+                IconButton(
+                  key: ValueKey('project-information-whatsapp-${entry.key}'),
+                  tooltip: 'WhatsApp',
+                  onPressed: () => unawaited(_openWhatsApp(entry)),
+                  icon: const Icon(Icons.chat_outlined),
+                ),
               IconButton(
                 key: ValueKey('project-information-copy-${entry.key}'),
                 tooltip: '${entry.label} kopyala',
@@ -1353,6 +1429,9 @@ class _InformationEntry {
     this.actionable = true,
     this.pinKey,
     this.userEntry,
+    this.mapQuery,
+    this.phoneNumber,
+    this.whatsAppNumber,
   });
 
   final String key;
@@ -1362,6 +1441,9 @@ class _InformationEntry {
   final bool actionable;
   final ProjectInformationKey? pinKey;
   final ProjectInformationEntry? userEntry;
+  final String? mapQuery;
+  final String? phoneNumber;
+  final String? whatsAppNumber;
 
   String get shareValue => '$label: $value';
 
@@ -1426,6 +1508,7 @@ List<_InformationSection> _sections(
         pinKey: ProjectInformationKey.system(
           ProjectInformationSystemValue.address,
         ),
+        mapQuery: value,
       ),
   ];
   final officialEntries = <_InformationEntry>[
@@ -1784,18 +1867,28 @@ _InformationEntry _fieldEntry(
   ),
 );
 
-_InformationEntry _userEntry(ProjectInformationEntry entry) =>
-    _InformationEntry(
-      key: 'user-${entry.id}',
-      category: _categoryLabel(entry.category),
-      label: entry.label,
-      value: _entryValue(entry),
-      pinKey: ProjectInformationKey(
-        space: ProjectInformationKeySpace.userEntry,
-        id: entry.id,
-      ),
-      userEntry: entry,
-    );
+_InformationEntry _userEntry(ProjectInformationEntry entry) {
+  final contact = entry.value.kind == ProjectInformationValueKind.contact
+      ? entry.value.contact
+      : null;
+  final isLocation =
+      entry.category == ProjectInformationCategory.location &&
+      entry.value.kind == ProjectInformationValueKind.text;
+  return _InformationEntry(
+    key: 'user-${entry.id}',
+    category: _categoryLabel(entry.category),
+    label: entry.label,
+    value: _entryValue(entry),
+    pinKey: ProjectInformationKey(
+      space: ProjectInformationKeySpace.userEntry,
+      id: entry.id,
+    ),
+    userEntry: entry,
+    mapQuery: isLocation ? entry.value.text : null,
+    phoneNumber: contact?.phone,
+    whatsAppNumber: contact?.whatsAppNumber,
+  );
+}
 
 String _entryValue(ProjectInformationEntry entry) {
   final value = entry.value;
@@ -1974,4 +2067,38 @@ Future<void> _shareText(String text) async {
   await SharePlus.instance.share(
     ShareParams(title: 'Proje bilgisi', subject: 'Proje bilgisi', text: text),
   );
+}
+
+Future<bool> _launchUri(Uri uri) => url_launcher_pkg.launchUrl(
+  uri,
+  mode: url_launcher_pkg.LaunchMode.externalApplication,
+);
+
+Uri? _mapUri(String? address) {
+  final trimmed = address?.trim();
+  if (trimmed == null || trimmed.isEmpty) return null;
+  return Uri.https('www.google.com', '/maps/search/', {
+    'api': '1',
+    'query': trimmed,
+  });
+}
+
+String? _sanitizedPhoneDigits(String? raw) {
+  final trimmed = raw?.trim();
+  if (trimmed == null || trimmed.isEmpty) return null;
+  final digits = trimmed.replaceAll(RegExp(r'[^0-9+]'), '');
+  final significant = digits.replaceAll('+', '');
+  if (significant.length < 5) return null;
+  return digits;
+}
+
+Uri? _telUri(String? phone) {
+  final sanitized = _sanitizedPhoneDigits(phone);
+  return sanitized == null ? null : Uri(scheme: 'tel', path: sanitized);
+}
+
+Uri? _whatsAppUri(String? number) {
+  final sanitized = _sanitizedPhoneDigits(number)?.replaceAll('+', '');
+  if (sanitized == null || sanitized.isEmpty) return null;
+  return Uri.https('wa.me', '/$sanitized');
 }
