@@ -4,11 +4,13 @@ import 'dart:ui' show SemanticsAction;
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/application/attachment_catalog_application.dart';
 import 'package:chief_site_engineer/application/inventory_application.dart';
+import 'package:chief_site_engineer/application/project_search_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/attachments/project_media_album_page.dart';
 import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
@@ -249,6 +251,69 @@ void main() {
       _expectIndicator(_projectA.name);
       expect(inventory.projects, [_projectB.id, _projectA.id]);
       expect(state.controller.selectedProjectId, _projectA.id);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'project search uses exact shared context and never retargets the session',
+    (tester) async {
+      final agenda = FakeAgendaApplication(
+        projects: const [_projectA, _projectB],
+        logs: [_searchLog(_projectA), _searchLog(_projectB)],
+      );
+      final search = _ContextProjectSearch();
+      await _pumpShell(tester, agenda, projectSearch: search);
+
+      await _chooseSharedProject(tester, _projectA.id);
+      await tester.tap(
+        find.byKey(const Key('shell-project-search')).hitTestable(),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('project-search-input')),
+        'kolon',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('project-search-submit')));
+      await tester.pumpAndSettle();
+      expect(find.text('Kuzey sonucu'), findsOneWidget);
+      await tester.tap(find.text('Kuzey sonucu'));
+      await tester.pumpAndSettle();
+      expect(agenda.getAgendaLogDetailCalls, 2);
+      expect(find.byType(LogDetailPage), findsOneWidget);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.text('Kuzey sonucu'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('project-search-input')))
+            .controller!
+            .text,
+        'kolon',
+      );
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      _expectIndicator(_projectA.name);
+
+      await _chooseSharedProject(tester, _projectB.id);
+      await tester.tap(
+        find.byKey(const Key('shell-project-search')).hitTestable(),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Kuzey sonucu'), findsNothing);
+      await tester.enterText(
+        find.byKey(const Key('project-search-input')),
+        'kolon',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('project-search-submit')));
+      await tester.pumpAndSettle();
+      expect(find.text('Güney sonucu'), findsOneWidget);
+      expect(search.projectIds, [_projectA.id, _projectB.id]);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      _expectIndicator(_projectB.name);
       expect(tester.takeException(), isNull);
     },
   );
@@ -674,6 +739,7 @@ Future<void> _pumpShell(
   FakeAgendaApplication agenda, {
   AttachmentCatalogApplication? attachmentCatalog,
   InventoryApplicationPort? inventory,
+  ProjectSearchApplicationPort? projectSearch,
 }) async {
   await tester.pumpWidget(
     CseApp(
@@ -685,12 +751,52 @@ Future<void> _pumpShell(
           agenda: agenda,
           attachmentCatalog: attachmentCatalog,
           inventory: inventory ?? const UnavailableInventoryApplication(),
+          projectSearch: projectSearch,
         ),
       ),
     ),
   );
   await tester.pumpAndSettle();
 }
+
+class _ContextProjectSearch implements ProjectSearchApplicationPort {
+  final List<String> projectIds = [];
+
+  @override
+  Future<ProjectSearchResponse> search(ProjectSearchQuery query) async {
+    projectIds.add(query.projectId);
+    final projectName = query.projectId == _projectA.id ? 'Kuzey' : 'Güney';
+    return ProjectSearchResponse(
+      results: [
+        ProjectSearchResult(
+          projectId: query.projectId,
+          sourceKind: ProjectSearchSourceKind.agendaObservation,
+          sourceId: query.projectId,
+          title: '$projectName sonucu',
+          summary: 'Genel not',
+          sourceDate: '2026-09-12T08:00:00Z',
+          statusLabel: 'Aktif',
+          matchQuality: ProjectSearchMatchQuality.exact,
+        ),
+      ],
+      failures: const [],
+    );
+  }
+}
+
+AgendaLog _searchLog(MobileProject project) => AgendaLog(
+  id: project.id,
+  projectId: project.id,
+  projectName: project.name,
+  observedAt: '2026-09-12T08:00:00Z',
+  createdAt: '2026-09-12T08:00:00Z',
+  updatedAt: '2026-09-12T08:00:00Z',
+  category: AgendaCategory.generalNote,
+  description: '${project.name} sonucu',
+  location: 'A Blok',
+  notes: null,
+  revision: 1,
+);
 
 Future<void> _chooseSharedProject(WidgetTester tester, String id) async {
   final control = find

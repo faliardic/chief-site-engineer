@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:chief_site_engineer/application/project_search_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -27,6 +28,7 @@ import 'package:chief_site_engineer/features/projects/project_create_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
+import 'package:chief_site_engineer/features/search/project_search_page.dart';
 import 'package:chief_site_engineer/features/settings/settings_page.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:flutter/foundation.dart';
@@ -522,6 +524,83 @@ class _MobileShellState extends State<MobileShell> {
     );
   }
 
+  Future<void> _openProjectSearch() async {
+    final application = widget.bootstrap.projectSearch;
+    if (application == null ||
+        _activeProjectSession.selectedProjectId == null ||
+        !mounted) {
+      return;
+    }
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ProjectSearchPage(
+          application: application,
+          activeProjectSession: _activeProjectSession,
+          readActiveProjectId: () => _activeProjectSession.selectedProjectId,
+          openResult: _openProjectSearchResult,
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _openProjectSearchResult(ProjectSearchResult result) async {
+    final projectId = _activeProjectSession.selectedProjectId;
+    if (!mounted || projectId == null || result.projectId != projectId) {
+      return false;
+    }
+    try {
+      switch (result.sourceKind) {
+        case ProjectSearchSourceKind.agendaObservation:
+          final detail = await widget.bootstrap.agenda.getAgendaLogDetail(
+            result.sourceId,
+          );
+          if (!mounted ||
+              _activeProjectSession.selectedProjectId != projectId ||
+              detail.log.projectId != projectId ||
+              detail.log.archivedAt != null) {
+            return false;
+          }
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute(
+              builder: (_) => LogDetailPage(
+                agenda: widget.bootstrap.agenda,
+                logId: result.sourceId,
+                projectLocations: widget.bootstrap.projectLocations,
+                attachments: widget.bootstrap.concreteAttachments,
+                concrete: widget.bootstrap.concrete,
+                concreteAttachments: widget.bootstrap.concreteAttachments,
+              ),
+            ),
+          );
+          return true;
+        case ProjectSearchSourceKind.concretePour:
+          final concrete = widget.bootstrap.concrete;
+          final attachments = widget.bootstrap.concreteAttachments;
+          if (concrete == null || attachments == null) return false;
+          final detail = await concrete.getPourDetail(result.sourceId);
+          if (!mounted ||
+              _activeProjectSession.selectedProjectId != projectId ||
+              detail.pour.projectId != projectId) {
+            return false;
+          }
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute(
+              builder: (_) => ConcretePourDetailPage(
+                concrete: concrete,
+                agenda: widget.bootstrap.agenda,
+                attachments: attachments,
+                pourId: result.sourceId,
+                projectLocations: widget.bootstrap.projectLocations,
+              ),
+            ),
+          );
+          return true;
+      }
+    } on Object {
+      return false;
+    }
+  }
+
   Future<void> _openConcrete(String projectId) async {
     final concrete = widget.bootstrap.concrete;
     final attachments = widget.bootstrap.concreteAttachments;
@@ -894,6 +973,26 @@ class _MobileShellState extends State<MobileShell> {
             ),
             title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
             actions: [
+              Semantics(
+                button: true,
+                label: 'Projede ara',
+                child: ExcludeSemantics(
+                  child: IconButton(
+                    key: const Key('shell-project-search'),
+                    tooltip: 'Projede ara',
+                    constraints: const BoxConstraints.tightFor(
+                      width: 48,
+                      height: 48,
+                    ),
+                    onPressed:
+                        widget.bootstrap.projectSearch != null &&
+                            _activeProjectSession.selectedProjectId != null
+                        ? () => unawaited(_openProjectSearch())
+                        : null,
+                    icon: const Icon(Icons.search_rounded),
+                  ),
+                ),
+              ),
               ActiveProjectControl(
                 label: _activeProjectLabel,
                 projects: _activeProjectOptions,
