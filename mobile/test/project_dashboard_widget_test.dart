@@ -9,6 +9,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
+import 'package:chief_site_engineer/domain/project_information_models.dart';
 import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
 import 'package:flutter/material.dart';
@@ -705,18 +706,189 @@ void main() {
     expect(find.text('ESKİ ADRES'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'durable pins keep order, cap six and never rebind unavailable keys',
+    (tester) async {
+      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final mutations = _DashboardMutations();
+      for (var index = 0; index < 7; index += 1) {
+        mutations.entries.add(_dashboardUserEntry(project.id, index));
+        mutations.pins.add(
+          _dashboardPin(
+            project.id,
+            'pin-$index',
+            ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'entry-$index',
+            ),
+            index,
+          ),
+        );
+      }
+      mutations.pins.insert(
+        0,
+        _dashboardPin(
+          project.id,
+          'missing-pin',
+          const ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: 'removed-entry',
+          ),
+          -1,
+          sourceAvailable: false,
+        ),
+      );
+      final fixture = _Fixture(projects: [project], mutations: mutations);
+      addTearDown(fixture.dispose);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('dashboard-pinned-information-unavailable')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('dashboard-quick-information')),
+          matching: find.byType(Card),
+        ),
+        findsNWidgets(6),
+      );
+      for (var index = 0; index < 6; index += 1) {
+        expect(find.text('Pin $index'), findsOneWidget);
+      }
+      expect(find.text('Pin 6'), findsNothing);
+      expect(find.text('Aktif blok'), findsNothing);
+    },
+  );
+
+  testWidgets('project switch rejects delayed user entries and pins', (
+    tester,
+  ) async {
+    final first = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+    final second = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Güney');
+    final staleEntries = Completer<List<ProjectInformationEntry>>();
+    final mutations = _DashboardMutations();
+    final firstEntry = _dashboardUserEntry(first.id, 1);
+    final secondEntry = _dashboardUserEntry(second.id, 2);
+    mutations.entries.addAll([firstEntry, secondEntry]);
+    mutations.entryReads[first.id] = [staleEntries.future];
+    mutations.pins.addAll([
+      _dashboardPin(
+        first.id,
+        'first-pin',
+        const ProjectInformationKey(
+          space: ProjectInformationKeySpace.userEntry,
+          id: 'entry-1',
+        ),
+        0,
+      ),
+      _dashboardPin(
+        second.id,
+        'second-pin',
+        const ProjectInformationKey(
+          space: ProjectInformationKeySpace.userEntry,
+          id: 'entry-2',
+        ),
+        0,
+      ),
+    ]);
+    final fixture = _Fixture(projects: [first, second], mutations: mutations);
+    addTearDown(fixture.dispose);
+
+    await tester.pumpWidget(fixture.app());
+    await tester.pumpAndSettle();
+    expect(fixture.session.select(first.id, [first, second]), isTrue);
+    await tester.pump();
+    await tester.pump();
+    expect(fixture.session.select(second.id, [first, second]), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Pin 2'), findsOneWidget);
+
+    staleEntries.complete([firstEntry]);
+    await tester.pumpAndSettle();
+    expect(find.text('Güney'), findsOneWidget);
+    expect(find.text('Pin 2'), findsOneWidget);
+    expect(find.text('Pin 1'), findsNothing);
+  });
+}
+
+ProjectInformationEntry _dashboardUserEntry(String projectId, int index) =>
+    ProjectInformationEntry(
+      id: 'entry-$index',
+      projectId: projectId,
+      category: ProjectInformationCategory.technical,
+      label: 'Pin $index',
+      value: ProjectInformationEntryValue.number(index.toDouble()),
+      unit: 'm',
+      revision: 1,
+      createdAt: '2026-09-13T09:00:00.000Z',
+      updatedAt: '2026-09-13T09:00:00.000Z',
+    );
+
+ProjectInformationPin _dashboardPin(
+  String projectId,
+  String id,
+  ProjectInformationKey key,
+  int sortOrder, {
+  bool sourceAvailable = true,
+}) => ProjectInformationPin(
+  id: id,
+  projectId: projectId,
+  key: key,
+  sortOrder: sortOrder,
+  revision: 1,
+  createdAt: '2026-09-13T09:00:00.000Z',
+  updatedAt: '2026-09-13T09:00:00.000Z',
+  sourceAvailable: sourceAvailable,
+);
+
+class _DashboardMutations implements ProjectInformationMutationApplication {
+  final List<ProjectInformationEntry> entries = [];
+  final List<ProjectInformationPin> pins = [];
+  final Map<String, List<Future<List<ProjectInformationEntry>>>> entryReads =
+      {};
+
+  @override
+  Future<List<ProjectInformationEntry>> listUserEntries(
+    String projectId, {
+    ProjectInformationArchiveFilter archiveFilter =
+        ProjectInformationArchiveFilter.active,
+  }) async {
+    final queued = entryReads[projectId];
+    if (queued != null && queued.isNotEmpty) return queued.removeAt(0);
+    return entries
+        .where((entry) => entry.projectId == projectId && !entry.isArchived)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<ProjectInformationPin>> listPins(String projectId) async {
+    final selected = pins
+        .where((pin) => pin.projectId == projectId)
+        .toList(growable: false);
+    selected.sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
+    return selected;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _Fixture {
   _Fixture({
     required List<MobileProject> projects,
     FakeAgendaApplication? agenda,
+    this.mutations,
   }) : agenda = agenda ?? FakeAgendaApplication(projects: projects) {
     source = _DashboardInformationSource(this.agenda);
   }
 
   final FakeAgendaApplication agenda;
   late final _DashboardInformationSource source;
+  final ProjectInformationMutationApplication? mutations;
   final ActiveProjectSession session = ActiveProjectSession();
 
   Widget app({
@@ -739,7 +911,10 @@ class _Fixture {
     home: Scaffold(
       body: ProjectDashboardPage(
         agenda: agenda,
-        projectInformation: ProjectInformationApplication(source: source),
+        projectInformation: ProjectInformationApplication(
+          source: source,
+          mutations: mutations,
+        ),
         livingPlan: const UnavailableConstructionLivingPlanApplication(),
         session: session,
         onCreateProject: onCreateProject ?? () {},

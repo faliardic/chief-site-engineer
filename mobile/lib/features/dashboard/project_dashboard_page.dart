@@ -77,6 +77,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   ProjectInformationSession? _informationSession;
   List<MobileProject> _projects = const [];
   ProjectInformationSnapshot? _information;
+  List<ProjectInformationEntry> _informationEntries = const [];
+  List<ProjectInformationPin> _informationPins = const [];
+  bool _pinReadFailed = false;
   ProjectInformationSourceStatus? _informationFailure;
   _LoadStatus _projectStatus = _LoadStatus.loading;
   _LoadStatus _informationStatus = _LoadStatus.loading;
@@ -184,6 +187,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     if (!mounted) return;
     setState(() {
       _information = null;
+      _informationEntries = const [];
+      _informationPins = const [];
+      _pinReadFailed = false;
       _informationFailure = null;
       _informationStatus = _LoadStatus.loading;
     });
@@ -197,6 +203,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     if (mounted && showLoading) {
       setState(() {
         _information = null;
+        _informationEntries = const [];
+        _informationPins = const [];
+        _pinReadFailed = false;
         _informationFailure = null;
         _informationStatus = _LoadStatus.loading;
       });
@@ -217,8 +226,25 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     switch (result) {
       case ProjectInformationReady():
         if (result.snapshot.projectId != projectId) return;
+        List<ProjectInformationEntry> entries = const [];
+        List<ProjectInformationPin> pins = const [];
+        var pinReadFailed = false;
+        try {
+          entries = await widget.projectInformation!.listUserEntries(projectId);
+          pins = await widget.projectInformation!.listPins(projectId);
+        } on ProjectInformationFailure catch (error) {
+          if (error.code != 'mutation_store_unavailable') pinReadFailed = true;
+        }
+        if (!mounted ||
+            generation != _informationGeneration ||
+            widget.session.selectedProjectId != projectId) {
+          return;
+        }
         setState(() {
           _information = result.snapshot;
+          _informationEntries = entries;
+          _informationPins = pins;
+          _pinReadFailed = pinReadFailed;
           _informationFailure = null;
           _informationStatus = _LoadStatus.ready;
         });
@@ -1056,7 +1082,16 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         onAction: () => _loadInformation(project.id),
       );
     }
-    final items = _quickItems(snapshot);
+    final pinned = _pinnedQuickItems(
+      snapshot,
+      _informationPins,
+      _informationEntries,
+    );
+    final items = _pinReadFailed
+        ? const <_QuickItem>[]
+        : _informationPins.isEmpty
+        ? _quickItems(snapshot)
+        : pinned.items;
     final hasFailure = snapshot.sourceStatuses.any(
       (status) => status.state == ProjectInformationReadState.failed,
     );
@@ -1071,6 +1106,19 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
               padding: EdgeInsets.all(12),
               child: Text(
                 'Bazı bilgiler okunamadı; boş alanlardan ayrı olarak işaretlendi.',
+              ),
+            ),
+          ),
+        if (_pinReadFailed || pinned.unavailableCount > 0)
+          Card(
+            key: const Key('dashboard-pinned-information-unavailable'),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                _pinReadFailed
+                    ? 'Ana sayfa seçimleri şu anda okunamadı; kayıtlar korunuyor.'
+                    : '${pinned.unavailableCount} ana sayfa bilgisi artık kullanılamıyor.',
               ),
             ),
           ),
@@ -1118,6 +1166,178 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
       ],
     );
   }
+}
+
+class _PinnedQuickItems {
+  const _PinnedQuickItems(this.items, this.unavailableCount);
+  final List<_QuickItem> items;
+  final int unavailableCount;
+}
+
+_PinnedQuickItems _pinnedQuickItems(
+  ProjectInformationSnapshot snapshot,
+  List<ProjectInformationPin> pins,
+  List<ProjectInformationEntry> entries,
+) {
+  final items = <_QuickItem>[];
+  var unavailable = 0;
+  for (final pin in pins) {
+    final resolved = pin.sourceAvailable
+        ? _resolvePinnedQuickItem(snapshot, entries, pin)
+        : null;
+    if (resolved == null) {
+      unavailable += 1;
+    } else if (items.length < 6) {
+      items.add(resolved);
+    }
+  }
+  return _PinnedQuickItems(items, unavailable);
+}
+
+_QuickItem? _resolvePinnedQuickItem(
+  ProjectInformationSnapshot snapshot,
+  List<ProjectInformationEntry> entries,
+  ProjectInformationPin pin,
+) {
+  final key = pin.key;
+  switch (key.space) {
+    case ProjectInformationKeySpace.systemValue:
+      final value = _systemQuickValue(snapshot, key.id);
+      return value == null
+          ? null
+          : _QuickItem('pin-${pin.id}', value.$1, value.$2);
+    case ProjectInformationKeySpace.profileField:
+      for (final field in snapshot.profileFields) {
+        if (field.id == key.id && !field.isArchived) {
+          return _QuickItem(
+            'pin-${pin.id}',
+            field.label,
+            _quickValue(field.value),
+          );
+        }
+      }
+    case ProjectInformationKeySpace.partyAssignment:
+      for (final party in snapshot.parties) {
+        if (party.assignment.id != key.id || party.assignment.isArchived) {
+          continue;
+        }
+        final value = party.company?.name ?? party.workforceMember?.fullName;
+        if (value != null && value.trim().isNotEmpty) {
+          return _QuickItem('pin-${pin.id}', 'Önemli kişi', value.trim());
+        }
+      }
+    case ProjectInformationKeySpace.inventoryBlock:
+      for (final block in snapshot.blocks) {
+        if (block.block.id == key.id && block.block.archivedAt == null) {
+          return _QuickItem('pin-${pin.id}', 'Blok', block.block.displayName);
+        }
+      }
+    case ProjectInformationKeySpace.inventoryFloor:
+      for (final block in snapshot.blocks) {
+        for (final floor in block.floors) {
+          if (floor.floor.id == key.id && floor.floor.archivedAt == null) {
+            return _QuickItem('pin-${pin.id}', 'Kat', floor.floor.displayName);
+          }
+        }
+      }
+    case ProjectInformationKeySpace.location:
+      for (final block in snapshot.blocks) {
+        for (final floor in block.floors) {
+          for (final location in floor.locations) {
+            if (location.location?.id == key.id &&
+                location.location?.archivedAt == null) {
+              return _QuickItem(
+                'pin-${pin.id}',
+                'Mahal',
+                location.location!.displayName,
+              );
+            }
+          }
+        }
+      }
+    case ProjectInformationKeySpace.userEntry:
+      for (final entry in entries) {
+        if (entry.id == key.id && !entry.isArchived) {
+          return _QuickItem(
+            'pin-${pin.id}',
+            entry.label,
+            _userEntryQuickValue(entry),
+          );
+        }
+      }
+  }
+  return null;
+}
+
+(String, String)? _systemQuickValue(
+  ProjectInformationSnapshot snapshot,
+  String id,
+) {
+  final metadata = snapshot.metadata;
+  if (id == ProjectInformationSystemValue.projectName.storageKey) {
+    return ('Proje adı', snapshot.project.name);
+  }
+  final values = <String, (String, String?)>{
+    ProjectInformationSystemValue.address.storageKey: (
+      'Adres',
+      metadata?.address,
+    ),
+    ProjectInformationSystemValue.permitNumber.storageKey: (
+      'Ruhsat no',
+      metadata?.permitNumber,
+    ),
+    ProjectInformationSystemValue.permitDate.storageKey: (
+      'Ruhsat tarihi',
+      metadata?.permitDate,
+    ),
+    ProjectInformationSystemValue.cadastralBlock.storageKey: (
+      'Ada',
+      metadata?.cadastralBlock,
+    ),
+    ProjectInformationSystemValue.cadastralParcel.storageKey: (
+      'Parsel',
+      metadata?.cadastralParcel,
+    ),
+    ProjectInformationSystemValue.projectStartDate.storageKey: (
+      'Başlangıç tarihi',
+      metadata?.projectStartDate,
+    ),
+    ProjectInformationSystemValue.targetFinishDate.storageKey: (
+      'Hedef bitiş',
+      metadata?.targetFinishDate,
+    ),
+    ProjectInformationSystemValue.usageType.storageKey: (
+      'Kullanım türü',
+      metadata?.usageType,
+    ),
+    ProjectInformationSystemValue.structuralSystem.storageKey: (
+      'Taşıyıcı sistem',
+      metadata?.structuralSystem,
+    ),
+  };
+  final candidate = values[id];
+  final value = candidate?.$2?.trim();
+  return candidate == null || value == null || value.isEmpty
+      ? null
+      : (candidate.$1, value);
+}
+
+String _userEntryQuickValue(ProjectInformationEntry entry) {
+  final value = entry.value;
+  return switch (value.kind) {
+    ProjectInformationValueKind.text => _quickValue(value.text),
+    ProjectInformationValueKind.number =>
+      '${_formatQuickNumber(value.number!)}${entry.unit == null ? '' : ' ${entry.unit}'}',
+    ProjectInformationValueKind.date => _quickValue(value.date),
+    ProjectInformationValueKind.boolean =>
+      value.boolean == true ? 'Evet' : 'Hayır',
+    ProjectInformationValueKind.contact => [
+      value.contact!.name,
+      value.contact!.company,
+      value.contact!.role,
+      value.contact!.phone,
+    ].whereType<String>().where((part) => part.trim().isNotEmpty).join(' · '),
+  };
 }
 
 class _QuickItem {
