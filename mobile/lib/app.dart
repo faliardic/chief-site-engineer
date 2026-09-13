@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/onboarding_preference.dart';
 import 'package:chief_site_engineer/application/project_search_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
@@ -27,6 +28,7 @@ import 'package:chief_site_engineer/features/onboarding/guided_onboarding_page.d
 import 'package:chief_site_engineer/features/project_context/active_project_control.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
 import 'package:chief_site_engineer/features/projects/project_create_page.dart';
+import 'package:chief_site_engineer/features/projects/project_information_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
@@ -906,9 +908,14 @@ class _MobileShellState extends State<MobileShell> {
     final materials = bootstrap.materialRequests;
     final catalog = bootstrap.attachmentCatalog;
     final attendance = bootstrap.attendance;
+    final projectInformation = bootstrap.projectInformation;
+    final profileApplication = bootstrap.agenda is ProjectProfileApplication
+        ? bootstrap.agenda as ProjectProfileApplication
+        : null;
     return ProjectDashboardPage(
       key: ValueKey('project-dashboard-context-$_dashboardContextEpoch'),
       agenda: bootstrap.agenda,
+      projectInformation: projectInformation,
       dailyLog: dailyLog,
       livingPlan: bootstrap.livingPlan,
       materialRequests: materials,
@@ -995,6 +1002,19 @@ class _MobileShellState extends State<MobileShell> {
           : (projectId) => unawaited(_openWorkforce(projectId)),
       onOpenPhoneCall: (projectId) =>
           unawaited(_openPhoneCallResult(projectId)),
+      onOpenProjectInformation: projectInformation == null
+          ? null
+          : (projectId) => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => ProjectInformationPage(
+                    application: projectInformation,
+                    profileApplication: profileApplication,
+                    projectId: projectId,
+                  ),
+                ),
+              ),
+            ),
       onOpenCatalog: catalog == null
           ? null
           : (projectId) => unawaited(

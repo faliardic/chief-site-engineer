@@ -4,9 +4,11 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/application/daily_log_application.dart';
 import 'package:chief_site_engineer/application/material_request_application.dart';
+import 'package:chief_site_engineer/application/project_information_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/project_information_models.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +24,7 @@ class ProjectDashboardPage extends StatefulWidget {
     required this.livingPlan,
     required this.session,
     required this.onCreateProject,
+    this.projectInformation,
     this.dailyLog,
     this.materialRequests,
     this.onAddReminder,
@@ -34,12 +37,14 @@ class ProjectDashboardPage extends StatefulWidget {
     this.onOpenWorkforce,
     this.onOpenPhoneCall,
     this.onOpenCatalog,
+    this.onOpenProjectInformation,
     this.onFirstSuccessfulProjectRead,
     DateTime Function()? clock,
     super.key,
   }) : clock = clock ?? _systemUtcClock;
 
   final AgendaApplication agenda;
+  final ProjectInformationApplication? projectInformation;
   final DailyLogApplicationPort? dailyLog;
   final ConstructionLivingPlanApplicationPort livingPlan;
   final MaterialRequestApplicationPort? materialRequests;
@@ -55,6 +60,7 @@ class ProjectDashboardPage extends StatefulWidget {
   final DashboardProjectAction? onOpenWorkforce;
   final DashboardProjectAction? onOpenPhoneCall;
   final DashboardProjectAction? onOpenCatalog;
+  final DashboardProjectAction? onOpenProjectInformation;
   final DashboardProjectReadiness? onFirstSuccessfulProjectRead;
   final DateTime Function() clock;
 
@@ -68,12 +74,14 @@ enum _LoadStatus { loading, ready, error }
 
 class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   StreamSubscription<void>? _projectSubscription;
+  ProjectInformationSession? _informationSession;
   List<MobileProject> _projects = const [];
-  ProjectProfile? _profile;
+  ProjectInformationSnapshot? _information;
+  ProjectInformationSourceStatus? _informationFailure;
   _LoadStatus _projectStatus = _LoadStatus.loading;
-  _LoadStatus _profileStatus = _LoadStatus.loading;
+  _LoadStatus _informationStatus = _LoadStatus.loading;
   int _projectGeneration = 0;
-  int _profileGeneration = 0;
+  int _informationGeneration = 0;
   bool _mutating = false;
   bool _reportedFirstSuccessfulProjectRead = false;
   EdgeDraggingAutoScroller? _fieldAutoScroller;
@@ -91,6 +99,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   @override
   void initState() {
     super.initState();
+    _informationSession = widget.projectInformation?.createSession();
     widget.session.addListener(_handleActiveProjectChanged);
     _projectSubscription = widget.agenda.projectChanges.listen(
       (_) => unawaited(_loadProjects(showLoading: false)),
@@ -101,6 +110,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   @override
   void dispose() {
     _fieldAutoScroller?.stopAutoScroll();
+    _informationSession?.clearProject();
     _projectSubscription?.cancel();
     widget.session.removeListener(_handleActiveProjectChanged);
     super.dispose();
@@ -133,9 +143,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
       _reportFirstSuccessfulProjectRead(projects);
       final selected = widget.session.selectedProject(projects);
       if (selected == null) {
-        _clearProfile();
+        _clearInformation();
       } else {
-        unawaited(_loadProfile(selected.id, showLoading: showLoading));
+        unawaited(_loadInformation(selected.id, showLoading: showLoading));
       }
     } on Object {
       if (!mounted || generation != _projectGeneration) return;
@@ -144,7 +154,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         _projects = const [];
         _projectStatus = _LoadStatus.error;
       });
-      _clearProfile();
+      _clearInformation();
     }
   }
 
@@ -161,55 +171,71 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     if (!mounted || _projectStatus != _LoadStatus.ready) return;
     final selected = widget.session.selectedProject(_projects);
     if (selected == null) {
-      _clearProfile();
+      _clearInformation();
       return;
     }
-    unawaited(_loadProfile(selected.id));
+    _clearInformation();
+    unawaited(_loadInformation(selected.id));
   }
 
-  void _clearProfile() {
-    _profileGeneration += 1;
+  void _clearInformation() {
+    _informationGeneration += 1;
+    _informationSession?.clearProject();
     if (!mounted) return;
     setState(() {
-      _profile = null;
-      _profileStatus = _LoadStatus.loading;
+      _information = null;
+      _informationFailure = null;
+      _informationStatus = _LoadStatus.loading;
     });
   }
 
-  Future<void> _loadProfile(String projectId, {bool showLoading = true}) async {
-    final generation = ++_profileGeneration;
+  Future<void> _loadInformation(
+    String projectId, {
+    bool showLoading = true,
+  }) async {
+    final generation = ++_informationGeneration;
     if (mounted && showLoading) {
       setState(() {
-        _profile = null;
-        _profileStatus = _LoadStatus.loading;
+        _information = null;
+        _informationFailure = null;
+        _informationStatus = _LoadStatus.loading;
       });
     }
-    final application = _profileApplication;
-    if (application == null) {
-      if (mounted && generation == _profileGeneration) {
-        setState(() => _profileStatus = _LoadStatus.error);
+    final session = _informationSession;
+    if (session == null) {
+      if (mounted && generation == _informationGeneration) {
+        setState(() => _informationStatus = _LoadStatus.error);
       }
       return;
     }
-    try {
-      final profile = await application.getProjectProfile(projectId);
-      if (!mounted ||
-          generation != _profileGeneration ||
-          widget.session.selectedProjectId != projectId) {
-        return;
-      }
-      setState(() {
-        _profile = profile;
-        _profileStatus = _LoadStatus.ready;
-      });
-    } on Object {
-      if (!mounted ||
-          generation != _profileGeneration ||
-          widget.session.selectedProjectId != projectId) {
-        return;
-      }
-      setState(() => _profileStatus = _LoadStatus.error);
+    final result = await session.loadProject(projectId);
+    if (!mounted ||
+        generation != _informationGeneration ||
+        widget.session.selectedProjectId != projectId) {
+      return;
     }
+    switch (result) {
+      case ProjectInformationReady():
+        if (result.snapshot.projectId != projectId) return;
+        setState(() {
+          _information = result.snapshot;
+          _informationFailure = null;
+          _informationStatus = _LoadStatus.ready;
+        });
+      case ProjectInformationLoadFailure():
+        setState(() {
+          _information = null;
+          _informationFailure = result.failure;
+          _informationStatus = _LoadStatus.error;
+        });
+      case ProjectInformationSuperseded():
+        break;
+    }
+  }
+
+  Future<void> _reloadInformationIfStillSelected(String projectId) async {
+    if (!mounted || widget.session.selectedProjectId != projectId) return;
+    await _loadInformation(projectId, showLoading: false);
   }
 
   Future<void> _runMutation(Future<void> Function() operation) async {
@@ -223,7 +249,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         context,
       ).showSnackBar(SnackBar(content: Text(_messageFor(error))));
       final projectId = widget.session.selectedProjectId;
-      if (projectId != null) unawaited(_loadProfile(projectId));
+      if (projectId != null) unawaited(_loadInformation(projectId));
     } finally {
       if (mounted) setState(() => _mutating = false);
     }
@@ -231,7 +257,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
 
   String _messageFor(Object error) => switch (error) {
     AgendaValidationFailure() => error.message,
-    _ => 'Proje profili güncellenemedi. Kayıtlar korunuyor.',
+    _ => 'Proje bilgileri güncellenemedi. Kayıtlar korunuyor.',
   };
 
   Future<void> _editProjectName(MobileProject project) async {
@@ -272,11 +298,10 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           for (final item in _projects)
             if (item.id == renamed.id) renamed else item,
         ];
-        final profile = _profile;
-        if (profile != null && profile.project.id == renamed.id) {
-          _profile = ProjectProfile(project: renamed, fields: profile.fields);
-        }
       });
+      if (widget.session.selectedProjectId == project.id) {
+        await _loadInformation(project.id, showLoading: false);
+      }
     });
   }
 
@@ -350,6 +375,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           value: result.$2,
         ),
       );
+      await _reloadInformationIfStillSelected(field.projectId);
     });
   }
 
@@ -408,6 +434,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           value: result.$2,
         ),
       );
+      await _reloadInformationIfStillSelected(project.id);
     });
   }
 
@@ -443,26 +470,50 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           archive: true,
         ),
       );
+      await _reloadInformationIfStillSelected(field.projectId);
     });
   }
 
-  Future<void> _reorderFields(int oldIndex, int newIndex) async {
-    final profile = _profile;
+  Future<void> _reorderFields(
+    MobileProject project,
+    List<ProjectProfileField> visibleFields,
+    int oldIndex,
+    int newIndex,
+  ) async {
     final application = _profileApplication;
-    if (profile == null || application == null || _mutating) return;
-    final fields = [...profile.fields];
-    final moved = fields.removeAt(oldIndex);
-    fields.insert(newIndex, moved);
-    setState(
-      () => _profile = ProjectProfile(project: profile.project, fields: fields),
-    );
+    final snapshot = _information;
+    if (application == null ||
+        snapshot == null ||
+        snapshot.projectId != project.id ||
+        widget.session.selectedProjectId != project.id ||
+        _mutating) {
+      return;
+    }
+    final currentFields = snapshot.profileFields
+        .where((field) => !field.isArchived)
+        .toList(growable: false);
+    if (currentFields.length != visibleFields.length ||
+        oldIndex < 0 ||
+        oldIndex >= currentFields.length ||
+        newIndex < 0 ||
+        newIndex >= currentFields.length ||
+        currentFields.indexed.any(
+          (entry) =>
+              entry.$2.id != visibleFields[entry.$1].id ||
+              entry.$2.revision != visibleFields[entry.$1].revision,
+        )) {
+      return;
+    }
+    final reordered = [...currentFields];
+    final moved = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, moved);
     await _runMutation(() async {
       await application.reorderProjectProfileFields(
         ReorderProjectProfileFieldsCommand(
           eventId: RecordId.randomUuid(),
-          projectId: profile.project.id,
+          projectId: project.id,
           fields: [
-            for (final field in fields)
+            for (final field in reordered)
               ProjectProfileFieldOrder(
                 fieldId: field.id,
                 expectedRevision: field.revision,
@@ -470,6 +521,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           ],
         ),
       );
+      await _reloadInformationIfStillSelected(project.id);
     });
   }
 
@@ -685,11 +737,10 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         onAction: widget.onCreateProject,
       );
     }
-    return _buildProfile(selected);
+    return _buildProject(selected);
   }
 
-  Widget _buildProfile(MobileProject project) {
-    final profile = _profile;
+  Widget _buildProject(MobileProject project) {
     return ListView(
       key: const Key('project-profile-home'),
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
@@ -711,7 +762,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Proje Profili',
+                            'Aktif Proje',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.labelLarge,
@@ -754,45 +805,77 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           ),
         ),
         const SizedBox(height: 8),
-        if (_profileStatus == _LoadStatus.loading ||
-            profile == null && _profileStatus == _LoadStatus.ready)
-          const Center(
-            key: Key('project-profile-loading'),
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: CircularProgressIndicator(),
-            ),
-          )
-        else if (_profileStatus == _LoadStatus.error)
-          _ProjectStateSurface(
-            key: const Key('project-profile-error'),
-            icon: Icons.warning_amber_rounded,
-            title: 'Proje profili okunamadı.',
-            body: 'Kayıtlar değiştirilmedi.',
-            actionIcon: Icons.refresh_rounded,
-            actionLabel: 'Tekrar dene',
-            onAction: () => _loadProfile(project.id),
-          )
-        else if (profile != null && profile.project.id == project.id) ...[
+        Semantics(
+          header: true,
+          child: Text(
+            'Hızlı Bilgiler',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildQuickInformation(project),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          key: const Key('dashboard-open-project-information'),
+          onPressed:
+              widget.onOpenProjectInformation == null ||
+                  _informationStatus != _LoadStatus.ready
+              ? null
+              : () => _openProjectAction(
+                  widget.onOpenProjectInformation,
+                  project.id,
+                ),
+          icon: const Icon(Icons.list_alt_rounded),
+          label: const Text('Tüm proje bilgileri'),
+        ),
+        if (_profileApplication != null &&
+            _informationStatus == _LoadStatus.ready &&
+            _information?.projectId == project.id &&
+            _information!.statusFor(ProjectInformationSource.profile).state !=
+                ProjectInformationReadState.failed) ...[
+          const SizedBox(height: 8),
+          _buildProfileEditor(project, _information!),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildProfileEditor(
+    MobileProject project,
+    ProjectInformationSnapshot snapshot,
+  ) {
+    final fields = snapshot.profileFields
+        .where((field) => !field.isArchived)
+        .toList(growable: false);
+    return Card(
+      key: const Key('project-profile-editor'),
+      child: ExpansionTile(
+        leading: const Icon(Icons.edit_note_rounded),
+        title: const Text('Profil alanlarını düzenle'),
+        subtitle: const Text('Mevcut alanları düzenle, ekle veya sırala'),
+        childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        children: [
           LayoutBuilder(
             builder: (context, constraints) {
-              final width = (constraints.maxWidth - 16) / 3;
+              final columns = constraints.maxWidth >= 520 ? 3 : 2;
+              final width =
+                  (constraints.maxWidth - (columns - 1) * 8) / columns;
               final height = 64 + MediaQuery.textScalerOf(context).scale(52);
               return Wrap(
                 key: const Key('project-profile-fields'),
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  for (var index = 0; index < profile.fields.length; index++)
+                  for (var index = 0; index < fields.length; index++)
                     SizedBox(
                       key: ValueKey(
-                        'project-profile-field-${profile.fields[index].id}',
+                        'project-profile-field-${fields[index].id}',
                       ),
                       width: width,
                       height: height,
                       child: _buildFieldCell(
-                        context,
-                        profile,
+                        project,
+                        fields,
                         index,
                         width,
                         height,
@@ -830,37 +913,35 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
             },
           ),
         ],
-      ],
+      ),
     );
   }
 
   Widget _buildFieldCell(
-    BuildContext context,
-    ProjectProfile profile,
+    MobileProject project,
+    List<ProjectProfileField> fields,
     int index,
     double width,
     double height,
   ) {
-    final field = profile.fields[index];
+    final field = fields[index];
     return DragTarget<ProjectProfileField>(
       onWillAcceptWithDetails: (details) =>
           !_mutating &&
-          details.data.projectId == profile.project.id &&
+          details.data.projectId == project.id &&
           details.data.id != field.id &&
-          profile.fields.any(
+          fields.any(
             (item) =>
                 item.id == details.data.id &&
                 item.revision == details.data.revision,
           ),
       onAcceptWithDetails: (details) {
-        if (!identical(_profile, profile) ||
-            widget.session.selectedProjectId != profile.project.id) {
-          return;
-        }
-        final oldIndex = profile.fields.indexWhere(
+        final oldIndex = fields.indexWhere(
           (item) => item.id == details.data.id,
         );
-        if (oldIndex >= 0) unawaited(_reorderFields(oldIndex, index));
+        if (oldIndex >= 0) {
+          unawaited(_reorderFields(project, fields, oldIndex, index));
+        }
       },
       builder: (context, candidates, rejected) => Card(
         margin: EdgeInsets.zero,
@@ -886,7 +967,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                     field.value.isEmpty ? 'Henüz girilmedi' : field.value,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
                 Row(
@@ -904,7 +984,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                         );
                       },
                       onDragUpdate: (details) {
-                        _fieldAutoScroller!.startAutoScrollIfNecessary(
+                        _fieldAutoScroller?.startAutoScrollIfNecessary(
                           Rect.fromCenter(
                             center: details.globalPosition,
                             width: 40,
@@ -947,7 +1027,187 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
       ),
     );
   }
+
+  Widget _buildQuickInformation(MobileProject project) {
+    if (_informationStatus == _LoadStatus.loading) {
+      return const Card(
+        key: Key('dashboard-project-information-loading'),
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+    final snapshot = _information;
+    if (_informationStatus == _LoadStatus.error ||
+        snapshot == null ||
+        snapshot.projectId != project.id) {
+      return _ProjectStateSurface(
+        key: const Key('dashboard-project-information-error'),
+        icon: Icons.warning_amber_rounded,
+        title: 'Proje bilgileri okunamadı.',
+        body:
+            _informationFailure?.errorCode ==
+                'project_information_project_changed_during_read'
+            ? 'Proje okuma sırasında değişti. Güncel bilgileri yeniden yükleyin.'
+            : 'Kayıtlar değiştirilmedi.',
+        actionIcon: Icons.refresh_rounded,
+        actionLabel: 'Tekrar dene',
+        onAction: () => _loadInformation(project.id),
+      );
+    }
+    final items = _quickItems(snapshot);
+    final hasFailure = snapshot.sourceStatuses.any(
+      (status) => status.state == ProjectInformationReadState.failed,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (hasFailure)
+          Card(
+            key: const Key('dashboard-project-information-partial-error'),
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'Bazı bilgiler okunamadı; boş alanlardan ayrı olarak işaretlendi.',
+              ),
+            ),
+          ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 520 ? 3 : 2;
+            final width = (constraints.maxWidth - (columns - 1) * 8) / columns;
+            return Wrap(
+              key: const Key('dashboard-quick-information'),
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final item in items)
+                  SizedBox(
+                    width: width,
+                    child: Card(
+                      key: ValueKey('dashboard-quick-${item.key}'),
+                      margin: EdgeInsets.zero,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.value,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
 }
+
+class _QuickItem {
+  const _QuickItem(this.key, this.label, this.value);
+
+  final String key;
+  final String label;
+  final String value;
+}
+
+List<_QuickItem> _quickItems(ProjectInformationSnapshot snapshot) {
+  final metadataStatus = snapshot.statusFor(ProjectInformationSource.metadata);
+  final profileStatus = snapshot.statusFor(ProjectInformationSource.profile);
+  final inventoryStatus = snapshot.statusFor(
+    ProjectInformationSource.inventory,
+  );
+  final fields = snapshot.profileFields.where((field) => !field.isArchived);
+  String? profileValue(ProjectProfileBuiltinField builtin) {
+    for (final field in fields) {
+      if (field.builtinField == builtin && field.value.trim().isNotEmpty) {
+        return field.value.trim();
+      }
+    }
+    return null;
+  }
+
+  final manualArea = profileValue(ProjectProfileBuiltinField.totalArea);
+  final derived = snapshot.derivedInventoryTotals;
+  final derivedArea =
+      derived.areaState == ProjectInformationDerivedAreaState.available
+      ? '${_formatQuickNumber(derived.totalArea!)} '
+            '${derived.totalAreaUnit!} (türetilmiş)'
+      : null;
+  final manualFloors = profileValue(ProjectProfileBuiltinField.totalFloors);
+  return <_QuickItem>[
+    _QuickItem(
+      'address',
+      'Adres',
+      metadataStatus.state == ProjectInformationReadState.failed
+          ? 'Okunamadı'
+          : _quickValue(snapshot.metadata?.address),
+    ),
+    _QuickItem(
+      'total-area',
+      'Toplam alan',
+      profileStatus.state == ProjectInformationReadState.failed
+          ? 'Okunamadı'
+          : manualArea ??
+                (inventoryStatus.state == ProjectInformationReadState.failed
+                    ? 'Okunamadı'
+                    : derivedArea ?? 'Henüz girilmedi'),
+    ),
+    _QuickItem(
+      'block-count',
+      'Aktif blok',
+      inventoryStatus.state == ProjectInformationReadState.failed
+          ? 'Okunamadı'
+          : '${derived.activeBlockCount} (türetilmiş)',
+    ),
+    _QuickItem(
+      'total-floors',
+      'Toplam kat',
+      profileStatus.state == ProjectInformationReadState.failed
+          ? 'Okunamadı'
+          : manualFloors ??
+                (inventoryStatus.state == ProjectInformationReadState.failed
+                    ? 'Okunamadı'
+                    : '${derived.activeFloorCount} (türetilmiş)'),
+    ),
+    _QuickItem(
+      'yibf',
+      'YİBF No',
+      profileStatus.state == ProjectInformationReadState.failed
+          ? 'Okunamadı'
+          : profileValue(ProjectProfileBuiltinField.yibfNumber) ??
+                'Henüz girilmedi',
+    ),
+  ];
+}
+
+String _quickValue(String? value) {
+  final normalized = value?.trim();
+  return normalized == null || normalized.isEmpty
+      ? 'Henüz girilmedi'
+      : normalized;
+}
+
+String _formatQuickNumber(double value) => value == value.roundToDouble()
+    ? value.toStringAsFixed(0)
+    : value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
 
 class _ProjectStateSurface extends StatelessWidget {
   const _ProjectStateSurface({
