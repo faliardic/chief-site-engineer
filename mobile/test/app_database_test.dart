@@ -85,7 +85,239 @@ void main() {
       {'version': 23, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 24, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 25, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 26, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
+  });
+
+  test(
+    'schema 25 to 26 is additive and enforces attendance Agenda link integrity',
+    () async {
+      const attendanceDayId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+      const secondAttendanceDayId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+      const agendaLogId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+      const otherAgendaLogId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+      const sameProjectAgendaLogId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3';
+      const projectId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+      const otherProjectId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
+      const createdAt = '2026-07-19T08:00:00Z';
+      final schemaTwentyFive = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(25).toList(),
+      );
+      await schemaTwentyFive.open();
+      for (final project in const [
+        (projectId, 'Korunan proje'),
+        (otherProjectId, 'Başka proje'),
+      ]) {
+        await schemaTwentyFive.database.insert('projects', {
+          'id': project.$1,
+          'name': project.$2,
+          'created_at': createdAt,
+          'updated_at': createdAt,
+          'revision': 1,
+        });
+      }
+      await schemaTwentyFive.database.insert('attendance_days', {
+        'id': attendanceDayId,
+        'project_id': projectId,
+        'local_date': '2026-07-19',
+        'status': 'completed',
+        'general_note': null,
+        'revision': 2,
+        'created_at': createdAt,
+        'updated_at': createdAt,
+        'completed_at': createdAt,
+      });
+      await schemaTwentyFive.database.insert('attendance_days', {
+        'id': secondAttendanceDayId,
+        'project_id': projectId,
+        'local_date': '2026-07-20',
+        'status': 'completed',
+        'general_note': null,
+        'revision': 2,
+        'created_at': createdAt,
+        'updated_at': createdAt,
+        'completed_at': createdAt,
+      });
+      for (final log in const [
+        (agendaLogId, projectId),
+        (otherAgendaLogId, otherProjectId),
+        (sameProjectAgendaLogId, projectId),
+      ]) {
+        await schemaTwentyFive.database.insert('field_observations', {
+          'id': log.$1,
+          'project_id': log.$2,
+          'observed_at': createdAt,
+          'created_at': createdAt,
+          'updated_at': createdAt,
+          'category': 'general_note',
+          'description': 'Korunan kayıt',
+          'revision': 1,
+        });
+      }
+      final attendanceBefore = await schemaTwentyFive.database.query(
+        'attendance_days',
+      );
+      final agendaBefore = await schemaTwentyFive.database.query(
+        'field_observations',
+        orderBy: 'id ASC',
+      );
+      await schemaTwentyFive.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      final db = upgraded.database;
+      expect(
+        sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
+        26,
+      );
+      expect(await db.query('attendance_days'), attendanceBefore);
+      expect(
+        await db.query('field_observations', orderBy: 'id ASC'),
+        agendaBefore,
+      );
+      expect(await db.query('attendance_day_agenda_links'), isEmpty);
+      final columns = await db.rawQuery(
+        'PRAGMA table_info(attendance_day_agenda_links)',
+      );
+      expect(
+        columns.singleWhere(
+          (row) => row['name'] == 'attendance_day_id',
+        )['notnull'],
+        1,
+      );
+
+      await expectLater(
+        db.insert('attendance_day_agenda_links', {
+          'attendance_day_id': attendanceDayId,
+          'project_id': otherProjectId,
+          'agenda_log_id': otherAgendaLogId,
+          'created_at': createdAt,
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.insert('attendance_day_agenda_links', {
+          'attendance_day_id': attendanceDayId,
+          'project_id': projectId,
+          'agenda_log_id': otherAgendaLogId,
+          'created_at': createdAt,
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.insert('attendance_day_agenda_links', {
+          'attendance_day_id': null,
+          'project_id': projectId,
+          'agenda_log_id': agendaLogId,
+          'created_at': createdAt,
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await db.insert('attendance_day_agenda_links', {
+        'attendance_day_id': attendanceDayId,
+        'project_id': projectId,
+        'agenda_log_id': agendaLogId,
+        'created_at': createdAt,
+      });
+      await expectLater(
+        db.insert('attendance_day_agenda_links', {
+          'attendance_day_id': attendanceDayId,
+          'project_id': projectId,
+          'agenda_log_id': sameProjectAgendaLogId,
+          'created_at': createdAt,
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.insert('attendance_day_agenda_links', {
+          'attendance_day_id': secondAttendanceDayId,
+          'project_id': projectId,
+          'agenda_log_id': agendaLogId,
+          'created_at': createdAt,
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'attendance_day_agenda_links',
+          {'created_at': '2026-07-19T09:00:00Z'},
+          where: 'attendance_day_id = ?',
+          whereArgs: [attendanceDayId],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.delete(
+          'attendance_day_agenda_links',
+          where: 'attendance_day_id = ?',
+          whereArgs: [attendanceDayId],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      await upgraded.close();
+    },
+  );
+
+  test('failed schema 26 migration rolls back intact schema 25 data', () async {
+    const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    final schemaTwentyFive = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(25).toList(),
+    );
+    await schemaTwentyFive.open();
+    await schemaTwentyFive.database.insert('projects', {
+      'id': projectId,
+      'name': 'Rollback V25',
+      'created_at': '2026-07-19T08:00:00Z',
+      'updated_at': '2026-07-19T08:00:00Z',
+      'revision': 3,
+    });
+    final projectsBefore = await schemaTwentyFive.database.query('projects');
+    await schemaTwentyFive.close();
+
+    final failing = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 19, 9),
+      migrations: [
+        ...AppDatabase.foundationMigrations.take(25),
+        DatabaseMigration(
+          version: 26,
+          apply: (transaction) async {
+            await AppDatabase.foundationMigrations[25].apply(transaction);
+            throw StateError('intentional schema 26 rollback');
+          },
+        ),
+      ],
+    );
+    await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+    final raw = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: sqflite.OpenDatabaseOptions(singleInstance: false),
+    );
+    expect(
+      sqflite.Sqflite.firstIntValue(await raw.rawQuery('PRAGMA user_version')),
+      25,
+    );
+    expect(await raw.query('projects'), projectsBefore);
+    expect(
+      await raw.rawQuery(
+        "SELECT name FROM sqlite_master "
+        "WHERE name = 'attendance_day_agenda_links'",
+      ),
+      isEmpty,
+    );
+    await raw.close();
   });
 
   test(
@@ -317,7 +549,7 @@ void main() {
         sqflite.Sqflite.firstIntValue(
           await upgraded.database.rawQuery('PRAGMA user_version'),
         ),
-        25,
+        AppDatabase.schemaVersion,
       );
       expect(
         await upgraded.database.rawQuery('PRAGMA foreign_key_check'),
@@ -327,7 +559,7 @@ void main() {
     },
   );
 
-  test('migrated and fresh schema 25 block-location objects match', () async {
+  test('migrated and fresh current block-location objects match', () async {
     final old = AppDatabase(
       path: directories.databaseFile,
       factory: databaseFactoryFfi,
@@ -343,7 +575,8 @@ void main() {
     );
     await migrated.open();
     final fresh = AppDatabase(
-      path: '${temporaryRoot.path}${Platform.pathSeparator}fresh-v25.sqlite3',
+      path:
+          '${temporaryRoot.path}${Platform.pathSeparator}fresh-current.sqlite3',
       factory: databaseFactoryFfi,
       clock: () => firstClock,
     );
@@ -2421,6 +2654,7 @@ void main() {
         'attendance_events',
         'attendance_reminder_settings',
         'attendance_day_reminder_links',
+        'attendance_day_agenda_links',
         'concrete_pours',
         'project_concrete_classes',
         'project_concrete_class_events',

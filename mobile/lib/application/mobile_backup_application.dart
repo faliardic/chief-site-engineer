@@ -1584,6 +1584,7 @@ class SqliteMobileBackupApplication
         'attendance_days',
         'attendance_entries',
         'attendance_events',
+        'attendance_day_agenda_links',
         'concrete_pours',
         'project_concrete_classes',
         'project_concrete_class_events',

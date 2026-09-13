@@ -2493,6 +2493,108 @@ void main() {
   );
 
   test(
+    'attendance-managed detail preserves source and blocks only main mutations',
+    () async {
+      final created = await createLog(
+        id: log1,
+        event: 780,
+        observedAt: '2026-07-19T07:00:00Z',
+        description: 'Puantaj gün tamamlama kaydı',
+        location: null,
+        notes: 'Bu kayıt tamamlanan Puantaj gününden otomatik oluşturuldu.',
+      );
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await raw.execute('PRAGMA foreign_keys = ON');
+      await raw.insert('attendance_days', {
+        'id': log2,
+        'project_id': project1,
+        'local_date': '2026-07-19',
+        'status': 'completed',
+        'general_note': null,
+        'revision': 2,
+        'created_at': '2026-07-19T07:00:00Z',
+        'updated_at': '2026-07-19T07:00:00Z',
+        'completed_at': '2026-07-19T07:00:00Z',
+      });
+      await raw.insert('attendance_day_agenda_links', {
+        'attendance_day_id': log2,
+        'project_id': project1,
+        'agenda_log_id': log1,
+        'created_at': '2026-07-19T07:00:00Z',
+      });
+      await raw.close();
+
+      final linked = await agenda.getAgendaLogDetail(log1);
+      expect(linked.managedAttendanceSource?.attendanceDayId, log2);
+      expect(linked.managedAttendanceSource?.projectId, project1);
+      expect(linked.managedAttendanceSource?.localDate, '2026-07-19');
+      await expectLater(
+        agenda.updateAgendaLog(
+          UpdateAgendaLogCommand(
+            id: log1,
+            eventId: eventId(781),
+            expectedRevision: created.revision,
+            projectId: project1,
+            observedAt: created.observedAt,
+            category: created.category,
+            description: 'Yetkisiz ana metin değişikliği',
+          ),
+        ),
+        throwsA(
+          isA<AgendaValidationFailure>().having(
+            (error) => error.message,
+            'message',
+            contains('Puantaj tarafından yönetiliyor'),
+          ),
+        ),
+      );
+      await expectLater(
+        agenda.mutateAgendaLogArchive(
+          MutateAgendaLogArchiveCommand(
+            id: log1,
+            eventId: eventId(782),
+            expectedRevision: created.revision,
+            archive: true,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+
+      await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(783),
+          projectId: project1,
+          sourceLogId: log1,
+          title: 'Puantaj kaynaklı takip',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in15Minutes,
+        ),
+      );
+      final withPhoto = await agenda.attachAgendaPhoto(
+        AttachAgendaPhotoCommand(
+          logId: log1,
+          id: log3,
+          eventId: eventId(784),
+          expectedLogRevision: created.revision,
+          originalFileName: 'puantaj.jpg',
+          bytes: const [0xff, 0xd8, 0xff, 1],
+          capturedAt: '2026-07-19T07:00:00Z',
+        ),
+      );
+      expect(withPhoto.reminders.single.id, reminder1);
+      expect(withPhoto.photos.single.id, log3);
+      expect(withPhoto.photos.single.integrity, AgendaAttachmentIntegrity.ok);
+      expect(withPhoto.managedAttendanceSource?.attendanceDayId, log2);
+      expect(withPhoto.log.description, 'Puantaj gün tamamlama kaydı');
+      expect(withPhoto.log.archivedAt, isNull);
+    },
+  );
+
+  test(
     'agenda photos stage attach diagnose archive and restart without partials',
     () async {
       final created = await agenda.createAgendaLog(

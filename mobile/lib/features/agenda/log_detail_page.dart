@@ -461,7 +461,21 @@ class _LogDetailPageState extends State<LogDetailPage> {
                   : null,
             ),
           ),
+        if (detail.managedAttendanceSource case final source?)
+          Card(
+            key: const Key('managed-attendance-agenda'),
+            child: ListTile(
+              leading: const Icon(Icons.lock_outline),
+              title: const Text('Puantaj tarafından yönetiliyor'),
+              subtitle: Text(
+                'Kaynak Puantaj günü: '
+                '${CseTimeCodec.formatIstanbulDay(source.localDate)}\n'
+                'Ana metin ve arşiv durumu Puantaj gününden yönetilir.',
+              ),
+            ),
+          ),
         if (detail.managedConcretePourId == null &&
+            detail.managedAttendanceSource == null &&
             AgendaConcreteSignalDetector.hasSignal(
               description: log.description,
               notes: log.notes,
@@ -519,7 +533,8 @@ class _LogDetailPageState extends State<LogDetailPage> {
         if (log.notes != null)
           _DetailRow(label: 'Ayrıntılı not', value: log.notes!),
         const SizedBox(height: 12),
-        if (detail.managedConcretePourId == null)
+        if (detail.managedConcretePourId == null &&
+            detail.managedAttendanceSource == null)
           Wrap(
             spacing: 8,
             runSpacing: 8,

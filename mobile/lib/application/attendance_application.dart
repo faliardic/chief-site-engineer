@@ -109,6 +109,9 @@ class SqliteAttendanceApplication implements AttendanceApplication {
     MobileOperationCoordinator? coordinator,
     AttendanceExportGateway? exportGateway,
     this.beforeAttendanceEventInsert,
+    this.beforeManagedAgendaBaseInsert,
+    this.beforeManagedAgendaEventInsert,
+    this.beforeManagedAgendaLinkInsert,
   }) : coordinator = coordinator ?? MobileOperationCoordinator(),
        exportGateway =
            exportGateway ?? const UnavailableAttendanceExportGateway();
@@ -120,6 +123,9 @@ class SqliteAttendanceApplication implements AttendanceApplication {
   final MobileOperationCoordinator coordinator;
   final AttendanceExportGateway exportGateway;
   final AttendanceTransactionHook? beforeAttendanceEventInsert;
+  final AttendanceTransactionHook? beforeManagedAgendaBaseInsert;
+  final AttendanceTransactionHook? beforeManagedAgendaEventInsert;
+  final AttendanceTransactionHook? beforeManagedAgendaLinkInsert;
 
   @override
   Future<List<Subcontractor>> listSubcontractors(
@@ -1753,7 +1759,9 @@ class SqliteAttendanceApplication implements AttendanceApplication {
             continue;
           }
           final existing = existingRows.single;
-          if (existing['id'] != value.entryId) {
+          final canonicalEntryId = existing['id']! as String;
+          final isRemoved = existing['removed_at'] != null;
+          if (!isRemoved && canonicalEntryId != value.entryId) {
             throw const AgendaValidationFailure(
               'Puantaj entry kimliği mevcut personel kaydıyla eşleşmiyor.',
             );
@@ -1780,10 +1788,10 @@ class SqliteAttendanceApplication implements AttendanceApplication {
               'removed_at': null,
             },
             where: 'id = ?',
-            whereArgs: [value.entryId],
+            whereArgs: [canonicalEntryId],
           );
           changes.add({
-            'entry_id': value.entryId,
+            'entry_id': canonicalEntryId,
             'member_id': member.id,
             'team_name': member.teamName,
             'before': before,
@@ -2114,6 +2122,14 @@ class SqliteAttendanceApplication implements AttendanceApplication {
             );
           }
         }
+        await _syncManagedAttendanceAgenda(
+          transaction,
+          day: day,
+          transition: command.transition,
+          acceptedTransitionId: command.dayEventId,
+          resultingRevision: day.revision + 1,
+          occurredAt: timestamp,
+        );
       });
     });
     await _safeReconcileNotifications(
@@ -2684,6 +2700,184 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       'occurred_at': occurredAt,
       'payload_json': jsonEncode(payload),
     });
+  }
+
+  Future<void> _syncManagedAttendanceAgenda(
+    Transaction transaction, {
+    required AttendanceDay day,
+    required AttendanceTransition transition,
+    required String acceptedTransitionId,
+    required int resultingRevision,
+    required String occurredAt,
+  }) async {
+    final links = await transaction.query(
+      'attendance_day_agenda_links',
+      columns: ['project_id', 'agenda_log_id'],
+      where: 'attendance_day_id = ?',
+      whereArgs: [day.id],
+      limit: 1,
+    );
+    String agendaLogId;
+    if (links.isEmpty) {
+      if (transition != AttendanceTransition.complete) return;
+      agendaLogId = _stableUuid('attendance-managed-agenda:${day.id}');
+      await beforeManagedAgendaBaseInsert?.call(transaction);
+      await transaction.insert('field_observations', {
+        'id': agendaLogId,
+        'project_id': day.projectId,
+        'observed_at': occurredAt,
+        'created_at': occurredAt,
+        'updated_at': occurredAt,
+        'category': 'general_note',
+        'description': 'Puantaj gün tamamlama kaydı',
+        'location': null,
+        'location_id': null,
+        'notes': 'Bu kayıt tamamlanan Puantaj gününden otomatik oluşturuldu.',
+        'revision': 1,
+        'archived_at': null,
+      });
+    } else {
+      final link = links.single;
+      if (link['project_id'] != day.projectId) {
+        throw const AgendaValidationFailure(
+          'Puantaj Ajanda bağlantısının proje kapsamı geçersizdir.',
+        );
+      }
+      agendaLogId = link['agenda_log_id']! as String;
+      if (transition == AttendanceTransition.complete &&
+          await _hasAcceptedMutationAfterLatestReopen(
+            transaction,
+            attendanceDayId: day.id,
+            acceptedCompletionId: acceptedTransitionId,
+          )) {
+        await _refreshManagedAttendanceAgenda(
+          transaction,
+          agendaLogId: agendaLogId,
+          projectId: day.projectId,
+          occurredAt: occurredAt,
+        );
+      }
+    }
+
+    await beforeManagedAgendaEventInsert?.call(transaction);
+    await transaction.insert('observation_events', {
+      'id': _stableUuid(
+        'attendance-managed-agenda-event:$acceptedTransitionId',
+      ),
+      'observation_id': agendaLogId,
+      'project_id': day.projectId,
+      'event_type': switch (transition) {
+        AttendanceTransition.complete => 'attendance_day.completed',
+        AttendanceTransition.noWork => 'attendance_day.no_work',
+        AttendanceTransition.reopen => 'attendance_day.reopened',
+      },
+      'occurred_at': occurredAt,
+      'payload_json': jsonEncode({
+        'attendance_day_id': day.id,
+        'project_id': day.projectId,
+        'source_local_date': day.localDate,
+        'accepted_transition_id': acceptedTransitionId,
+        'attendance_revision': resultingRevision,
+      }),
+    });
+
+    if (links.isEmpty) {
+      await beforeManagedAgendaLinkInsert?.call(transaction);
+      await transaction.insert('attendance_day_agenda_links', {
+        'attendance_day_id': day.id,
+        'project_id': day.projectId,
+        'agenda_log_id': agendaLogId,
+        'created_at': occurredAt,
+      });
+    }
+  }
+
+  Future<bool> _hasAcceptedMutationAfterLatestReopen(
+    Transaction transaction, {
+    required String attendanceDayId,
+    required String acceptedCompletionId,
+  }) async {
+    final completionRows = await transaction.query(
+      'attendance_events',
+      columns: ['sequence', 'event_type'],
+      where: 'id = ? AND attendance_day_id = ?',
+      whereArgs: [acceptedCompletionId, attendanceDayId],
+      limit: 2,
+    );
+    if (completionRows.length != 1 ||
+        completionRows.single['event_type'] != 'attendance_day.completed') {
+      throw const AgendaValidationFailure(
+        'Puantaj Ajanda yenileme tamamlanma kaydı geçersizdir.',
+      );
+    }
+    final completionSequence = completionRows.single['sequence']! as int;
+    final reopenRows = await transaction.query(
+      'attendance_events',
+      columns: ['sequence'],
+      where: 'attendance_day_id = ? AND event_type = ? AND sequence < ?',
+      whereArgs: [
+        attendanceDayId,
+        'attendance_day.reopened',
+        completionSequence,
+      ],
+      orderBy: 'sequence DESC',
+      limit: 1,
+    );
+    if (reopenRows.isEmpty) return false;
+    final reopenSequence = reopenRows.single['sequence']! as int;
+    final mutationRows = await transaction.query(
+      'attendance_events',
+      columns: ['id'],
+      where:
+          'attendance_day_id = ? AND sequence > ? AND sequence < ? '
+          'AND event_type IN (?, ?, ?)',
+      whereArgs: [
+        attendanceDayId,
+        reopenSequence,
+        completionSequence,
+        'attendance_entry.upserted',
+        'attendance_entry.removed',
+        'attendance_day.note_updated',
+      ],
+      limit: 1,
+    );
+    return mutationRows.isNotEmpty;
+  }
+
+  Future<void> _refreshManagedAttendanceAgenda(
+    Transaction transaction, {
+    required String agendaLogId,
+    required String projectId,
+    required String occurredAt,
+  }) async {
+    final rows = await transaction.query(
+      'field_observations',
+      columns: ['id', 'project_id', 'revision'],
+      where: 'id = ?',
+      whereArgs: [agendaLogId],
+      limit: 2,
+    );
+    if (rows.length != 1 || rows.single['project_id'] != projectId) {
+      throw const AgendaValidationFailure(
+        'Puantaj Ajanda kaydının proje kapsamı geçersizdir.',
+      );
+    }
+    final revision = rows.single['revision']! as int;
+    final updated = await transaction.update(
+      'field_observations',
+      {
+        'observed_at': occurredAt,
+        'updated_at': occurredAt,
+        'revision': revision + 1,
+      },
+      where: 'id = ? AND project_id = ? AND revision = ?',
+      whereArgs: [agendaLogId, projectId, revision],
+    );
+    if (updated != 1) {
+      throw const AgendaValidationFailure(
+        'Puantaj Ajanda kaydı güvenli biçimde yenilenemedi.',
+      );
+    }
   }
 
   Future<void> _insertReminderEvent(

@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 25;
+  static const schemaVersion = 26;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2912,6 +2912,7 @@ class AppDatabase {
       version: 25,
       apply: _applyBlockLocationFoundationMigration,
     ),
+    DatabaseMigration(version: 26, apply: _applyAttendanceAgendaLinkMigration),
   ];
 
   final String path;
@@ -7586,6 +7587,37 @@ Future<void> _applyAttachmentFoundationMigration(
   );
   await transaction.execute('DROP TABLE agenda_log_attachments');
   await transaction.execute('DROP TABLE concrete_attachments');
+}
+
+Future<void> _applyAttendanceAgendaLinkMigration(
+  Transaction transaction,
+) async {
+  await transaction.execute('''
+    CREATE TABLE attendance_day_agenda_links (
+      attendance_day_id TEXT NOT NULL PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      agenda_log_id TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (attendance_day_id, project_id)
+        REFERENCES attendance_days(id, project_id),
+      FOREIGN KEY (agenda_log_id, project_id)
+        REFERENCES field_observations(id, project_id)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER attendance_day_agenda_links_immutable_update
+    BEFORE UPDATE ON attendance_day_agenda_links
+    BEGIN
+      SELECT RAISE(ABORT, 'attendance Agenda link is immutable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER attendance_day_agenda_links_no_physical_delete
+    BEFORE DELETE ON attendance_day_agenda_links
+    BEGIN
+      SELECT RAISE(ABORT, 'physical delete is not allowed');
+    END
+  ''');
 }
 
 String _normalizeRegistryName(String value) =>

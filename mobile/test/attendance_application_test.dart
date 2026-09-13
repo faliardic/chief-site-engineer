@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -5,6 +6,7 @@ import 'dart:typed_data';
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
+import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
@@ -1680,6 +1682,192 @@ void main() {
     },
   );
 
+  test(
+    'tombstoned roster entry revives canonical identity and refreshes Agenda',
+    () async {
+      final originalClock = now;
+      addTearDown(() => now = originalClock);
+      await _createMember(
+        attendance,
+        id: member1,
+        name: 'Ali Usta',
+        team: 'Kalıp Ekibi',
+      );
+      final day = await _ensureDay(attendance);
+      var detail = await attendance.saveRoster(
+        SaveAttendanceRosterCommand(
+          dayId: day.id,
+          eventId: event2,
+          expectedRevision: day.revision,
+          values: const [
+            AttendanceRosterValue(
+              entryId: entry1,
+              memberId: member1,
+              result: AttendanceResult.fullDay,
+              overtimeMinutes: 0,
+            ),
+          ],
+        ),
+      );
+      final initialRosterSnapshot = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      final initialEntryRow =
+          initialRosterSnapshot['attendance_entries']!.single;
+
+      now = DateTime.utc(2026, 7, 19, 9);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: event3,
+          reminderEventId: event4,
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      final initialAgendaSnapshot = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      final initialAgendaRow =
+          initialAgendaSnapshot['field_observations']!.single;
+      final initialAgendaLink =
+          initialAgendaSnapshot['attendance_day_agenda_links']!.single;
+
+      now = DateTime.utc(2026, 7, 19, 10);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: event5,
+          reminderEventId: event6,
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.reopen,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 11);
+      detail = await attendance.removeEntry(
+        RemoveAttendanceEntryCommand(
+          dayId: day.id,
+          entryId: entry1,
+          eventId: 'f4000000-0000-4000-8000-000000000001',
+          expectedRevision: detail.day.revision,
+        ),
+      );
+      expect(detail.entries, isEmpty);
+      final tombstonedSnapshot = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      expect(tombstonedSnapshot['attendance_entries'], hasLength(1));
+      expect(
+        tombstonedSnapshot['attendance_entries']!.single['removed_at'],
+        isNotNull,
+      );
+
+      now = DateTime.utc(2026, 7, 19, 12);
+      final reactivate = SaveAttendanceRosterCommand(
+        dayId: day.id,
+        eventId: 'f4000000-0000-4000-8000-000000000002',
+        expectedRevision: detail.day.revision,
+        values: const [
+          AttendanceRosterValue(
+            entryId: entry2,
+            memberId: member1,
+            result: AttendanceResult.halfDay,
+            overtimeMinutes: 30,
+            shortNote: 'Yeniden sahada',
+          ),
+        ],
+      );
+      detail = await attendance.saveRoster(reactivate);
+      expect(detail.entries, hasLength(1));
+      expect(detail.entries.single.id, entry1);
+      expect(detail.entries.single.result, AttendanceResult.halfDay);
+      expect(detail.entries.single.overtimeMinutes, 30);
+      final revivedSnapshot = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      expect(revivedSnapshot['attendance_entries'], hasLength(1));
+      final revivedEntryRow = revivedSnapshot['attendance_entries']!.single;
+      expect(revivedEntryRow['id'], entry1);
+      expect(revivedEntryRow['created_at'], initialEntryRow['created_at']);
+      expect(revivedEntryRow['removed_at'], isNull);
+      expect(revivedEntryRow['result'], 'half_day');
+      expect(revivedEntryRow['overtime_minutes'], 30);
+      expect(revivedEntryRow['short_note'], 'Yeniden sahada');
+      final reactivationEvent = revivedSnapshot['attendance_events']!
+          .singleWhere(
+            (row) => row['id'] == 'f4000000-0000-4000-8000-000000000002',
+          );
+      final reactivationPayload =
+          jsonDecode(reactivationEvent['payload_json']! as String)
+              as Map<String, dynamic>;
+      final reactivationChange =
+          (reactivationPayload['changes']! as List<dynamic>).single
+              as Map<String, dynamic>;
+      expect(reactivationChange['entry_id'], entry1);
+
+      now = DateTime.utc(2026, 7, 19, 13);
+      final retried = await attendance.saveRoster(reactivate);
+      expect(retried.day.revision, detail.day.revision);
+      expect(
+        await _attendanceAgendaSnapshot(directories.databaseFile, day.id),
+        revivedSnapshot,
+      );
+
+      now = DateTime.utc(2026, 7, 19, 14);
+      await expectLater(
+        attendance.saveRoster(
+          SaveAttendanceRosterCommand(
+            dayId: day.id,
+            eventId: 'f4000000-0000-4000-8000-000000000003',
+            expectedRevision: retried.day.revision,
+            values: const [
+              AttendanceRosterValue(
+                entryId: entry2,
+                memberId: member1,
+                result: AttendanceResult.absent,
+                overtimeMinutes: 0,
+              ),
+            ],
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(
+        await _attendanceAgendaSnapshot(directories.databaseFile, day.id),
+        revivedSnapshot,
+      );
+
+      now = DateTime.utc(2026, 7, 19, 15);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: 'f4000000-0000-4000-8000-000000000004',
+          reminderEventId: 'f4000000-0000-4000-8000-000000000005',
+          expectedRevision: retried.day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      final finalSnapshot = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      expect(finalSnapshot['attendance_entries'], hasLength(1));
+      expect(finalSnapshot['attendance_entries']!.single['id'], entry1);
+      expect(finalSnapshot['field_observations'], hasLength(1));
+      expect(finalSnapshot['field_observations']!.single, {
+        ...initialAgendaRow,
+        'observed_at': detail.day.updatedAt,
+        'updated_at': detail.day.updatedAt,
+        'revision': 2,
+      });
+      expect(finalSnapshot['attendance_day_agenda_links'], [initialAgendaLink]);
+    },
+  );
+
   test('overtime invariants fail before mutation', () async {
     await _createMember(attendance, id: member1, name: 'Ali', team: 'Ekip');
     final day = await _ensureDay(attendance);
@@ -1813,6 +2001,886 @@ void main() {
           'attendance_day.reopened',
           'attendance_day.no_work',
         ]),
+      );
+    },
+  );
+
+  test(
+    'attendance completion owns one Agenda projection across retry and lifecycle',
+    () async {
+      final originalClock = now;
+      addTearDown(() => now = originalClock);
+      final day = await _ensureDay(attendance);
+      const complete = TransitionAttendanceDayCommand(
+        dayId: day1,
+        dayEventId: event2,
+        reminderEventId: event3,
+        expectedRevision: 1,
+        transition: AttendanceTransition.complete,
+      );
+      var detail = await attendance.transitionDay(complete);
+      expect(detail.day.status, AttendanceDayStatus.completed);
+      expect(detail.day.revision, 2);
+      final acceptedCompletionAt = detail.day.updatedAt;
+
+      final firstSnapshot = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      detail = await attendance.transitionDay(complete);
+      expect(detail.day.revision, 2);
+      expect(
+        await _attendanceAgendaSnapshot(directories.databaseFile, day.id),
+        firstSnapshot,
+      );
+      await expectLater(
+        attendance.transitionDay(
+          const TransitionAttendanceDayCommand(
+            dayId: day1,
+            dayEventId: '99999999-9999-4999-8999-999999999991',
+            reminderEventId: '99999999-9999-4999-8999-999999999992',
+            expectedRevision: 1,
+            transition: AttendanceTransition.reopen,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(
+        await _attendanceAgendaSnapshot(directories.databaseFile, day.id),
+        firstSnapshot,
+      );
+
+      final links = firstSnapshot['attendance_day_agenda_links']!;
+      expect(links, hasLength(1));
+      expect(links.single['attendance_day_id'], day.id);
+      expect(links.single['project_id'], project1);
+      final agendaLogId = links.single['agenda_log_id']! as String;
+      final agendaRows = firstSnapshot['field_observations']!;
+      expect(agendaRows, hasLength(1));
+      expect(agendaRows.single, containsPair('id', agendaLogId));
+      expect(agendaRows.single['project_id'], project1);
+      expect(agendaRows.single['observed_at'], acceptedCompletionAt);
+      expect(agendaRows.single['created_at'], acceptedCompletionAt);
+      expect(agendaRows.single['category'], 'general_note');
+      expect(agendaRows.single['description'], 'Puantaj gün tamamlama kaydı');
+      expect(
+        agendaRows.single['notes'],
+        'Bu kayıt tamamlanan Puantaj gününden otomatik oluşturuldu.',
+      );
+      expect(agendaRows.single['location'], isNull);
+      expect(agendaRows.single['location_id'], isNull);
+      expect(agendaRows.single['revision'], 1);
+
+      final sourceDetail = await agenda.getAgendaLogDetail(agendaLogId);
+      expect(sourceDetail.managedAttendanceSource?.attendanceDayId, day.id);
+      expect(sourceDetail.managedAttendanceSource?.projectId, project1);
+      expect(sourceDetail.managedAttendanceSource?.localDate, '2026-07-19');
+
+      now = DateTime.utc(2026, 7, 19, 9);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: event4,
+          reminderEventId: event5,
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.reopen,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 10);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: event6,
+          reminderEventId: 'ffffffff-ffff-4fff-8fff-fffffffffff1',
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      final noMutationRecompletion = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      expect(noMutationRecompletion['field_observations'], agendaRows);
+      expect(noMutationRecompletion['attendance_day_agenda_links'], links);
+
+      now = DateTime.utc(2026, 7, 19, 11);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: 'ffffffff-ffff-4fff-8fff-fffffffffff2',
+          reminderEventId: 'ffffffff-ffff-4fff-8fff-fffffffffff3',
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.reopen,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 12);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: 'ffffffff-ffff-4fff-8fff-fffffffffff4',
+          reminderEventId: 'ffffffff-ffff-4fff-8fff-fffffffffff5',
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.noWork,
+        ),
+      );
+      expect(detail.day.status, AttendanceDayStatus.noWork);
+
+      final lifecycle = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      expect(lifecycle['field_observations'], agendaRows);
+      expect(lifecycle['attendance_day_agenda_links'], links);
+      final lifecycleEvents = lifecycle['observation_events']!;
+      expect(lifecycleEvents.map((row) => row['event_type']), [
+        'attendance_day.completed',
+        'attendance_day.reopened',
+        'attendance_day.completed',
+        'attendance_day.reopened',
+        'attendance_day.no_work',
+      ]);
+      expect(
+        lifecycleEvents.map(
+          (row) =>
+              jsonDecode(row['payload_json']! as String)['attendance_revision'],
+        ),
+        [2, 3, 4, 5, 6],
+      );
+
+      final restarted = SqliteAttendanceApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        agenda: agenda,
+      );
+      expect((await restarted.getDayDetail(day.id)).day.revision, 6);
+      expect(
+        (await agenda.getAgendaLogDetail(
+          agendaLogId,
+        )).managedAttendanceSource?.attendanceDayId,
+        day.id,
+      );
+    },
+  );
+
+  test(
+    'changed recompletion refreshes one managed Agenda projection and retry is exact',
+    () async {
+      final originalClock = now;
+      addTearDown(() => now = originalClock);
+      await _createMember(
+        attendance,
+        id: member1,
+        name: 'Ali Usta',
+        team: 'Kalıp Ekibi',
+      );
+      final day = await _ensureDay(attendance);
+      var detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: event2,
+          reminderEventId: event3,
+          expectedRevision: day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      final initialSnapshot = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      final initialAgendaRow = Map<String, Object?>.from(
+        initialSnapshot['field_observations']!.single,
+      );
+      final initialLink =
+          initialSnapshot['attendance_day_agenda_links']!.single;
+      final agendaLogId = initialAgendaRow['id']! as String;
+
+      now = DateTime.utc(2026, 7, 19, 9);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: event4,
+          reminderEventId: event5,
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.reopen,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 10);
+      detail = await attendance.saveRoster(
+        SaveAttendanceRosterCommand(
+          dayId: day.id,
+          eventId: event6,
+          expectedRevision: detail.day.revision,
+          values: const [
+            AttendanceRosterValue(
+              entryId: entry1,
+              memberId: member1,
+              result: AttendanceResult.fullDay,
+              overtimeMinutes: 60,
+            ),
+          ],
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 11);
+      final recomplete = TransitionAttendanceDayCommand(
+        dayId: day.id,
+        dayEventId: 'f1000000-0000-4000-8000-000000000001',
+        reminderEventId: 'f1000000-0000-4000-8000-000000000002',
+        expectedRevision: detail.day.revision,
+        transition: AttendanceTransition.complete,
+      );
+      detail = await attendance.transitionDay(recomplete);
+      final refreshedAt = detail.day.updatedAt;
+      final refreshedSnapshot = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      expect(refreshedSnapshot['field_observations'], hasLength(1));
+      expect(refreshedSnapshot['field_observations']!.single, {
+        ...initialAgendaRow,
+        'observed_at': refreshedAt,
+        'updated_at': refreshedAt,
+        'revision': 2,
+      });
+      expect(refreshedSnapshot['attendance_day_agenda_links'], [initialLink]);
+
+      now = DateTime.utc(2026, 7, 19, 12);
+      final retried = await attendance.transitionDay(recomplete);
+      expect(retried.day.revision, detail.day.revision);
+      expect(
+        await _attendanceAgendaSnapshot(directories.databaseFile, day.id),
+        refreshedSnapshot,
+      );
+
+      final restartedAgenda = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      final restartedAttendance = SqliteAttendanceApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        agenda: restartedAgenda,
+      );
+      final restartedSource = await restartedAgenda.getAgendaLogDetail(
+        agendaLogId,
+      );
+      expect(restartedSource.log.observedAt, refreshedAt);
+      expect(restartedSource.log.updatedAt, refreshedAt);
+      expect(restartedSource.log.createdAt, initialAgendaRow['created_at']);
+      expect(restartedSource.log.revision, 2);
+      expect(restartedSource.managedAttendanceSource?.attendanceDayId, day.id);
+      expect((await restartedAttendance.getDayDetail(day.id)).day.revision, 5);
+    },
+  );
+
+  test(
+    'entry removal and note update each refresh changed recompletion',
+    () async {
+      final originalClock = now;
+      addTearDown(() => now = originalClock);
+      await _createMember(
+        attendance,
+        id: member1,
+        name: 'Ali Usta',
+        team: 'Kalıp Ekibi',
+      );
+      final day = await _ensureDay(attendance);
+      var detail = await attendance.saveRoster(
+        SaveAttendanceRosterCommand(
+          dayId: day.id,
+          eventId: event2,
+          expectedRevision: day.revision,
+          values: const [
+            AttendanceRosterValue(
+              entryId: entry1,
+              memberId: member1,
+              result: AttendanceResult.fullDay,
+              overtimeMinutes: 0,
+            ),
+          ],
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 9);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: event3,
+          reminderEventId: event4,
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      final initialSnapshot = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      final initialRow = initialSnapshot['field_observations']!.single;
+      final initialLink =
+          initialSnapshot['attendance_day_agenda_links']!.single;
+
+      now = DateTime.utc(2026, 7, 19, 10);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: event5,
+          reminderEventId: event6,
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.reopen,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 11);
+      detail = await attendance.removeEntry(
+        RemoveAttendanceEntryCommand(
+          dayId: day.id,
+          entryId: entry1,
+          eventId: 'f2000000-0000-4000-8000-000000000001',
+          expectedRevision: detail.day.revision,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 12);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: 'f2000000-0000-4000-8000-000000000002',
+          reminderEventId: 'f2000000-0000-4000-8000-000000000003',
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      final removalRefreshAt = detail.day.updatedAt;
+      var refreshed = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      expect(
+        refreshed['field_observations']!.single['observed_at'],
+        removalRefreshAt,
+      );
+      expect(
+        refreshed['field_observations']!.single['updated_at'],
+        removalRefreshAt,
+      );
+      expect(refreshed['field_observations']!.single['revision'], 2);
+
+      now = DateTime.utc(2026, 7, 19, 13);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: 'f2000000-0000-4000-8000-000000000004',
+          reminderEventId: 'f2000000-0000-4000-8000-000000000005',
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.reopen,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 14);
+      detail = await attendance.updateNote(
+        UpdateAttendanceNoteCommand(
+          dayId: day.id,
+          eventId: 'f2000000-0000-4000-8000-000000000006',
+          expectedRevision: detail.day.revision,
+          generalNote: 'Reopen sonrası saha notu',
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 15);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: 'f2000000-0000-4000-8000-000000000007',
+          reminderEventId: 'f2000000-0000-4000-8000-000000000008',
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      final noteRefreshAt = detail.day.updatedAt;
+      refreshed = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      final finalRow = refreshed['field_observations']!.single;
+      expect(finalRow['observed_at'], noteRefreshAt);
+      expect(finalRow['updated_at'], noteRefreshAt);
+      expect(finalRow['revision'], 3);
+      expect(finalRow['created_at'], initialRow['created_at']);
+      expect(finalRow['id'], initialRow['id']);
+      expect(finalRow['project_id'], initialRow['project_id']);
+      expect(refreshed['field_observations'], hasLength(1));
+      expect(refreshed['attendance_day_agenda_links'], [initialLink]);
+    },
+  );
+
+  test(
+    'managed Agenda update failure rolls back Attendance reminder Agenda and link',
+    () async {
+      final originalClock = now;
+      addTearDown(() => now = originalClock);
+      await _createMember(
+        attendance,
+        id: member1,
+        name: 'Ali Usta',
+        team: 'Kalıp Ekibi',
+      );
+      await attendance.saveReminderSetting(
+        const SaveAttendanceReminderSettingCommand(
+          projectId: project1,
+          expectedRevision: 0,
+          isEnabled: true,
+          localTime: '17:00',
+          selectedWeekdays: {1, 2, 3, 4, 5, 6, 7},
+        ),
+      );
+      await attendance.ensureRollingOccurrences();
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final dayId =
+          (await raw.query(
+                'attendance_days',
+                columns: ['id'],
+                where: 'project_id = ? AND local_date = ?',
+                whereArgs: [project1, '2026-07-19'],
+                limit: 1,
+              )).single['id']!
+              as String;
+      await raw.close();
+      var detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: dayId,
+          dayEventId: event2,
+          reminderEventId: event3,
+          expectedRevision: 1,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 9);
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: dayId,
+          dayEventId: event4,
+          reminderEventId: event5,
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.reopen,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 10);
+      detail = await attendance.saveRoster(
+        SaveAttendanceRosterCommand(
+          dayId: dayId,
+          eventId: event6,
+          expectedRevision: detail.day.revision,
+          values: const [
+            AttendanceRosterValue(
+              entryId: entry1,
+              memberId: member1,
+              result: AttendanceResult.fullDay,
+              overtimeMinutes: 0,
+            ),
+          ],
+        ),
+      );
+      final before = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        dayId,
+      );
+      final agendaLogId = before['field_observations']!.single['id']! as String;
+      final triggerDatabase = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await triggerDatabase.execute('''
+        CREATE TRIGGER fail_managed_agenda_refresh
+        BEFORE UPDATE OF observed_at, updated_at, revision
+        ON field_observations
+        WHEN OLD.id = '$agendaLogId'
+        BEGIN
+          SELECT RAISE(ABORT, 'intentional managed Agenda update failure');
+        END
+      ''');
+      await triggerDatabase.close();
+
+      now = DateTime.utc(2026, 7, 19, 11);
+      final failing = SqliteAttendanceApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        agenda: agenda,
+      );
+      await expectLater(
+        failing.transitionDay(
+          TransitionAttendanceDayCommand(
+            dayId: dayId,
+            dayEventId: 'f3000000-0000-4000-8000-000000000001',
+            reminderEventId: 'f3000000-0000-4000-8000-000000000002',
+            expectedRevision: detail.day.revision,
+            transition: AttendanceTransition.complete,
+          ),
+        ),
+        throwsA(isA<DatabaseException>()),
+      );
+      expect(
+        await _attendanceAgendaSnapshot(directories.databaseFile, dayId),
+        before,
+      );
+    },
+  );
+
+  test(
+    'Agenda projection failures roll back Attendance reminder Agenda and link',
+    () async {
+      await attendance.saveReminderSetting(
+        const SaveAttendanceReminderSettingCommand(
+          projectId: project1,
+          expectedRevision: 0,
+          isEnabled: true,
+          localTime: '17:00',
+          selectedWeekdays: {1, 2, 3, 4, 5, 6, 7},
+        ),
+      );
+      await attendance.ensureRollingOccurrences();
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final dayId =
+          (await raw.query(
+                'attendance_days',
+                columns: ['id'],
+                where: 'project_id = ? AND local_date = ?',
+                whereArgs: [project1, '2026-07-19'],
+                limit: 1,
+              )).single['id']!
+              as String;
+      await raw.close();
+      final before = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        dayId,
+      );
+
+      for (var index = 0; index < 3; index += 1) {
+        final stage = ['base', 'event', 'link'][index];
+        Future<void> fail(Transaction _) async {
+          throw StateError('intentional $stage failure');
+        }
+
+        final failing = SqliteAttendanceApplication(
+          databasePath: directories.databaseFile,
+          databaseFactory: databaseFactoryFfi,
+          clock: () => now,
+          agenda: agenda,
+          beforeManagedAgendaBaseInsert: stage == 'base' ? fail : null,
+          beforeManagedAgendaEventInsert: stage == 'event' ? fail : null,
+          beforeManagedAgendaLinkInsert: stage == 'link' ? fail : null,
+        );
+        await expectLater(
+          failing.transitionDay(
+            TransitionAttendanceDayCommand(
+              dayId: dayId,
+              dayEventId:
+                  '44444444-4444-4444-8444-${(100 + index).toString().padLeft(12, '0')}',
+              reminderEventId:
+                  '55555555-5555-4555-8555-${(100 + index).toString().padLeft(12, '0')}',
+              expectedRevision: 1,
+              transition: AttendanceTransition.complete,
+            ),
+          ),
+          throwsStateError,
+        );
+        expect(
+          await _attendanceAgendaSnapshot(directories.databaseFile, dayId),
+          before,
+          reason: stage,
+        );
+      }
+    },
+  );
+
+  test(
+    'no-work without a prior completion creates no Agenda projection',
+    () async {
+      final day = await _ensureDay(attendance);
+      final result = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: event2,
+          reminderEventId: event3,
+          expectedRevision: day.revision,
+          transition: AttendanceTransition.noWork,
+        ),
+      );
+      expect(result.day.status, AttendanceDayStatus.noWork);
+      expect(
+        await _count(directories.databaseFile, 'attendance_day_agenda_links'),
+        0,
+      );
+      expect(await _count(directories.databaseFile, 'field_observations'), 0);
+      expect(await _count(directories.databaseFile, 'observation_events'), 0);
+    },
+  );
+
+  test(
+    'concurrent completion accepts one writer and rejects one stale writer',
+    () async {
+      final day = await _ensureDay(attendance);
+      final firstReachedEventBoundary = Completer<void>();
+      final releaseFirst = Completer<void>();
+      final coordinator = MobileOperationCoordinator();
+      final firstWriter = SqliteAttendanceApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        agenda: agenda,
+        coordinator: coordinator,
+        beforeAttendanceEventInsert: (_) async {
+          if (!firstReachedEventBoundary.isCompleted) {
+            firstReachedEventBoundary.complete();
+            await releaseFirst.future;
+          }
+        },
+      );
+      final secondWriter = SqliteAttendanceApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        agenda: agenda,
+        coordinator: coordinator,
+      );
+      Future<Object?> outcome(Future<AttendanceDayDetail> operation) async {
+        try {
+          await operation;
+          return null;
+        } on Object catch (error) {
+          return error;
+        }
+      }
+
+      final accepted = outcome(
+        firstWriter.transitionDay(
+          TransitionAttendanceDayCommand(
+            dayId: day.id,
+            dayEventId: event2,
+            reminderEventId: event3,
+            expectedRevision: day.revision,
+            transition: AttendanceTransition.complete,
+          ),
+        ),
+      );
+      await firstReachedEventBoundary.future;
+      final stale = outcome(
+        secondWriter.transitionDay(
+          TransitionAttendanceDayCommand(
+            dayId: day.id,
+            dayEventId: event4,
+            reminderEventId: event5,
+            expectedRevision: day.revision,
+            transition: AttendanceTransition.complete,
+          ),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      releaseFirst.complete();
+      final outcomes = await Future.wait([accepted, stale]);
+
+      expect(outcomes.first, isNull);
+      expect(outcomes.last, isA<AgendaValidationFailure>());
+      final snapshot = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      expect(snapshot['attendance_day_agenda_links'], hasLength(1));
+      expect(snapshot['field_observations'], hasLength(1));
+      expect(snapshot['observation_events'], hasLength(1));
+      expect(
+        snapshot['attendance_events']!.where(
+          (row) => row['event_type'] == 'attendance_day.completed',
+        ),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'same local date in two projects creates isolated Agenda source records',
+    () async {
+      await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: 'Şantiye B'),
+      );
+      final first = await _ensureDay(attendance);
+      final second = await attendance.ensureDay(
+        const EnsureAttendanceDayCommand(
+          id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2',
+          eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee21',
+          projectId: project2,
+          localDate: '2026-07-19',
+        ),
+      );
+      await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: first.id,
+          dayEventId: event2,
+          reminderEventId: event3,
+          expectedRevision: first.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: second.id,
+          dayEventId: event4,
+          reminderEventId: event5,
+          expectedRevision: second.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final links = await raw.query(
+        'attendance_day_agenda_links',
+        orderBy: 'project_id ASC',
+      );
+      final observations = await raw.rawQuery('''
+        SELECT o.id, o.project_id, o.description, l.attendance_day_id
+        FROM field_observations o
+        JOIN attendance_day_agenda_links l ON l.agenda_log_id = o.id
+        ORDER BY o.project_id ASC
+      ''');
+      await raw.close();
+
+      expect(links, hasLength(2));
+      expect(links.map((row) => row['project_id']), [project1, project2]);
+      expect(links.map((row) => row['agenda_log_id']).toSet(), hasLength(2));
+      expect(observations, hasLength(2));
+      expect(observations.map((row) => row['project_id']), [
+        project1,
+        project2,
+      ]);
+      expect(observations.map((row) => row['attendance_day_id']), [
+        first.id,
+        second.id,
+      ]);
+      expect(observations.map((row) => row['description']).toSet(), {
+        'Puantaj gün tamamlama kaydı',
+      });
+    },
+  );
+
+  test(
+    'legacy completed day is linked only after a later explicit completion',
+    () async {
+      final day = await _ensureDay(attendance);
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await raw.update(
+        'attendance_days',
+        {
+          'status': 'completed',
+          'revision': 2,
+          'updated_at': '2026-07-19T08:00:00Z',
+          'completed_at': '2026-07-19T08:00:00Z',
+        },
+        where: 'id = ? AND revision = 1',
+        whereArgs: [day.id],
+      );
+      await raw.insert('attendance_events', {
+        'id': event2,
+        'attendance_day_id': day.id,
+        'sequence': 2,
+        'event_type': 'attendance_day.completed',
+        'occurred_at': '2026-07-19T08:00:00Z',
+        'payload_json': jsonEncode({
+          'before_status': 'draft',
+          'after_status': 'completed',
+          'revision': 2,
+        }),
+      });
+      await raw.close();
+
+      var detail = await attendance.transitionDay(
+        const TransitionAttendanceDayCommand(
+          dayId: day1,
+          dayEventId: event3,
+          reminderEventId: event4,
+          expectedRevision: 2,
+          transition: AttendanceTransition.reopen,
+        ),
+      );
+      expect(
+        await _count(directories.databaseFile, 'attendance_day_agenda_links'),
+        0,
+      );
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: event5,
+          reminderEventId: event6,
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      expect(detail.day.revision, 4);
+      expect(
+        await _count(directories.databaseFile, 'attendance_day_agenda_links'),
+        1,
+      );
+      final projection = await _attendanceAgendaSnapshot(
+        directories.databaseFile,
+        day.id,
+      );
+      expect(
+        projection['observation_events']!.map((row) => row['event_type']),
+        ['attendance_day.completed'],
+      );
+    },
+  );
+
+  test(
+    'deterministic Agenda id collision fails without adopting ordinary data',
+    () async {
+      final day = await _ensureDay(attendance);
+      final collidingId = _attendanceAgendaTestUuid(
+        'attendance-managed-agenda:${day.id}',
+      );
+      await agenda.createAgendaLog(
+        CreateAgendaLogCommand(
+          id: collidingId,
+          eventId: event2,
+          projectId: project1,
+          observedAt: '2026-07-19T07:00:00Z',
+          category: AgendaCategory.generalNote,
+          description: 'Sıradan kullanıcı kaydı',
+          location: null,
+          notes: null,
+        ),
+      );
+
+      await expectLater(
+        attendance.transitionDay(
+          TransitionAttendanceDayCommand(
+            dayId: day.id,
+            dayEventId: event3,
+            reminderEventId: event4,
+            expectedRevision: day.revision,
+            transition: AttendanceTransition.complete,
+          ),
+        ),
+        throwsA(isA<DatabaseException>()),
+      );
+      final unchangedDay = await attendance.getDayDetail(day.id);
+      expect(unchangedDay.day.status, AttendanceDayStatus.draft);
+      expect(unchangedDay.day.revision, 1);
+      expect(
+        (await agenda.getAgendaLogDetail(collidingId)).log.description,
+        'Sıradan kullanıcı kaydı',
+      );
+      expect(
+        await _count(directories.databaseFile, 'attendance_day_agenda_links'),
+        0,
       );
     },
   );
@@ -2275,6 +3343,98 @@ Future<int> _count(String path, String table) async {
   )!;
   await raw.close();
   return value;
+}
+
+Future<Map<String, List<Map<String, Object?>>>> _attendanceAgendaSnapshot(
+  String path,
+  String attendanceDayId,
+) async {
+  final agendaLogId = _attendanceAgendaTestUuid(
+    'attendance-managed-agenda:$attendanceDayId',
+  );
+  final raw = await databaseFactoryFfi.openDatabase(
+    path,
+    options: OpenDatabaseOptions(singleInstance: false),
+  );
+  final snapshot = <String, List<Map<String, Object?>>>{
+    'attendance_days': await raw.query(
+      'attendance_days',
+      where: 'id = ?',
+      whereArgs: [attendanceDayId],
+    ),
+    'attendance_events': await raw.query(
+      'attendance_events',
+      where: 'attendance_day_id = ?',
+      whereArgs: [attendanceDayId],
+      orderBy: 'sequence ASC, id ASC',
+    ),
+    'attendance_entries': await raw.query(
+      'attendance_entries',
+      where: 'attendance_day_id = ?',
+      whereArgs: [attendanceDayId],
+      orderBy: 'id ASC',
+    ),
+    'attendance_day_reminder_links': await raw.query(
+      'attendance_day_reminder_links',
+      where: 'attendance_day_id = ?',
+      whereArgs: [attendanceDayId],
+    ),
+    'follow_up_items': await raw.query(
+      'follow_up_items',
+      where: 'attendance_day_id = ?',
+      whereArgs: [attendanceDayId],
+      orderBy: 'id ASC',
+    ),
+    'follow_up_events': await raw.query(
+      'follow_up_events',
+      where: 'source_attendance_day_id = ?',
+      whereArgs: [attendanceDayId],
+      orderBy: 'id ASC',
+    ),
+    'field_observations': await raw.query(
+      'field_observations',
+      where: 'id = ?',
+      whereArgs: [agendaLogId],
+      orderBy: 'id ASC',
+    ),
+    'observation_events': await raw.query(
+      'observation_events',
+      where: 'observation_id = ?',
+      whereArgs: [agendaLogId],
+      orderBy: 'rowid ASC',
+    ),
+    'attendance_day_agenda_links': await raw.query(
+      'attendance_day_agenda_links',
+      where: 'attendance_day_id = ?',
+      whereArgs: [attendanceDayId],
+    ),
+  };
+  await raw.close();
+  return snapshot;
+}
+
+String _attendanceAgendaTestUuid(String seed) {
+  int hash(String value, int salt) {
+    var result = (2166136261 ^ salt) & 0xffffffff;
+    for (final unit in value.codeUnits) {
+      result ^= unit;
+      result = (result * 16777619) & 0xffffffff;
+    }
+    return result;
+  }
+
+  final raw = List.generate(
+    4,
+    (index) =>
+        hash(seed, 0x9e3779b9 * (index + 1)).toRadixString(16).padLeft(8, '0'),
+  ).join();
+  final chars = raw.split('');
+  chars[12] = '4';
+  chars[16] = '8';
+  final value = chars.join();
+  return '${value.substring(0, 8)}-${value.substring(8, 12)}-'
+      '${value.substring(12, 16)}-${value.substring(16, 20)}-'
+      '${value.substring(20)}';
 }
 
 class _FakeAttendanceExportGateway implements AttendanceExportGateway {

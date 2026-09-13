@@ -250,6 +250,144 @@ void main() {
     },
   );
 
+  test(
+    'Q13 backup round-trip preserves Attendance Agenda source truth exactly',
+    () async {
+      const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+      const dayId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+      const ensureEventId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+      const completeEventId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
+      const reopenEventId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3';
+      const reCompleteEventId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc4';
+      const mutateEventId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc5';
+      final agenda = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      final attendance = SqliteAttendanceApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+        agenda: agenda,
+      );
+      await agenda.createProject(
+        const CreateProjectCommand(id: projectId, name: 'Q13 yedek projesi'),
+      );
+      var day = await attendance.ensureDay(
+        const EnsureAttendanceDayCommand(
+          id: dayId,
+          eventId: ensureEventId,
+          projectId: projectId,
+          localDate: '2026-07-19',
+        ),
+      );
+      var detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: completeEventId,
+          reminderEventId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1',
+          expectedRevision: day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: reopenEventId,
+          reminderEventId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2',
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.reopen,
+        ),
+      );
+      detail = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: reCompleteEventId,
+          reminderEventId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd3',
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      expect(detail.day.revision, 4);
+
+      Future<Map<String, List<Map<String, Object?>>>> snapshot() async {
+        final raw = await _openRaw(directories);
+        try {
+          expect(await raw.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+          return {
+            for (final table in const [
+              'attendance_days',
+              'attendance_events',
+              'field_observations',
+              'observation_events',
+              'attendance_day_agenda_links',
+            ])
+              table: await raw.query(table, orderBy: 'rowid ASC'),
+          };
+        } finally {
+          await raw.close();
+        }
+      }
+
+      final before = await snapshot();
+      expect(before['attendance_day_agenda_links'], hasLength(1));
+      expect(before['field_observations'], hasLength(1));
+      expect(before['observation_events']!.map((row) => row['event_type']), [
+        'attendance_day.completed',
+        'attendance_day.reopened',
+        'attendance_day.completed',
+      ]);
+      final agendaLogId =
+          before['attendance_day_agenda_links']!.single['agenda_log_id']!
+              as String;
+
+      final backup = _application(directories, gateway: gateway);
+      final created = await backup.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: day.id,
+          dayEventId: mutateEventId,
+          reminderEventId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd4',
+          expectedRevision: detail.day.revision,
+          transition: AttendanceTransition.reopen,
+        ),
+      );
+      expect(await snapshot(), isNot(before));
+
+      final preflight = await backup.preflightBackup(
+        created.package,
+        _password,
+      );
+      expect(preflight.migratedSchemaVersion, AppDatabase.schemaVersion);
+      await backup.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: created.package,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+      expect(await snapshot(), before);
+
+      final restoredAgenda = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      final restoredSource = await restoredAgenda.getAgendaLogDetail(
+        agendaLogId,
+      );
+      expect(restoredSource.managedAttendanceSource?.attendanceDayId, dayId);
+      expect(restoredSource.managedAttendanceSource?.projectId, projectId);
+      expect(restoredSource.managedAttendanceSource?.localDate, '2026-07-19');
+    },
+  );
+
   test('backup creation reports real stages in pipeline order', () async {
     final application = _application(directories, gateway: gateway);
     final stages = <MobileBackupCreationStage>[];
@@ -480,7 +618,7 @@ void main() {
   );
 
   test(
-    'format 1 backup preserves schema 25 block metadata Floor-Mahal rows and events',
+    'format 1 backup preserves current block metadata Floor-Mahal rows and events',
     () async {
       const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa51';
       const blockId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb51';
@@ -597,7 +735,7 @@ void main() {
         _password,
       );
       expect(preflight.manifest.formatVersion, 1);
-      expect(preflight.migratedSchemaVersion, 25);
+      expect(preflight.migratedSchemaVersion, AppDatabase.schemaVersion);
       final restored = await backup.restoreBackup(
         RestoreMobileBackupCommand(
           package: created.package,
@@ -606,7 +744,7 @@ void main() {
         ),
       );
       expect(restored.restoredManifest.formatVersion, 1);
-      expect(restored.activeSchemaVersion, 25);
+      expect(restored.activeSchemaVersion, AppDatabase.schemaVersion);
       final restoredRaw = await _openRaw(directories);
       for (final entry in before.entries) {
         expect(
@@ -797,7 +935,7 @@ void main() {
     },
   );
 
-  test('current database smoke requires every schema 25 table', () async {
+  test('current database smoke requires every current-schema table', () async {
     final raw = await _openRaw(directories);
     await raw.execute('DROP TABLE inventory_events');
     await raw.close();
@@ -817,7 +955,7 @@ void main() {
   test(
     'format 1 backup restores populated Inventory with exact replayable truth',
     () async {
-      expect(AppDatabase.schemaVersion, 25);
+      expect(AppDatabase.schemaVersion, 26);
       final fixture = await _seedPopulatedInventory(
         directories,
         attachmentGateway: _inventoryPhotoGateway(directories),
@@ -1384,7 +1522,7 @@ void main() {
     },
   );
 
-  test('format 1 schema 24 backup migrates to schema 25', () async {
+  test('format 1 schema 24 backup migrates to current schema', () async {
     final legacyRoot = await Directory.systemTemp.createTemp('cse_schema24_');
     addTearDown(() async {
       if (await legacyRoot.exists()) await legacyRoot.delete(recursive: true);
@@ -1408,6 +1546,60 @@ void main() {
       'updated_at': _now,
       'revision': 1,
     });
+    await legacy.database.insert('attendance_days', {
+      'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa24',
+      'project_id': 'schema24-project',
+      'local_date': '2026-07-19',
+      'status': 'completed',
+      'general_note': 'Korunan eski Puantaj',
+      'revision': 7,
+      'created_at': _now,
+      'updated_at': _now,
+      'completed_at': _now,
+    });
+    await legacy.database.insert('attendance_events', {
+      'id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb24',
+      'attendance_day_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa24',
+      'sequence': 1,
+      'event_type': 'attendance_day.completed',
+      'occurred_at': _now,
+      'payload_json': '{"legacy":true,"revision":7}',
+    });
+    await legacy.database.insert('field_observations', {
+      'id': 'cccccccc-cccc-4ccc-8ccc-cccccccccc24',
+      'project_id': 'schema24-project',
+      'observed_at': _now,
+      'created_at': _now,
+      'updated_at': _now,
+      'category': 'general_note',
+      'description': 'Puantaj gün tamamlama kaydı',
+      'notes': 'Bu kayıt tamamlanan Puantaj gününden otomatik oluşturuldu.',
+      'revision': 3,
+    });
+    await legacy.database.insert('observation_events', {
+      'id': 'dddddddd-dddd-4ddd-8ddd-dddddddddd24',
+      'observation_id': 'cccccccc-cccc-4ccc-8ccc-cccccccccc24',
+      'project_id': 'schema24-project',
+      'event_type': 'created',
+      'occurred_at': _now,
+      'payload_json': '{"legacy_manual_agenda":true}',
+    });
+    final legacyAttendanceBefore = await legacy.database.query(
+      'attendance_days',
+      orderBy: 'id ASC',
+    );
+    final legacyAttendanceEventsBefore = await legacy.database.query(
+      'attendance_events',
+      orderBy: 'id ASC',
+    );
+    final legacyAgendaBefore = await legacy.database.query(
+      'field_observations',
+      orderBy: 'id ASC',
+    );
+    final legacyAgendaEventsBefore = await legacy.database.query(
+      'observation_events',
+      orderBy: 'id ASC',
+    );
     await legacy.close();
     final databaseBytes = await File(legacyFile).readAsBytes();
     final archive = const CseBackupArchiveCodec().encode(
@@ -1424,7 +1616,7 @@ void main() {
     final application = _application(directories, gateway: gateway);
     final preflight = await application.preflightBackup(imported, _password);
     expect(preflight.manifest.mobileSchemaVersion, 24);
-    expect(preflight.migratedSchemaVersion, 25);
+    expect(preflight.migratedSchemaVersion, AppDatabase.schemaVersion);
     await application.restoreBackup(
       RestoreMobileBackupCommand(
         package: imported,
@@ -1435,7 +1627,7 @@ void main() {
     final restored = await _openRaw(directories);
     expect(
       Sqflite.firstIntValue(await restored.rawQuery('PRAGMA user_version')),
-      25,
+      AppDatabase.schemaVersion,
     );
     expect(
       (await restored.query(
@@ -1444,6 +1636,31 @@ void main() {
         whereArgs: ['schema24-project'],
       )).single['name'],
       'Schema 24 legacy proje',
+    );
+    expect(
+      await restored.query('attendance_days', orderBy: 'id ASC'),
+      legacyAttendanceBefore,
+    );
+    expect(
+      await restored.query('attendance_events', orderBy: 'id ASC'),
+      legacyAttendanceEventsBefore,
+    );
+    expect(
+      await restored.query('field_observations', orderBy: 'id ASC'),
+      legacyAgendaBefore,
+    );
+    expect(
+      await restored.query('observation_events', orderBy: 'id ASC'),
+      legacyAgendaEventsBefore,
+    );
+    expect(await restored.query('attendance_day_agenda_links'), isEmpty);
+    expect(
+      await restored.query(
+        'observation_events',
+        where: 'observation_id = ? AND event_type LIKE ?',
+        whereArgs: ['cccccccc-cccc-4ccc-8ccc-cccccccccc24', 'attendance_day.%'],
+      ),
+      isEmpty,
     );
     for (final table in const [
       'project_metadata',
@@ -1966,6 +2183,7 @@ void main() {
         'DROP TRIGGER floor_location_active_location_archive_guard',
       );
       for (final table in const [
+        'attendance_day_agenda_links',
         'project_floor_location_relation_events',
         'project_floor_location_relations',
         'inventory_block_metadata_events',
@@ -4902,6 +5120,7 @@ Future<Map<String, int>> _tableCounts(AppDirectories directories) async {
     'attendance_days',
     'attendance_entries',
     'attendance_events',
+    'attendance_day_agenda_links',
     'concrete_pours',
     'project_concrete_classes',
     'project_concrete_class_events',
@@ -4943,6 +5162,7 @@ Future<Map<String, Object?>> _fixtureSnapshot(
     'attendance_days',
     'attendance_entries',
     'attendance_events',
+    'attendance_day_agenda_links',
     'concrete_pours',
     'project_concrete_classes',
     'project_concrete_class_events',

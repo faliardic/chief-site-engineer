@@ -2524,7 +2524,7 @@ class SqliteAgendaApplication
     return _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         final current = await _requireAgendaLog(transaction, command.id);
-        await _requireAgendaNotManagedByConcrete(transaction, command.id);
+        await _requireAgendaNotSourceManaged(transaction, command.id);
         if (current.archivedAt != null) {
           throw const AgendaValidationFailure(
             'Arşivlenen kayıt geri getirilmeden düzenlenemez.',
@@ -2926,7 +2926,7 @@ class SqliteAgendaApplication
     await _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         final current = await _requireAgendaLog(transaction, command.id);
-        await _requireAgendaNotManagedByConcrete(transaction, command.id);
+        await _requireAgendaNotSourceManaged(transaction, command.id);
         if (current.revision != command.expectedRevision) {
           throw const AgendaValidationFailure(
             'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
@@ -5893,6 +5893,17 @@ class SqliteAgendaApplication
       whereArgs: [logId],
       limit: 1,
     );
+    final managedAttendanceRows = await database.rawQuery(
+      '''
+      SELECT l.attendance_day_id, l.project_id, d.local_date
+      FROM attendance_day_agenda_links l
+      JOIN attendance_days d
+        ON d.id = l.attendance_day_id AND d.project_id = l.project_id
+      WHERE l.agenda_log_id = ?
+      LIMIT 1
+      ''',
+      [logId],
+    );
     final phoneCallContext = await _loadPhoneCallContext(database, logId);
     final observationEvents = events
         .map(_observationEventFromRow)
@@ -5910,6 +5921,14 @@ class SqliteAgendaApplication
       managedConcretePourId: managedLinks.isEmpty
           ? null
           : managedLinks.single['concrete_pour_id']! as String,
+      managedAttendanceSource: managedAttendanceRows.isEmpty
+          ? null
+          : AgendaAttendanceSource(
+              attendanceDayId:
+                  managedAttendanceRows.single['attendance_day_id']! as String,
+              projectId: managedAttendanceRows.single['project_id']! as String,
+              localDate: managedAttendanceRows.single['local_date']! as String,
+            ),
       phoneCallContext: phoneCallContext,
       isPhoneCallResult:
           phoneCallContext != null || events.any(_isPhoneCallCreateEvent),
@@ -5927,12 +5946,13 @@ class SqliteAgendaApplication
       photos: photos,
       events: detail.events,
       managedConcretePourId: detail.managedConcretePourId,
+      managedAttendanceSource: detail.managedAttendanceSource,
       phoneCallContext: detail.phoneCallContext,
       isPhoneCallResult: detail.isPhoneCallResult,
     );
   }
 
-  Future<void> _requireAgendaNotManagedByConcrete(
+  Future<void> _requireAgendaNotSourceManaged(
     DatabaseExecutor database,
     String logId,
   ) async {
@@ -5947,6 +5967,19 @@ class SqliteAgendaApplication
       throw const AgendaValidationFailure(
         'Bu Ajanda kaydı Beton paketi tarafından yönetiliyor; '
         'ana kayıt Beton paketinden değiştirilmelidir.',
+      );
+    }
+    final attendanceLinks = await database.query(
+      'attendance_day_agenda_links',
+      columns: ['attendance_day_id'],
+      where: 'agenda_log_id = ?',
+      whereArgs: [logId],
+      limit: 1,
+    );
+    if (attendanceLinks.isNotEmpty) {
+      throw const AgendaValidationFailure(
+        'Bu Ajanda kaydı Puantaj tarafından yönetiliyor; '
+        'ana kayıt Puantaj gününden değiştirilmelidir.',
       );
     }
   }
