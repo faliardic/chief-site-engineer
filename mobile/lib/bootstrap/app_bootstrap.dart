@@ -11,6 +11,7 @@ import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/application/material_request_application.dart';
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
 import 'package:chief_site_engineer/application/project_search_application.dart';
+import 'package:chief_site_engineer/application/project_information_application.dart';
 import 'package:chief_site_engineer/application/work_chain_application.dart';
 import 'package:chief_site_engineer/application/restore_recovery_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
@@ -52,6 +53,7 @@ class BootstrapSuccess extends BootstrapResult {
     this.materialRequests,
     this.contextSuggestions,
     this.projectSearch,
+    this.projectInformation,
     this.projectLocations,
     this.attendance,
     this.concrete,
@@ -74,6 +76,7 @@ class BootstrapSuccess extends BootstrapResult {
   final MaterialRequestApplicationPort? materialRequests;
   final ContextSuggestionApplication? contextSuggestions;
   final ProjectSearchApplicationPort? projectSearch;
+  final ProjectInformationApplication? projectInformation;
   final ProjectLocationApplication? projectLocations;
   final AttendanceApplication? attendance;
   final ConcreteApplication? concrete;
@@ -338,6 +341,19 @@ class AppBootstrap {
         ),
         coordinator: coordinator,
       );
+      final projectInformation = ProjectInformationApplication(
+        source: CanonicalProjectInformationReadSource(
+          projects: agenda,
+          metadata: agenda,
+          profiles: agenda,
+          parties: agenda,
+          projectLocations: agenda,
+          floorLocations: agenda,
+          attendance: attendance,
+          inventory: inventory,
+          blockMetadata: inventory,
+        ),
+      );
       final concrete = SqliteConcreteApplication(
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
@@ -451,6 +467,7 @@ class AppBootstrap {
         materialRequests: materialRequests,
         contextSuggestions: contextSuggestions,
         projectSearch: projectSearch,
+        projectInformation: projectInformation,
         projectLocations: agenda,
         attendance: attendance,
         concrete: concrete,
