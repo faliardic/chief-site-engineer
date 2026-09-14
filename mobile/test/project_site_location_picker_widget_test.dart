@@ -122,6 +122,202 @@ void main() {
     );
     expect(find.text('Harita şu an yüklenemiyor.'), findsOneWidget);
   });
+
+  testWidgets(
+    '"Konumumu bul" success places pending marker at current position and '
+    'enables the normal explicit Save path without persisting anything by '
+    'itself',
+    (tester) async {
+      Object? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                result = await Navigator.of(context).push<Object?>(
+                  MaterialPageRoute(
+                    builder: (_) => ProjectSiteLocationPickerPage(
+                      tileProvider: _FakeOfflineTileProvider(),
+                      locationReader: () async =>
+                          const CurrentLocationSuccess(40.9909, 29.0233),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      // No point pending yet, and no navigation has happened — nothing was
+      // persisted merely by opening the picker.
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const Key('site-location-picker-save')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(result, isNull);
+
+      await tester.tap(find.byKey(const Key('site-location-picker-locate')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const Key('site-location-picker-save')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      // Obtaining current position alone must not have popped/saved.
+      expect(result, isNull);
+
+      await tester.tap(find.byKey(const Key('site-location-picker-save')));
+      await tester.pumpAndSettle();
+
+      expect(result, (40.9909, 29.0233));
+    },
+  );
+
+  testWidgets(
+    '"Konumumu bul" success re-centers the map on the current position',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProjectSiteLocationPickerPage(
+            tileProvider: _FakeOfflineTileProvider(),
+            locationReader: () async =>
+                const CurrentLocationSuccess(36.8969, 30.7133),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('site-location-picker-locate')));
+      await tester.pumpAndSettle();
+
+      final map = tester.widget<FlutterMap>(find.byType(FlutterMap));
+      expect(map.mapController, isNotNull);
+      expect(
+        map.mapController!.camera.center.latitude,
+        closeTo(36.8969, 0.001),
+      );
+      expect(
+        map.mapController!.camera.center.longitude,
+        closeTo(30.7133, 0.001),
+      );
+    },
+  );
+
+  testWidgets(
+    'an existing saved site point is never overwritten merely by obtaining '
+    'current position — only explicit Save changes the returned point',
+    (tester) async {
+      Object? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                result = await Navigator.of(context).push<Object?>(
+                  MaterialPageRoute(
+                    builder: (_) => ProjectSiteLocationPickerPage(
+                      initialLatitude: 41.015137,
+                      initialLongitude: 28.97953,
+                      tileProvider: _FakeOfflineTileProvider(),
+                      locationReader: () async =>
+                          const CurrentLocationSuccess(0, 0),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      // Existing saved point is the initial editing truth and Save is
+      // already enabled from it — obtaining current position is not
+      // performed automatically.
+      expect(result, isNull);
+
+      await tester.tap(find.byKey(const Key('site-location-picker-save')));
+      await tester.pumpAndSettle();
+
+      expect(result, (41.015137, 28.97953));
+    },
+  );
+
+  for (final entry in <String, CurrentLocationFailureReason>{
+    'permission denied': CurrentLocationFailureReason.permissionDenied,
+    'permission denied forever':
+        CurrentLocationFailureReason.permissionDeniedForever,
+    'location services disabled': CurrentLocationFailureReason.serviceDisabled,
+    'timeout': CurrentLocationFailureReason.timeout,
+  }.entries) {
+    testWidgets(
+      '"Konumumu bul" failure (${entry.key}) fails safely: manual selection '
+      'stays fully usable and any existing saved point is untouched',
+      (tester) async {
+        Object? result;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () async {
+                  result = await Navigator.of(context).push<Object?>(
+                    MaterialPageRoute(
+                      builder: (_) => ProjectSiteLocationPickerPage(
+                        initialLatitude: 41.015137,
+                        initialLongitude: 28.97953,
+                        tileProvider: _FakeOfflineTileProvider(),
+                        locationReader: () async =>
+                            CurrentLocationFailure(entry.value),
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('site-location-picker-locate')));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('site-location-picker-location-error')),
+          findsOneWidget,
+        );
+
+        // Existing saved point is untouched and manual Save still works.
+        expect(
+          tester
+              .widget<TextButton>(
+                find.byKey(const Key('site-location-picker-save')),
+              )
+              .onPressed,
+          isNotNull,
+        );
+        await tester.tap(find.byKey(const Key('site-location-picker-save')));
+        await tester.pumpAndSettle();
+
+        expect(result, (41.015137, 28.97953));
+      },
+    );
+  }
 }
 
 /// Serves a tiny in-memory 1x1 PNG for every tile request so the picker

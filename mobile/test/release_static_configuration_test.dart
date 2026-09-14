@@ -55,6 +55,8 @@ void main() {
       'android.permission.POST_NOTIFICATIONS',
       'android.permission.RECEIVE_BOOT_COMPLETED',
       'android.permission.SCHEDULE_EXACT_ALARM',
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.ACCESS_COARSE_LOCATION',
     });
     expect(manifest, contains('android:allowBackup="false"'));
     expect(manifest, contains('android:usesCleartextTraffic="false"'));
@@ -64,6 +66,10 @@ void main() {
     // Owner-approved exception (Issue #815): interactive OSM tile loading
     // from the site-location map picker only.
     expect(manifest, contains('android.permission.INTERNET'));
+    // Issue #815 comment 5661140945 current-location correction: only
+    // foreground one-shot fine/coarse location; no background/always
+    // location or foreground-service-location permission is ever added.
+    expect(manifest, isNot(contains('ACCESS_BACKGROUND_LOCATION')));
   });
 
   test('Şefim identity split and host-only acceptance are fail-closed', () {
@@ -166,6 +172,16 @@ void main() {
     expect(project, contains('APP_DISPLAY_NAME = "Şefim"'));
     expect(info, contains(r'<string>$(APP_DISPLAY_NAME)</string>'));
     expect(info, contains('<string>Şefim</string>'));
+    // Issue #815 comment 5661140945 current-location correction: only the
+    // When-In-Use usage description is authorized; no Always/background
+    // location key or background mode is ever added.
+    expect(info, contains('<key>NSLocationWhenInUseUsageDescription</key>'));
+    expect(
+      info,
+      isNot(contains('NSLocationAlwaysAndWhenInUseUsageDescription')),
+    );
+    expect(info, isNot(contains('NSLocationAlwaysUsageDescription')));
+    expect(info, isNot(contains('UIBackgroundModes')));
   });
 
   test('all declared iOS AppIcons have exact dimensions and no alpha', () {

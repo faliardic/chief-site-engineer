@@ -22,6 +22,10 @@ ANDROID_PERMISSION_ALLOWLIST = {
     "android.permission.POST_NOTIFICATIONS",
     "android.permission.RECEIVE_BOOT_COMPLETED",
     "android.permission.SCHEDULE_EXACT_ALARM",
+    # Issue #815 comment 5661140945 current-location correction: foreground
+    # one-shot current-position read only, from the explicit picker action.
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_COARSE_LOCATION",
 }
 FORBIDDEN_PRODUCTION_PERMISSIONS = {
     "android.permission.READ_EXTERNAL_STORAGE",
@@ -30,6 +34,8 @@ FORBIDDEN_PRODUCTION_PERMISSIONS = {
     "android.permission.READ_MEDIA_AUDIO",
     "android.permission.USE_EXACT_ALARM",
     "android.permission.FOREGROUND_SERVICE",
+    "android.permission.ACCESS_BACKGROUND_LOCATION",
+    "android.permission.FOREGROUND_SERVICE_LOCATION",
 }
 REQUIRED_TRANSITIVE_PERMISSION_REMOVALS = {
     "android.permission.READ_EXTERNAL_STORAGE",
