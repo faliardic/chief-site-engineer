@@ -761,6 +761,8 @@ void main() {
       final project = _project('33333333-3333-4333-8333-333333333333', 'Kuzey');
       final fixture = _Fixture(projects: [project]);
       addTearDown(fixture.dispose);
+      // A postal address exists, but no canonical site location — Konum
+      // must not invent one from it.
       fixture.source.metadataByProject[project.id] = _metadata(
         project.id,
         address: 'İnönü Caddesi 12',
@@ -844,6 +846,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Harita açılamadı.'), findsOneWidget);
+    // No mutation — the location remains exactly as set.
     expect(mutations.siteLocation?.projectId, project.id);
   });
 
@@ -884,6 +887,8 @@ void main() {
       fixture.session.select(second.id, [first, second]);
       await tester.pumpAndSettle();
 
+      // Second project has no site location of its own — Konum must hide,
+      // never showing/using the first project's stale point.
       expect(find.byKey(const Key('dashboard-action-location')), findsNothing);
       expect(launches, isEmpty);
     },
