@@ -783,6 +783,207 @@ void main() {
       );
     },
   );
+
+  test(
+    'site location set/replace/clear enforces revision, isolation and append-only events',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cse_site_location_');
+      addTearDown(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+      final databasePath = '${root.path}/application.sqlite3';
+      const projectA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9';
+      const projectB = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8';
+      String event(int value) =>
+          'dddddddd-dddd-4ddd-8ddd-${value.toString().padLeft(12, '0')}';
+      final database = AppDatabase(
+        path: databasePath,
+        factory: databaseFactoryFfi,
+        clock: () => _now,
+      );
+      await database.open();
+      for (final id in [projectA, projectB]) {
+        await database.database.insert('projects', {
+          'id': id,
+          'name': id,
+          'revision': 1,
+          'created_at': '2026-09-13T09:00:00Z',
+          'updated_at': '2026-09-13T09:00:00Z',
+        });
+      }
+      await database.close();
+
+      final mutations = SqliteProjectInformationMutationApplication(
+        databasePath: databasePath,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => _now,
+      );
+      final application = ProjectInformationApplication(
+        source: _FakeProjectInformationSource.standard(),
+        mutations: mutations,
+      );
+
+      // No location saved yet.
+      expect(await application.getSiteLocation(projectA), isNull);
+
+      // Reject out-of-range coordinates before any write.
+      await expectLater(
+        application.setSiteLocation(
+          SetProjectSiteLocationCommand(
+            eventId: event(1),
+            projectId: projectA,
+            latitude: 91,
+            longitude: 0,
+          ),
+        ),
+        throwsA(
+          isA<ProjectInformationFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'invalid_site_location',
+          ),
+        ),
+      );
+      expect(await application.getSiteLocation(projectA), isNull);
+
+      // First set must not carry an expectedRevision.
+      await expectLater(
+        application.setSiteLocation(
+          SetProjectSiteLocationCommand(
+            eventId: event(2),
+            projectId: projectA,
+            latitude: 41.015137,
+            longitude: 28.97953,
+            expectedRevision: 1,
+          ),
+        ),
+        throwsA(isA<ProjectInformationRevisionConflict>()),
+      );
+
+      final created = await application.setSiteLocation(
+        SetProjectSiteLocationCommand(
+          eventId: event(3),
+          projectId: projectA,
+          latitude: 41.015137,
+          longitude: 28.97953,
+        ),
+      );
+      expect(created.revision, 1);
+      expect(created.latitude, 41.015137);
+
+      // Stale-revision replace is rejected and the prior value is preserved.
+      await expectLater(
+        application.setSiteLocation(
+          SetProjectSiteLocationCommand(
+            eventId: event(4),
+            projectId: projectA,
+            latitude: 41.02,
+            longitude: 28.98,
+            expectedRevision: 99,
+          ),
+        ),
+        throwsA(isA<ProjectInformationRevisionConflict>()),
+      );
+      expect((await application.getSiteLocation(projectA))!.revision, 1);
+
+      // Exact-revision replace succeeds and advances revision atomically.
+      final replaced = await application.setSiteLocation(
+        SetProjectSiteLocationCommand(
+          eventId: event(5),
+          projectId: projectA,
+          latitude: 41.02,
+          longitude: 28.98,
+          expectedRevision: 1,
+        ),
+      );
+      expect(replaced.revision, 2);
+      expect(replaced.latitude, 41.02);
+
+      // Exact project isolation: project B never observes project A's point.
+      expect(await application.getSiteLocation(projectB), isNull);
+
+      // Clear with a stale revision is rejected; value remains active.
+      await expectLater(
+        application.clearSiteLocation(
+          ClearProjectSiteLocationCommand(
+            eventId: event(6),
+            projectId: projectA,
+            expectedRevision: 1,
+          ),
+        ),
+        throwsA(isA<ProjectInformationRevisionConflict>()),
+      );
+      expect(await application.getSiteLocation(projectA), isNotNull);
+
+      // Correct-revision clear succeeds.
+      await application.clearSiteLocation(
+        ClearProjectSiteLocationCommand(
+          eventId: event(7),
+          projectId: projectA,
+          expectedRevision: 2,
+        ),
+      );
+      expect(await application.getSiteLocation(projectA), isNull);
+
+      // Clearing an already-cleared location fails closed rather than
+      // silently succeeding twice.
+      await expectLater(
+        application.clearSiteLocation(
+          ClearProjectSiteLocationCommand(
+            eventId: event(8),
+            projectId: projectA,
+            expectedRevision: 3,
+          ),
+        ),
+        throwsA(isA<ProjectInformationFailure>()),
+      );
+
+      // Re-set after clear behaves as a fresh first-set (no expectedRevision)
+      // and continues the exact same append-only event sequence.
+      final resurrected = await application.setSiteLocation(
+        SetProjectSiteLocationCommand(
+          eventId: event(9),
+          projectId: projectA,
+          latitude: 40.9,
+          longitude: 29.1,
+        ),
+      );
+      expect(resurrected.revision, 4);
+
+      // Event history is append-only, sequential per project, and exactly
+      // one row per successful mutation (idempotent identity, no duplicate
+      // sequence, no lost/duplicated events across the full lifecycle).
+      final reopened = AppDatabase(
+        path: databasePath,
+        factory: databaseFactoryFfi,
+        clock: () => _now,
+      );
+      await reopened.open();
+      final events = await reopened.database.query(
+        'project_site_location_events',
+        where: 'project_id = ?',
+        whereArgs: [projectA],
+        orderBy: 'sequence ASC',
+      );
+      expect(events.map((row) => row['event_type']), [
+        'site_location.set',
+        'site_location.updated',
+        'site_location.cleared',
+        'site_location.set',
+      ]);
+      expect(events.map((row) => row['sequence']), [1, 2, 3, 4]);
+      expect(events.map((row) => row['id']).toSet().length, 4);
+      await expectLater(
+        reopened.database.delete(
+          'project_site_location_events',
+          where: 'project_id = ?',
+          whereArgs: [projectA],
+        ),
+        throwsA(isA<Object>()),
+      );
+      await reopened.close();
+    },
+  );
 }
 
 class _FakeProjectInformationSource implements ProjectInformationReadSource {

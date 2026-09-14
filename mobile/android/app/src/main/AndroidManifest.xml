@@ -6,6 +6,16 @@
          The app requests it only from an explicit reminder action. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Owner-approved exception: interactive OpenStreetMap tile loading only
+         from the site-location map picker. No telemetry, sync, background
+         fetch, prefetch or location permission is added alongside this. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Issue #815 current-location correction (Issue #815 comment
+         5661140945): foreground one-shot current-position read only, from
+         the explicit "Konumumu bul" picker action. No background/always
+         location or foreground-service-location permission is requested. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <!-- open_filex can open our app-private FileProvider URI without broad
          storage/media access. Keep its transitive permissions out of the
          final manifest and rely on one-shot URI grants instead. -->

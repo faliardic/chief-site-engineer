@@ -188,6 +188,16 @@ class ProjectInformationApplication {
   Future<void> removePin(RemoveProjectInformationPinCommand command) =>
       _mutations.removePin(command);
 
+  Future<ProjectSiteLocation?> getSiteLocation(String projectId) =>
+      _mutations.getSiteLocation(projectId);
+
+  Future<ProjectSiteLocation> setSiteLocation(
+    SetProjectSiteLocationCommand command,
+  ) => _mutations.setSiteLocation(command);
+
+  Future<void> clearSiteLocation(ClearProjectSiteLocationCommand command) =>
+      _mutations.clearSiteLocation(command);
+
   Future<ProjectInformationLoadResult> _loadProject({
     required String projectId,
     required int generation,
@@ -1155,6 +1165,12 @@ abstract interface class ProjectInformationMutationApplication {
     ReorderProjectInformationPinsCommand command,
   );
   Future<void> removePin(RemoveProjectInformationPinCommand command);
+
+  Future<ProjectSiteLocation?> getSiteLocation(String projectId);
+  Future<ProjectSiteLocation> setSiteLocation(
+    SetProjectSiteLocationCommand command,
+  );
+  Future<void> clearSiteLocation(ClearProjectSiteLocationCommand command);
 }
 
 class SqliteProjectInformationMutationApplication
@@ -1568,6 +1584,160 @@ class SqliteProjectInformationMutationApplication
     );
   }
 
+  @override
+  Future<ProjectSiteLocation?> getSiteLocation(String projectId) {
+    _requireUuid(projectId, 'invalid_project_id');
+    return _withDatabase((database, _) async {
+      final rows = await database.query(
+        'project_site_locations',
+        where: 'project_id = ? AND cleared_at IS NULL',
+        whereArgs: [projectId],
+        limit: 1,
+      );
+      return rows.isEmpty ? null : _siteLocationFromRow(rows.single);
+    });
+  }
+
+  @override
+  Future<ProjectSiteLocation> setSiteLocation(
+    SetProjectSiteLocationCommand command,
+  ) async {
+    _requireUuid(command.eventId, 'invalid_event_id');
+    _requireUuid(command.projectId, 'invalid_project_id');
+    if (!command.latitude.isFinite ||
+        command.latitude < -90 ||
+        command.latitude > 90 ||
+        !command.longitude.isFinite ||
+        command.longitude < -180 ||
+        command.longitude > 180) {
+      throw const ProjectInformationFailure('invalid_site_location');
+    }
+    return _withDatabase(
+      (database, timestamp) => database.transaction((transaction) async {
+        await _requireActiveProject(transaction, command.projectId);
+        final rows = await transaction.query(
+          'project_site_locations',
+          where: 'project_id = ?',
+          whereArgs: [command.projectId],
+          limit: 1,
+        );
+        if (rows.isEmpty) {
+          if (command.expectedRevision != null) {
+            throw const ProjectInformationRevisionConflict();
+          }
+          await transaction.insert('project_site_locations', {
+            'project_id': command.projectId,
+            'latitude': command.latitude,
+            'longitude': command.longitude,
+            'revision': 1,
+            'created_at': timestamp,
+            'updated_at': timestamp,
+            'cleared_at': null,
+          });
+          await _insertSiteLocationEvent(
+            transaction,
+            id: command.eventId,
+            projectId: command.projectId,
+            sequence: 1,
+            eventType: 'site_location.set',
+            occurredAt: timestamp,
+          );
+        } else {
+          // The row's identity (project_id) is stable even after a clear —
+          // `cleared_at` only marks it inactive, it is never physically
+          // deleted. A clear leaves this branch active on the next save, so
+          // a cleared row is treated as a fresh first-set (no
+          // expectedRevision) that resurrects the same row via UPDATE
+          // instead of INSERT, rather than a stale-revision conflict.
+          final currentRevision = rows.single['revision']! as int;
+          final wasCleared = rows.single['cleared_at'] != null;
+          final expectedRevisionForActiveRow = wasCleared
+              ? null
+              : currentRevision;
+          if (command.expectedRevision != expectedRevisionForActiveRow) {
+            throw const ProjectInformationRevisionConflict();
+          }
+          final changed = await transaction.update(
+            'project_site_locations',
+            {
+              'latitude': command.latitude,
+              'longitude': command.longitude,
+              'revision': currentRevision + 1,
+              'updated_at': timestamp,
+              'cleared_at': null,
+            },
+            where: 'project_id = ? AND revision = ?',
+            whereArgs: [command.projectId, currentRevision],
+          );
+          if (changed != 1) {
+            throw const ProjectInformationRevisionConflict();
+          }
+          await _insertSiteLocationEvent(
+            transaction,
+            id: command.eventId,
+            projectId: command.projectId,
+            sequence: currentRevision + 1,
+            eventType: wasCleared
+                ? 'site_location.set'
+                : 'site_location.updated',
+            occurredAt: timestamp,
+          );
+        }
+        final saved = await transaction.query(
+          'project_site_locations',
+          where: 'project_id = ?',
+          whereArgs: [command.projectId],
+          limit: 1,
+        );
+        return _siteLocationFromRow(saved.single);
+      }),
+    );
+  }
+
+  @override
+  Future<void> clearSiteLocation(
+    ClearProjectSiteLocationCommand command,
+  ) async {
+    _requireUuid(command.eventId, 'invalid_event_id');
+    _requireUuid(command.projectId, 'invalid_project_id');
+    return _withDatabase(
+      (database, timestamp) => database.transaction((transaction) async {
+        final rows = await transaction.query(
+          'project_site_locations',
+          where: 'project_id = ? AND cleared_at IS NULL',
+          whereArgs: [command.projectId],
+          limit: 1,
+        );
+        if (rows.isEmpty) {
+          throw const ProjectInformationFailure('site_location_not_found');
+        }
+        final revision = rows.single['revision']! as int;
+        if (revision != command.expectedRevision) {
+          throw const ProjectInformationRevisionConflict();
+        }
+        final changed = await transaction.update(
+          'project_site_locations',
+          {
+            'revision': revision + 1,
+            'updated_at': timestamp,
+            'cleared_at': timestamp,
+          },
+          where: 'project_id = ? AND revision = ?',
+          whereArgs: [command.projectId, revision],
+        );
+        if (changed != 1) throw const ProjectInformationRevisionConflict();
+        await _insertSiteLocationEvent(
+          transaction,
+          id: command.eventId,
+          projectId: command.projectId,
+          sequence: revision + 1,
+          eventType: 'site_location.cleared',
+          occurredAt: timestamp,
+        );
+      }),
+    );
+  }
+
   Future<List<ProjectInformationPin>> listPinsInTransaction(
     DatabaseExecutor database,
     String projectId,
@@ -1859,6 +2029,32 @@ Future<void> _insertPinEvent(
 ) => database.insert('project_information_pin_events', {
   'id': id,
   'pin_id': pinId,
+  'project_id': projectId,
+  'sequence': sequence,
+  'event_type': eventType,
+  'occurred_at': occurredAt,
+  'payload_json': jsonEncode({'revision': sequence}),
+});
+
+ProjectSiteLocation _siteLocationFromRow(Map<String, Object?> row) =>
+    ProjectSiteLocation(
+      projectId: row['project_id']! as String,
+      latitude: (row['latitude']! as num).toDouble(),
+      longitude: (row['longitude']! as num).toDouble(),
+      revision: row['revision']! as int,
+      createdAt: row['created_at']! as String,
+      updatedAt: row['updated_at']! as String,
+    );
+
+Future<void> _insertSiteLocationEvent(
+  DatabaseExecutor database, {
+  required String id,
+  required String projectId,
+  required int sequence,
+  required String eventType,
+  required String occurredAt,
+}) => database.insert('project_site_location_events', {
+  'id': id,
   'project_id': projectId,
   'sequence': sequence,
   'event_type': eventType,

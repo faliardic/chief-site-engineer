@@ -12,11 +12,15 @@ import 'package:chief_site_engineer/domain/project_information_models.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart' as url_launcher_pkg;
 
 typedef DashboardCaptureAction =
     Future<bool> Function(String projectId, String localDay);
 typedef DashboardProjectAction = void Function(String projectId);
 typedef DashboardProjectReadiness = void Function(List<MobileProject> projects);
+typedef DashboardTextAction = Future<void> Function(String text);
+typedef DashboardUriAction = Future<bool> Function(Uri uri);
 
 class ProjectDashboardPage extends StatefulWidget {
   const ProjectDashboardPage({
@@ -39,11 +43,15 @@ class ProjectDashboardPage extends StatefulWidget {
     this.onOpenCatalog,
     this.onOpenProjectInformation,
     this.onFirstSuccessfulProjectRead,
+    this.shareText,
+    this.launchUri,
     DateTime Function()? clock,
     super.key,
   }) : clock = clock ?? _systemUtcClock;
 
   final AgendaApplication agenda;
+  final DashboardTextAction? shareText;
+  final DashboardUriAction? launchUri;
   final ProjectInformationApplication? projectInformation;
   final DailyLogApplicationPort? dailyLog;
   final ConstructionLivingPlanApplicationPort livingPlan;
@@ -77,6 +85,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   ProjectInformationSession? _informationSession;
   List<MobileProject> _projects = const [];
   ProjectInformationSnapshot? _information;
+  ProjectSiteLocation? _siteLocation;
   List<ProjectInformationEntry> _informationEntries = const [];
   List<ProjectInformationPin> _informationPins = const [];
   bool _pinReadFailed = false;
@@ -88,8 +97,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   bool _mutating = false;
   bool _reportedFirstSuccessfulProjectRead = false;
   EdgeDraggingAutoScroller? _fieldAutoScroller;
-  final ExpansibleController _profileTileController =
-      ExpansibleController();
+  final ExpansibleController _profileTileController = ExpansibleController();
   BuildContext? _profileTileContext;
 
   bool _profileEditorAvailable(MobileProject project) =>
@@ -111,6 +119,54 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         duration: const Duration(milliseconds: 200),
       ),
     );
+  }
+
+  ProjectSiteLocation? _canonicalSiteLocation(MobileProject project) {
+    final location = _siteLocation;
+    if (location == null || location.projectId != project.id) return null;
+    return location;
+  }
+
+  Future<void> _openSiteLocationMap(MobileProject project) async {
+    final location = _canonicalSiteLocation(project);
+    if (location == null) return;
+    final uri = Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': '${location.latitude},${location.longitude}',
+    });
+    var ok = false;
+    try {
+      ok = await (widget.launchUri ?? _defaultLaunchUri)(uri);
+    } on Object {
+      ok = false;
+    }
+    if (!mounted || ok) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Harita açılamadı.')));
+  }
+
+  Future<void> _shareSiteLocation(MobileProject project) async {
+    final location = _canonicalSiteLocation(project);
+    if (location == null) return;
+    final uri = Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': '${location.latitude},${location.longitude}',
+    });
+    final text = [
+      'Proje: ${project.name}',
+      'Şantiye konumu: ${location.latitude.toStringAsFixed(6)}, '
+          '${location.longitude.toStringAsFixed(6)}',
+      uri.toString(),
+    ].join('\n');
+    try {
+      await (widget.shareText ?? _defaultShareText)(text);
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Konum paylaşılamadı.')));
+    }
   }
 
   ProjectProfileApplication? get _profileApplication =>
@@ -213,6 +269,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
       _information = null;
       _informationEntries = const [];
       _informationPins = const [];
+      _siteLocation = null;
       _pinReadFailed = false;
       _informationFailure = null;
       _informationStatus = _LoadStatus.loading;
@@ -252,10 +309,14 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         if (result.snapshot.projectId != projectId) return;
         List<ProjectInformationEntry> entries = const [];
         List<ProjectInformationPin> pins = const [];
+        ProjectSiteLocation? siteLocation;
         var pinReadFailed = false;
         try {
           entries = await widget.projectInformation!.listUserEntries(projectId);
           pins = await widget.projectInformation!.listPins(projectId);
+          siteLocation = await widget.projectInformation!.getSiteLocation(
+            projectId,
+          );
         } on ProjectInformationFailure catch (error) {
           if (error.code != 'mutation_store_unavailable') pinReadFailed = true;
         }
@@ -268,6 +329,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           _information = result.snapshot;
           _informationEntries = entries;
           _informationPins = pins;
+          _siteLocation = siteLocation;
           _pinReadFailed = pinReadFailed;
           _informationFailure = null;
           _informationStatus = _LoadStatus.ready;
@@ -862,6 +924,28 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                       : null,
                   icon: const Icon(Icons.badge_outlined),
                 ),
+                if (_canonicalSiteLocation(project) != null) ...[
+                  IconButton(
+                    key: const Key('dashboard-action-location'),
+                    tooltip: 'Konum',
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
+                    ),
+                    onPressed: () => unawaited(_openSiteLocationMap(project)),
+                    icon: const Icon(Icons.map_outlined),
+                  ),
+                  IconButton(
+                    key: const Key('dashboard-action-share-location'),
+                    tooltip: 'Paylaş',
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
+                    ),
+                    onPressed: () => unawaited(_shareSiteLocation(project)),
+                    icon: const Icon(Icons.ios_share_outlined),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1512,5 +1596,16 @@ class _ProjectStateSurface extends StatelessWidget {
         ],
       ),
     ),
+  );
+}
+
+Future<bool> _defaultLaunchUri(Uri uri) => url_launcher_pkg.launchUrl(
+  uri,
+  mode: url_launcher_pkg.LaunchMode.externalApplication,
+);
+
+Future<void> _defaultShareText(String text) async {
+  await SharePlus.instance.share(
+    ShareParams(title: 'Proje bilgisi', subject: 'Proje bilgisi', text: text),
   );
 }

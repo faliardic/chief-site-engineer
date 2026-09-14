@@ -386,6 +386,55 @@ class SetProjectInformationEntryArchiveCommand {
   final bool archived;
 }
 
+/// Canonical project-scoped geographic site location (`Şantiye konumu`).
+/// Distinct from the free-text postal `metadata.address` and from
+/// `MobileProjectLocation` (Mahal/construction hierarchy) — this value is
+/// only ever explicitly chosen by the owner from the map picker.
+class ProjectSiteLocation {
+  const ProjectSiteLocation({
+    required this.projectId,
+    required this.latitude,
+    required this.longitude,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  final String projectId;
+  final double latitude;
+  final double longitude;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+}
+
+class SetProjectSiteLocationCommand {
+  const SetProjectSiteLocationCommand({
+    required this.eventId,
+    required this.projectId,
+    required this.latitude,
+    required this.longitude,
+    this.expectedRevision,
+  });
+  final String eventId;
+  final String projectId;
+  final double latitude;
+  final double longitude;
+
+  /// Null only for the first-ever save of a project's site location.
+  final int? expectedRevision;
+}
+
+class ClearProjectSiteLocationCommand {
+  const ClearProjectSiteLocationCommand({
+    required this.eventId,
+    required this.projectId,
+    required this.expectedRevision,
+  });
+  final String eventId;
+  final String projectId;
+  final int expectedRevision;
+}
+
 enum ProjectInformationKeySpace {
   systemValue,
   profileField,

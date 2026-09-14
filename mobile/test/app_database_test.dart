@@ -87,8 +87,123 @@ void main() {
       {'version': 25, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 26, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 27, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 28, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
+
+  test(
+    'schema 27 to 28 is additive and adds project_site_locations canonically',
+    () async {
+      const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8';
+      const timestamp = '2026-09-13T08:00:00Z';
+      final schemaTwentySeven = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(27).toList(),
+      );
+      await schemaTwentySeven.open();
+      await schemaTwentySeven.database.insert('projects', {
+        'id': projectId,
+        'name': 'Şantiye konumu projesi',
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await schemaTwentySeven.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 9, 13, 9),
+      );
+      await upgraded.open();
+      final db = upgraded.database;
+      expect(
+        sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
+        AppDatabase.schemaVersion,
+      );
+      expect(await db.query('project_site_locations'), isEmpty);
+      expect(await db.query('project_site_location_events'), isEmpty);
+
+      await db.insert('project_site_locations', {
+        'project_id': projectId,
+        'latitude': 41.015137,
+        'longitude': 28.97953,
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await expectLater(
+        db.insert('project_site_location_events', {
+          'id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb8',
+          'project_id': projectId,
+          'sequence': 1,
+          'event_type': 'site_location.set',
+          'occurred_at': timestamp,
+          'payload_json': '{"revision":1}',
+        }),
+        completes,
+      );
+
+      // latitude/longitude domain is enforced.
+      await expectLater(
+        db.insert('project_site_locations', {
+          'project_id': 'cccccccc-cccc-4ccc-8ccc-ccccccccccc8',
+          'latitude': 91,
+          'longitude': 0,
+          'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+
+      // revision guard trigger.
+      await expectLater(
+        db.update(
+          'project_site_locations',
+          {'revision': 3, 'latitude': 41.0, 'longitude': 29.0},
+          where: 'project_id = ?',
+          whereArgs: [projectId],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await db.update(
+        'project_site_locations',
+        {
+          'revision': 2,
+          'latitude': 41.02,
+          'longitude': 28.98,
+          'updated_at': timestamp,
+        },
+        where: 'project_id = ? AND revision = 1',
+        whereArgs: [projectId],
+      );
+
+      // no physical delete.
+      await expectLater(
+        db.delete(
+          'project_site_locations',
+          where: 'project_id = ?',
+          whereArgs: [projectId],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+
+      // append-only event history.
+      await expectLater(
+        db.delete(
+          'project_site_location_events',
+          where: 'project_id = ?',
+          whereArgs: [projectId],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+
+      await upgraded.close();
+    },
+  );
 
   test(
     'schema 26 to 27 is additive and leaves legacy profile untouched',
@@ -137,7 +252,7 @@ void main() {
         sqflite.Sqflite.firstIntValue(
           await upgraded.database.rawQuery('PRAGMA user_version'),
         ),
-        27,
+        AppDatabase.schemaVersion,
       );
       expect(await upgraded.database.query('project_profile_fields'), before);
       for (final table in const [
@@ -238,7 +353,7 @@ void main() {
       final db = upgraded.database;
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        27,
+        AppDatabase.schemaVersion,
       );
       expect(await db.query('attendance_days'), attendanceBefore);
       expect(

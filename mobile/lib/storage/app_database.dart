@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 27;
+  static const schemaVersion = 28;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2914,6 +2914,7 @@ class AppDatabase {
     ),
     DatabaseMigration(version: 26, apply: _applyAttendanceAgendaLinkMigration),
     DatabaseMigration(version: 27, apply: _applyProjectInformationMigration),
+    DatabaseMigration(version: 28, apply: _applyProjectSiteLocationMigration),
   ];
 
   final String path;
@@ -7783,6 +7784,61 @@ Future<void> _applyProjectInformationMigration(Transaction transaction) async {
         END
       ''');
     }
+  }
+}
+
+Future<void> _applyProjectSiteLocationMigration(Transaction transaction) async {
+  await transaction.execute('''
+    CREATE TABLE project_site_locations (
+      project_id TEXT PRIMARY KEY REFERENCES projects(id),
+      latitude REAL NOT NULL CHECK (latitude >= -90 AND latitude <= 90),
+      longitude REAL NOT NULL CHECK (longitude >= -180 AND longitude <= 180),
+      revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      cleared_at TEXT
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_site_location_events (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES project_site_locations(project_id),
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (event_type IN (
+        'site_location.set', 'site_location.updated', 'site_location.cleared'
+      )),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      UNIQUE (project_id, sequence)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_site_locations_no_physical_delete
+    BEFORE DELETE ON project_site_locations BEGIN
+      SELECT RAISE(ABORT, 'physical delete is not allowed');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_site_locations_revision_guard
+    BEFORE UPDATE ON project_site_locations
+    WHEN NEW.revision != OLD.revision + 1 BEGIN
+      SELECT RAISE(ABORT, 'revision mismatch');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_site_locations_identity_immutable
+    BEFORE UPDATE OF project_id ON project_site_locations
+    WHEN NEW.project_id != OLD.project_id BEGIN
+      SELECT RAISE(ABORT, 'project site location identity is immutable');
+    END
+  ''');
+  for (final operation in ['update', 'delete']) {
+    await transaction.execute('''
+      CREATE TRIGGER project_site_location_events_append_only_$operation
+      BEFORE ${operation.toUpperCase()} ON project_site_location_events BEGIN
+        SELECT RAISE(ABORT, 'append-only event history');
+      END
+    ''');
   }
 }
 

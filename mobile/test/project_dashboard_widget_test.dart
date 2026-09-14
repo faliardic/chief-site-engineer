@@ -855,6 +855,146 @@ void main() {
 
     expect(find.byKey(const Key('dashboard-action-profile')), findsNothing);
   });
+
+  testWidgets(
+    'Konum/Paylaş are hidden without a canonical site location and never '
+    'fall back to postal address',
+    (tester) async {
+      final project = _project('33333333-3333-4333-8333-333333333333', 'Kuzey');
+      final fixture = _Fixture(projects: [project]);
+      addTearDown(fixture.dispose);
+      // A postal address exists, but no canonical site location — Konum
+      // must not invent one from it.
+      fixture.source.metadataByProject[project.id] = _metadata(
+        project.id,
+        address: 'İnönü Caddesi 12',
+      );
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('dashboard-action-location')), findsNothing);
+      expect(
+        find.byKey(const Key('dashboard-action-share-location')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'Konum opens the exact canonical site location and Paylaş shares a safe '
+    'payload with no internal identifiers',
+    (tester) async {
+      final project = _project('44444444-4444-4444-8444-444444444444', 'Kuzey');
+      final mutations = _DashboardMutations()
+        ..siteLocation = ProjectSiteLocation(
+          projectId: project.id,
+          latitude: 41.015137,
+          longitude: 28.97953,
+          revision: 1,
+          createdAt: '2026-09-13T09:00:00.000Z',
+          updatedAt: '2026-09-13T09:00:00.000Z',
+        );
+      final fixture = _Fixture(projects: [project], mutations: mutations);
+      addTearDown(fixture.dispose);
+      final launches = <Uri>[];
+      final shared = <String>[];
+
+      await tester.pumpWidget(
+        fixture.app(
+          launchUri: (uri) async {
+            launches.add(uri);
+            return true;
+          },
+          shareText: (text) async => shared.add(text),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('dashboard-action-location')));
+      await tester.pumpAndSettle();
+      expect(launches, hasLength(1));
+      expect(launches.single.queryParameters['query'], '41.015137,28.97953');
+
+      await tester.tap(
+        find.byKey(const Key('dashboard-action-share-location')),
+      );
+      await tester.pumpAndSettle();
+      expect(shared.single, contains('Kuzey'));
+      expect(shared.single, contains('41.015137'));
+      expect(shared.single, isNot(contains(project.id)));
+    },
+  );
+
+  testWidgets('failed map launch reports safe feedback without mutation', (
+    tester,
+  ) async {
+    final project = _project('55555555-5555-4555-8555-555555555555', 'Kuzey');
+    final mutations = _DashboardMutations()
+      ..siteLocation = ProjectSiteLocation(
+        projectId: project.id,
+        latitude: 41.015137,
+        longitude: 28.97953,
+        revision: 1,
+        createdAt: '2026-09-13T09:00:00.000Z',
+        updatedAt: '2026-09-13T09:00:00.000Z',
+      );
+    final fixture = _Fixture(projects: [project], mutations: mutations);
+    addTearDown(fixture.dispose);
+
+    await tester.pumpWidget(fixture.app(launchUri: (uri) async => false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('dashboard-action-location')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Harita açılamadı.'), findsOneWidget);
+    // No mutation — the location remains exactly as set.
+    expect(mutations.siteLocation?.projectId, project.id);
+  });
+
+  testWidgets(
+    'project switch never carries the previous project stale site location',
+    (tester) async {
+      final first = _project('66666666-6666-4666-8666-666666666666', 'Kuzey');
+      final second = _project('77777777-7777-4777-8777-777777777777', 'Güney');
+      final mutations = _DashboardMutations()
+        ..siteLocation = ProjectSiteLocation(
+          projectId: first.id,
+          latitude: 41.015137,
+          longitude: 28.97953,
+          revision: 1,
+          createdAt: '2026-09-13T09:00:00.000Z',
+          updatedAt: '2026-09-13T09:00:00.000Z',
+        );
+      final fixture = _Fixture(projects: [first, second], mutations: mutations);
+      addTearDown(fixture.dispose);
+      final launches = <Uri>[];
+
+      await tester.pumpWidget(
+        fixture.app(
+          launchUri: (uri) async {
+            launches.add(uri);
+            return true;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(fixture.session.select(first.id, [first, second]), isTrue);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('dashboard-action-location')),
+        findsOneWidget,
+      );
+
+      fixture.session.select(second.id, [first, second]);
+      await tester.pumpAndSettle();
+
+      // Second project has no site location of its own — Konum must hide,
+      // never showing/using the first project's stale point.
+      expect(find.byKey(const Key('dashboard-action-location')), findsNothing);
+      expect(launches, isEmpty);
+    },
+  );
 }
 
 ProjectInformationEntry _dashboardUserEntry(String projectId, int index) =>
@@ -915,6 +1055,35 @@ class _DashboardMutations implements ProjectInformationMutationApplication {
     return selected;
   }
 
+  ProjectSiteLocation? siteLocation;
+
+  @override
+  Future<ProjectSiteLocation?> getSiteLocation(String projectId) async =>
+      siteLocation?.projectId == projectId ? siteLocation : null;
+
+  @override
+  Future<ProjectSiteLocation> setSiteLocation(
+    SetProjectSiteLocationCommand command,
+  ) async {
+    final saved = ProjectSiteLocation(
+      projectId: command.projectId,
+      latitude: command.latitude,
+      longitude: command.longitude,
+      revision: (siteLocation?.revision ?? 0) + 1,
+      createdAt: '2026-09-13T10:00:00.000Z',
+      updatedAt: '2026-09-13T10:00:00.000Z',
+    );
+    siteLocation = saved;
+    return saved;
+  }
+
+  @override
+  Future<void> clearSiteLocation(
+    ClearProjectSiteLocationCommand command,
+  ) async {
+    siteLocation = null;
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -939,6 +1108,8 @@ class _Fixture {
     DashboardProjectAction? onOpenProjectAlbum,
     DashboardProjectAction? onOpenCatalog,
     DashboardProjectAction? onOpenProjectInformation,
+    DashboardTextAction? shareText,
+    DashboardUriAction? launchUri,
     double textScale = 1,
   }) => MaterialApp(
     builder: (context, child) => MediaQuery(
@@ -964,6 +1135,8 @@ class _Fixture {
         onOpenProjectAlbum: onOpenProjectAlbum,
         onOpenCatalog: onOpenCatalog,
         onOpenProjectInformation: onOpenProjectInformation,
+        shareText: shareText,
+        launchUri: launchUri,
         clock: () => DateTime.utc(2026, 9, 4, 9),
       ),
     ),

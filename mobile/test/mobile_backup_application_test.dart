@@ -607,6 +607,107 @@ void main() {
     },
   );
 
+  test('Issue #815 backup round-trip preserves Şantiye konumu lifecycle (set → '
+      'updated → cleared → re-set)', () async {
+    const project = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9';
+    final database = await _openRaw(directories);
+    await database.transaction((transaction) async {
+      await transaction.insert('projects', {
+        'id': project,
+        'name': 'Şantiye konumu projesi',
+        'revision': 1,
+        'created_at': _now,
+        'updated_at': _now,
+      });
+      await transaction.insert('project_site_locations', {
+        'project_id': project,
+        'latitude': 40.9,
+        'longitude': 29.1,
+        'revision': 4,
+        'created_at': _now,
+        'updated_at': _now,
+        'cleared_at': null,
+      });
+      for (final event in const [
+        (1, 'site_location.set'),
+        (2, 'site_location.updated'),
+        (3, 'site_location.cleared'),
+        (4, 'site_location.set'),
+      ]) {
+        await transaction.insert('project_site_location_events', {
+          'id': 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee${event.$1}',
+          'project_id': project,
+          'sequence': event.$1,
+          'event_type': event.$2,
+          'occurred_at': _now,
+          'payload_json': '{"revision":${event.$1}}',
+        });
+      }
+    });
+    await database.close();
+
+    final application = _application(directories, gateway: gateway);
+    final created = await application.createBackup(
+      const CreateMobileBackupCommand(
+        password: _password,
+        passwordConfirmation: _password,
+      ),
+    );
+    final preflight = await application.preflightBackup(
+      created.package,
+      _password,
+    );
+    await application.restoreBackup(
+      RestoreMobileBackupCommand(
+        package: created.package,
+        password: _password,
+        expectedPackageSha256: preflight.packageSha256,
+      ),
+    );
+
+    final restored = await _openRaw(directories);
+    final restoredLocation = (await restored.query(
+      'project_site_locations',
+      where: 'project_id = ?',
+      whereArgs: [project],
+    )).single;
+    expect(restoredLocation['latitude'], 40.9);
+    expect(restoredLocation['longitude'], 29.1);
+    expect(restoredLocation['revision'], 4);
+    expect(restoredLocation['cleared_at'], isNull);
+    final restoredEvents = await restored.query(
+      'project_site_location_events',
+      where: 'project_id = ?',
+      whereArgs: [project],
+      orderBy: 'sequence ASC',
+    );
+    expect(restoredEvents.map((row) => row['event_type']), [
+      'site_location.set',
+      'site_location.updated',
+      'site_location.cleared',
+      'site_location.set',
+    ]);
+    expect(restoredEvents.map((row) => row['sequence']), [1, 2, 3, 4]);
+    // Append-only/no-physical-delete triggers survive the restore intact.
+    await expectLater(
+      restored.delete(
+        'project_site_location_events',
+        where: 'project_id = ?',
+        whereArgs: [project],
+      ),
+      throwsA(isA<Object>()),
+    );
+    await expectLater(
+      restored.delete(
+        'project_site_locations',
+        where: 'project_id = ?',
+        whereArgs: [project],
+      ),
+      throwsA(isA<Object>()),
+    );
+    await restored.close();
+  });
+
   test(
     'Q04-A2 unchanged-schema backup round-trip preserves technical linkage and event',
     () async {
@@ -1090,7 +1191,7 @@ void main() {
   test(
     'format 1 backup restores populated Inventory with exact replayable truth',
     () async {
-      expect(AppDatabase.schemaVersion, 27);
+      expect(AppDatabase.schemaVersion, 28);
       final fixture = await _seedPopulatedInventory(
         directories,
         attachmentGateway: _inventoryPhotoGateway(directories),
@@ -2318,6 +2419,8 @@ void main() {
         'DROP TRIGGER floor_location_active_location_archive_guard',
       );
       for (final table in const [
+        'project_site_location_events',
+        'project_site_locations',
         'project_information_pin_events',
         'project_information_pins',
         'project_information_entry_events',

@@ -7,6 +7,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/domain/project_information_models.dart';
+import 'package:chief_site_engineer/features/projects/project_site_location_picker_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -45,6 +46,8 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
   ProjectInformationSnapshot? _snapshot;
   List<ProjectInformationEntry> _userEntries = const [];
   List<ProjectInformationPin> _pins = const [];
+  ProjectSiteLocation? _siteLocation;
+  bool _siteLocationBusy = false;
   ProjectInformationSourceStatus? _failure;
   int _loadGeneration = 0;
   final Set<String> _restoringFieldIds = <String>{};
@@ -83,6 +86,7 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
     _snapshot = null;
     _userEntries = const [];
     _pins = const [];
+    _siteLocation = null;
     _failure = null;
     _status = _InformationLoadStatus.loading;
     _query = '';
@@ -109,16 +113,19 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
         if (result.snapshot.projectId != projectId) return;
         List<ProjectInformationEntry> userEntries;
         List<ProjectInformationPin> pins;
+        ProjectSiteLocation? siteLocation;
         try {
           userEntries = await widget.application.listUserEntries(
             projectId,
             archiveFilter: ProjectInformationArchiveFilter.all,
           );
           pins = await widget.application.listPins(projectId);
+          siteLocation = await widget.application.getSiteLocation(projectId);
         } on ProjectInformationFailure catch (error) {
           if (error.code != 'mutation_store_unavailable') rethrow;
           userEntries = const [];
           pins = const [];
+          siteLocation = null;
         }
         if (!mounted ||
             generation != _loadGeneration ||
@@ -129,6 +136,7 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
           _snapshot = result.snapshot;
           _userEntries = userEntries;
           _pins = pins;
+          _siteLocation = siteLocation;
           _failure = null;
           _status = _InformationLoadStatus.ready;
         });
@@ -140,6 +148,168 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
         });
       case ProjectInformationSuperseded():
         break;
+    }
+  }
+
+  Widget _siteLocationTile() {
+    final location = _siteLocation;
+    return ListTile(
+      key: const Key('project-information-site-location'),
+      leading: const Icon(Icons.location_on_outlined),
+      title: const Text('Şantiye konumu'),
+      subtitle: Text(
+        location == null
+            ? 'Haritadan seçilmedi.'
+            : '${location.latitude.toStringAsFixed(6)}, '
+                  '${location.longitude.toStringAsFixed(6)}',
+      ),
+      trailing: Wrap(
+        spacing: 0,
+        children: [
+          if (location != null) ...[
+            IconButton(
+              key: const Key('project-information-site-location-map'),
+              tooltip: 'Haritada aç',
+              onPressed: _siteLocationBusy
+                  ? null
+                  : () => unawaited(_openSiteLocationMap(location)),
+              icon: const Icon(Icons.map_outlined),
+            ),
+            IconButton(
+              key: const Key('project-information-site-location-share'),
+              tooltip: 'Konumu paylaş',
+              onPressed: _siteLocationBusy
+                  ? null
+                  : () => unawaited(_shareSiteLocation(location)),
+              icon: const Icon(Icons.ios_share_outlined),
+            ),
+            IconButton(
+              key: const Key('project-information-site-location-clear'),
+              tooltip: 'Konumu kaldır',
+              onPressed: _siteLocationBusy
+                  ? null
+                  : () => unawaited(_confirmClearSiteLocation(location)),
+              icon: const Icon(Icons.delete_outline),
+            ),
+          ],
+          TextButton(
+            key: const Key('project-information-site-location-pick'),
+            onPressed: _siteLocationBusy
+                ? null
+                : () => unawaited(_openSiteLocationPicker(location)),
+            child: Text(location == null ? 'Konum seç' : 'Değiştir'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openSiteLocationPicker(ProjectSiteLocation? current) async {
+    final picked = await Navigator.of(context).push<(double, double)>(
+      MaterialPageRoute(
+        builder: (_) => ProjectSiteLocationPickerPage(
+          initialLatitude: current?.latitude,
+          initialLongitude: current?.longitude,
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _siteLocationBusy = true);
+    try {
+      final saved = await widget.application.setSiteLocation(
+        SetProjectSiteLocationCommand(
+          eventId: RecordId.randomUuid(),
+          projectId: widget.projectId,
+          latitude: picked.$1,
+          longitude: picked.$2,
+          expectedRevision: current?.revision,
+        ),
+      );
+      if (!mounted || widget.projectId != saved.projectId) return;
+      setState(() => _siteLocation = saved);
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Konum kaydedilemedi. Kayıt korundu, tekrar deneyin.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _siteLocationBusy = false);
+    }
+  }
+
+  Future<void> _confirmClearSiteLocation(ProjectSiteLocation current) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Konumu kaldır'),
+        content: const Text(
+          'Şantiye konumu bu projeden kaldırılacak. Devam edilsin mi?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Vazgeç'),
+          ),
+          TextButton(
+            key: const Key('project-information-site-location-confirm-clear'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Kaldır'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _siteLocationBusy = true);
+    try {
+      await widget.application.clearSiteLocation(
+        ClearProjectSiteLocationCommand(
+          eventId: RecordId.randomUuid(),
+          projectId: widget.projectId,
+          expectedRevision: current.revision,
+        ),
+      );
+      if (!mounted) return;
+      setState(() => _siteLocation = null);
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Konum kaldırılamadı. Kayıt korundu.')),
+      );
+    } finally {
+      if (mounted) setState(() => _siteLocationBusy = false);
+    }
+  }
+
+  Future<void> _openSiteLocationMap(ProjectSiteLocation location) => _launch(
+    Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': '${location.latitude},${location.longitude}',
+    }),
+    failureMessage: 'Harita açılamadı.',
+  );
+
+  Future<void> _shareSiteLocation(ProjectSiteLocation location) async {
+    final uri = Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': '${location.latitude},${location.longitude}',
+    });
+    final projectName = _snapshot?.project.name;
+    final text = [
+      if (projectName != null && projectName.trim().isNotEmpty)
+        'Proje: $projectName',
+      'Şantiye konumu: ${location.latitude.toStringAsFixed(6)}, '
+          '${location.longitude.toStringAsFixed(6)}',
+      uri.toString(),
+    ].join('\n');
+    try {
+      await (widget.shareText ?? _shareText)(text);
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Konum paylaşılamadı.')));
     }
   }
 
@@ -552,21 +722,24 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
                     icon: const Icon(Icons.add_rounded),
                     label: Text(section.addLabel!),
                   ),
-            children: section.entries.isEmpty
-                ? [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          status?.state == ProjectInformationReadState.failed
-                              ? 'Kayıtlar değiştirilmedi. Daha sonra tekrar deneyin.'
-                              : section.emptyMessage,
+            children: [
+              if (section.key == 'address') _siteLocationTile(),
+              ...section.entries.isEmpty
+                  ? [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            status?.state == ProjectInformationReadState.failed
+                                ? 'Kayıtlar değiştirilmedi. Daha sonra tekrar deneyin.'
+                                : section.emptyMessage,
+                          ),
                         ),
                       ),
-                    ),
-                  ]
-                : [for (final entry in section.entries) _entryTile(entry)],
+                    ]
+                  : [for (final entry in section.entries) _entryTile(entry)],
+            ],
           );
         },
       ),

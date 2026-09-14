@@ -18,18 +18,24 @@ ANDROID_NAMESPACE = "{http://schemas.android.com/apk/res/android}"
 TOOLS_NAMESPACE = "{http://schemas.android.com/tools}"
 ANDROID_PERMISSION_ALLOWLIST = {
     "android.permission.CAMERA",
+    "android.permission.INTERNET",
     "android.permission.POST_NOTIFICATIONS",
     "android.permission.RECEIVE_BOOT_COMPLETED",
     "android.permission.SCHEDULE_EXACT_ALARM",
+    # Issue #815 comment 5661140945 current-location correction: foreground
+    # one-shot current-position read only, from the explicit picker action.
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_COARSE_LOCATION",
 }
 FORBIDDEN_PRODUCTION_PERMISSIONS = {
-    "android.permission.INTERNET",
     "android.permission.READ_EXTERNAL_STORAGE",
     "android.permission.READ_MEDIA_IMAGES",
     "android.permission.READ_MEDIA_VIDEO",
     "android.permission.READ_MEDIA_AUDIO",
     "android.permission.USE_EXACT_ALARM",
     "android.permission.FOREGROUND_SERVICE",
+    "android.permission.ACCESS_BACKGROUND_LOCATION",
+    "android.permission.FOREGROUND_SERVICE_LOCATION",
 }
 REQUIRED_TRANSITIVE_PERMISSION_REMOVALS = {
     "android.permission.READ_EXTERNAL_STORAGE",

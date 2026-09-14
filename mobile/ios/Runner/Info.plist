@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Çektiğiniz şantiye fotoğrafını seçtiğiniz saha kaydına kanıt olarak eklemek için kamera erişimi gerekir.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Şantiye konumunu haritada bulmanız için yalnız siz "Konumumu bul" seçtiğinizde mevcut konumunuz bir kerelik okunur.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Yalnız seçtiğiniz mevcut fotoğrafı saha kaydına kanıt olarak eklemek için fotoğraf arşivi erişimi gerekir.</string>
 	<key>UIApplicationSceneManifest</key>
