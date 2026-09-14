@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:chief_site_engineer/application/project_information_application.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -784,6 +785,110 @@ void main() {
     },
   );
 
+  test('Issue #823: listCompanionReads returns data identical to the three '
+      'separate calls, and opens exactly one connection where the three '
+      'separate calls open three', () async {
+    final root = await Directory.systemTemp.createTemp('cse_companion_reads_');
+    addTearDown(() => root.delete(recursive: true));
+    final databasePath = '${root.path}/application.sqlite3';
+    const projectA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+    const entryId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+    String event(int value) =>
+        'dddddddd-dddd-4ddd-8ddd-${value.toString().padLeft(12, '0')}';
+    final database = AppDatabase(
+      path: databasePath,
+      factory: databaseFactoryFfi,
+      clock: () => _now,
+    );
+    await database.open();
+    await database.database.insert('projects', {
+      'id': projectA,
+      'name': projectA,
+      'revision': 1,
+      'created_at': '2026-09-14T09:00:00Z',
+      'updated_at': '2026-09-14T09:00:00Z',
+    });
+    await database.close();
+
+    final counting = _CountingDatabaseFactory(databaseFactoryFfi);
+    final mutations = SqliteProjectInformationMutationApplication(
+      databasePath: databasePath,
+      databaseFactory: counting,
+      clock: () => _now,
+    );
+    final application = ProjectInformationApplication(
+      source: _FakeProjectInformationSource.standard(),
+      mutations: mutations,
+    );
+
+    final entry = await application.createUserEntry(
+      CreateProjectInformationEntryCommand(
+        id: entryId,
+        eventId: event(1),
+        projectId: projectA,
+        category: ProjectInformationCategory.technical,
+        label: 'Beton sınıfı',
+        value: const ProjectInformationEntryValue.text('C35'),
+      ),
+    );
+    final pin = await application.setPin(
+      SetProjectInformationPinCommand(
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1',
+        eventId: event(2),
+        projectId: projectA,
+        key: ProjectInformationKey(
+          space: ProjectInformationKeySpace.userEntry,
+          id: entryId,
+        ),
+      ),
+    );
+    final location = await application.setSiteLocation(
+      SetProjectSiteLocationCommand(
+        eventId: event(3),
+        projectId: projectA,
+        expectedRevision: null,
+        latitude: 40.9,
+        longitude: 29.1,
+      ),
+    );
+
+    counting.openCount = 0;
+    final separateEntries = await application.listUserEntries(projectA);
+    final separatePins = await application.listPins(projectA);
+    final separateLocation = await application.getSiteLocation(projectA);
+    expect(
+      counting.openCount,
+      3,
+      reason: 'baseline: three separate calls open three connections',
+    );
+
+    counting.openCount = 0;
+    final combined = await application.listCompanionReads(projectA);
+    expect(
+      counting.openCount,
+      1,
+      reason:
+          'Issue #823 Phase 1: the combined companion read must perform '
+          'all three logical reads inside exactly one coordinator/DB turn',
+    );
+
+    expect(combined.userEntries.map((e) => e.id), [entry.id]);
+    expect(
+      combined.userEntries.map((e) => (e.id, e.revision, e.value.text)),
+      separateEntries.map((e) => (e.id, e.revision, e.value.text)),
+    );
+    expect(combined.pins.map((p) => p.id), [pin.id]);
+    expect(
+      combined.pins.map((p) => (p.id, p.revision, p.sourceAvailable)),
+      separatePins.map((p) => (p.id, p.revision, p.sourceAvailable)),
+    );
+    expect(combined.siteLocation?.latitude, location.latitude);
+    expect(
+      (combined.siteLocation?.latitude, combined.siteLocation?.longitude),
+      (separateLocation?.latitude, separateLocation?.longitude),
+    );
+  });
+
   test(
     'site location set/replace/clear enforces revision, isolation and append-only events',
     () async {
@@ -984,6 +1089,43 @@ void main() {
       await reopened.close();
     },
   );
+}
+
+/// Counts [openDatabase] calls made through it, delegating everything else
+/// to [inner]. Used to deterministically prove Issue #823's "3 opens -> 1
+/// open" companion-read claim without relying on subjective wall-clock
+/// timing.
+class _CountingDatabaseFactory implements DatabaseFactory {
+  _CountingDatabaseFactory(this.inner);
+
+  final DatabaseFactory inner;
+  int openCount = 0;
+
+  @override
+  Future<Database> openDatabase(String path, {OpenDatabaseOptions? options}) {
+    openCount += 1;
+    return inner.openDatabase(path, options: options);
+  }
+
+  @override
+  Future<String> getDatabasesPath() => inner.getDatabasesPath();
+
+  @override
+  Future<void> setDatabasesPath(String path) => inner.setDatabasesPath(path);
+
+  @override
+  Future<void> deleteDatabase(String path) => inner.deleteDatabase(path);
+
+  @override
+  Future<bool> databaseExists(String path) => inner.databaseExists(path);
+
+  @override
+  Future<void> writeDatabaseBytes(String path, Uint8List bytes) =>
+      inner.writeDatabaseBytes(path, bytes);
+
+  @override
+  Future<Uint8List> readDatabaseBytes(String path) =>
+      inner.readDatabaseBytes(path);
 }
 
 class _FakeProjectInformationSource implements ProjectInformationReadSource {

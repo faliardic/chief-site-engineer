@@ -160,12 +160,13 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
         List<ProjectInformationPin> pins;
         ProjectSiteLocation? siteLocation;
         try {
-          userEntries = await widget.application.listUserEntries(
+          final companion = await widget.application.listCompanionReads(
             projectId,
             archiveFilter: ProjectInformationArchiveFilter.all,
           );
-          pins = await widget.application.listPins(projectId);
-          siteLocation = await widget.application.getSiteLocation(projectId);
+          userEntries = companion.userEntries;
+          pins = companion.pins;
+          siteLocation = companion.siteLocation;
         } on ProjectInformationFailure catch (error) {
           if (error.code != 'mutation_store_unavailable') rethrow;
           userEntries = const [];
@@ -545,32 +546,94 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
             : '${entry.label} geri yüklendi.',
       );
 
+  /// Adds/removes [entry]'s Hızlı Bilgiler pin. Unlike [_runEntryMutation],
+  /// this never sends the page into the blocking loading surface: the
+  /// mutation completes, then a non-blocking background revalidation
+  /// (`showLoading: false`) refreshes `_pins` while existing content stays
+  /// visible throughout (Issue #823 — pin/unpin/reorder must not trigger
+  /// full-page loading). Removal offers a nonblocking `Geri al` (Undo)
+  /// instead of a confirmation dialog; Undo only re-adds the pin membership
+  /// — it never touches the source record.
   Future<void> _togglePin(_InformationEntry entry) async {
     final key = entry.pinKey;
     if (key == null) return;
     final existing = _pinFor(key);
-    await _runEntryMutation(
-      () => existing == null
-          ? widget.application.setPin(
-              SetProjectInformationPinCommand(
-                id: RecordId.randomUuid(),
-                eventId: RecordId.randomUuid(),
-                projectId: widget.projectId,
-                key: key,
-              ),
-            )
-          : widget.application.removePin(
-              RemoveProjectInformationPinCommand(
-                id: existing.id,
-                eventId: RecordId.randomUuid(),
-                projectId: widget.projectId,
-                expectedRevision: existing.revision,
-              ),
+    final projectId = widget.projectId;
+    try {
+      if (existing == null) {
+        await widget.application.setPin(
+          SetProjectInformationPinCommand(
+            id: RecordId.randomUuid(),
+            eventId: RecordId.randomUuid(),
+            projectId: projectId,
+            key: key,
+          ),
+        );
+        if (!mounted || widget.projectId != projectId) return;
+        unawaited(_load(showLoading: false));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${entry.label} Hızlı Bilgilere eklendi.')),
+        );
+      } else {
+        await widget.application.removePin(
+          RemoveProjectInformationPinCommand(
+            id: existing.id,
+            eventId: RecordId.randomUuid(),
+            projectId: projectId,
+            expectedRevision: existing.revision,
+          ),
+        );
+        if (!mounted || widget.projectId != projectId) return;
+        unawaited(_load(showLoading: false));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${entry.label} Hızlı Bilgilerden kaldırıldı.'),
+            action: SnackBarAction(
+              label: 'Geri al',
+              onPressed: () => unawaited(_restorePin(key)),
             ),
-      success: existing == null
-          ? '${entry.label} ana sayfaya eklendi.'
-          : '${entry.label} ana sayfadan kaldırıldı.',
-    );
+          ),
+        );
+      }
+    } on ProjectInformationRevisionConflict {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Kayıt başka bir işlemde değişti. Güncel halini yeniden açın.',
+          ),
+        ),
+      );
+      unawaited(_load(showLoading: false));
+    } on ProjectInformationFailure {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('İşlem tamamlanamadı. Mevcut kayıt korundu.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _restorePin(ProjectInformationKey key) async {
+    final projectId = widget.projectId;
+    try {
+      await widget.application.setPin(
+        SetProjectInformationPinCommand(
+          id: RecordId.randomUuid(),
+          eventId: RecordId.randomUuid(),
+          projectId: projectId,
+          key: key,
+        ),
+      );
+      if (!mounted || widget.projectId != projectId) return;
+      unawaited(_load(showLoading: false));
+    } on ProjectInformationFailure {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Geri alma tamamlanamadı.')));
+    }
   }
 
   ProjectInformationPin? _pinFor(ProjectInformationKey key) {
@@ -860,8 +923,8 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
                         value: 'pin',
                         child: Text(
                           _pinFor(entry.pinKey!) == null
-                              ? 'Ana sayfada göster'
-                              : 'Ana sayfadan kaldır',
+                              ? 'Hızlı Bilgilere ekle'
+                              : 'Hızlı Bilgilerden kaldır',
                         ),
                       ),
                     if (entry.userEntry != null) ...const [

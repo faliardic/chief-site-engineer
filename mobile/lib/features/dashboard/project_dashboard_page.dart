@@ -99,30 +99,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   int _informationGeneration = 0;
   bool _mutating = false;
   bool _reportedFirstSuccessfulProjectRead = false;
-  EdgeDraggingAutoScroller? _fieldAutoScroller;
-  final ExpansibleController _profileTileController = ExpansibleController();
-  BuildContext? _profileTileContext;
-
-  bool _profileEditorAvailable(MobileProject project) =>
-      _profileApplication != null &&
-      _informationStatus == _LoadStatus.ready &&
-      _information?.projectId == project.id &&
-      _information!.statusFor(ProjectInformationSource.profile).state !=
-          ProjectInformationReadState.failed;
-
-  void _focusProfile() {
-    if (!_profileTileController.isExpanded) {
-      _profileTileController.expand();
-    }
-    final tileContext = _profileTileContext;
-    if (tileContext == null || !tileContext.mounted) return;
-    unawaited(
-      Scrollable.ensureVisible(
-        tileContext,
-        duration: const Duration(milliseconds: 200),
-      ),
-    );
-  }
+  bool _hizliBilgilerEditMode = false;
+  bool _pinMutating = false;
+  EdgeDraggingAutoScroller? _pinAutoScroller;
 
   ProjectSiteLocation? _canonicalSiteLocation(MobileProject project) {
     final location = _siteLocation;
@@ -195,7 +174,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
 
   @override
   void dispose() {
-    _fieldAutoScroller?.stopAutoScroll();
+    _pinAutoScroller?.stopAutoScroll();
     _informationSession?.clearProject();
     _projectSubscription?.cancel();
     widget.session.removeListener(_handleActiveProjectChanged);
@@ -315,11 +294,12 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         ProjectSiteLocation? siteLocation;
         var pinReadFailed = false;
         try {
-          entries = await widget.projectInformation!.listUserEntries(projectId);
-          pins = await widget.projectInformation!.listPins(projectId);
-          siteLocation = await widget.projectInformation!.getSiteLocation(
+          final companion = await widget.projectInformation!.listCompanionReads(
             projectId,
           );
+          entries = companion.userEntries;
+          pins = companion.pins;
+          siteLocation = companion.siteLocation;
         } on ProjectInformationFailure catch (error) {
           if (error.code != 'mutation_store_unavailable') pinReadFailed = true;
         }
@@ -450,16 +430,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           ],
         ),
         actions: [
-          if (!field.isBuiltIn)
-            TextButton.icon(
-              key: ValueKey('project-profile-archive-${field.id}'),
-              onPressed: () {
-                Navigator.pop(context);
-                unawaited(_archiveField(field));
-              },
-              icon: const Icon(Icons.archive_outlined),
-              label: const Text('Arşivle'),
-            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Vazgeç'),
@@ -491,152 +461,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         ),
       );
       await _reloadInformationIfStillSelected(field.projectId);
-    });
-  }
-
-  Future<void> _addField(MobileProject project) async {
-    var label = '';
-    var value = '';
-    final result = await showDialog<(String, String)>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Özel alan ekle'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              key: const Key('project-profile-new-label'),
-              onChanged: (next) => label = next,
-              autofocus: true,
-              maxLength: 120,
-              decoration: const InputDecoration(labelText: 'Alan adı'),
-            ),
-            TextFormField(
-              key: const Key('project-profile-new-value'),
-              onChanged: (next) => value = next,
-              maxLength: 4000,
-              decoration: const InputDecoration(labelText: 'Değer'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            key: const Key('project-profile-create-field'),
-            onPressed: () {
-              final normalizedLabel = label.trim();
-              if (normalizedLabel.isEmpty) return;
-              Navigator.pop(context, (normalizedLabel, value));
-            },
-            child: const Text('Ekle'),
-          ),
-        ],
-      ),
-    );
-    if (result == null || !mounted) return;
-    final application = _profileApplication;
-    if (application == null) return;
-    await _runMutation(() async {
-      await application.createProjectProfileField(
-        CreateProjectProfileFieldCommand(
-          id: RecordId.randomUuid(),
-          eventId: RecordId.randomUuid(),
-          projectId: project.id,
-          label: result.$1,
-          value: result.$2,
-        ),
-      );
-      await _reloadInformationIfStillSelected(project.id);
-    });
-  }
-
-  Future<void> _archiveField(ProjectProfileField field) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Özel alanı arşivle'),
-        content: Text('${field.label} profil görünümünden kaldırılacak.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            key: const Key('project-profile-confirm-archive'),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Arşivle'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    final application = _profileApplication;
-    if (application == null) return;
-    await _runMutation(() async {
-      await application.mutateProjectProfileFieldArchive(
-        MutateProjectProfileFieldArchiveCommand(
-          fieldId: field.id,
-          eventId: RecordId.randomUuid(),
-          projectId: field.projectId,
-          expectedRevision: field.revision,
-          archive: true,
-        ),
-      );
-      await _reloadInformationIfStillSelected(field.projectId);
-    });
-  }
-
-  Future<void> _reorderFields(
-    MobileProject project,
-    List<ProjectProfileField> visibleFields,
-    int oldIndex,
-    int newIndex,
-  ) async {
-    final application = _profileApplication;
-    final snapshot = _information;
-    if (application == null ||
-        snapshot == null ||
-        snapshot.projectId != project.id ||
-        widget.session.selectedProjectId != project.id ||
-        _mutating) {
-      return;
-    }
-    final currentFields = snapshot.profileFields
-        .where((field) => !field.isArchived)
-        .toList(growable: false);
-    if (currentFields.length != visibleFields.length ||
-        oldIndex < 0 ||
-        oldIndex >= currentFields.length ||
-        newIndex < 0 ||
-        newIndex >= currentFields.length ||
-        currentFields.indexed.any(
-          (entry) =>
-              entry.$2.id != visibleFields[entry.$1].id ||
-              entry.$2.revision != visibleFields[entry.$1].revision,
-        )) {
-      return;
-    }
-    final reordered = [...currentFields];
-    final moved = reordered.removeAt(oldIndex);
-    reordered.insert(newIndex, moved);
-    await _runMutation(() async {
-      await application.reorderProjectProfileFields(
-        ReorderProjectProfileFieldsCommand(
-          eventId: RecordId.randomUuid(),
-          projectId: project.id,
-          fields: [
-            for (final field in reordered)
-              ProjectProfileFieldOrder(
-                fieldId: field.id,
-                expectedRevision: field.revision,
-              ),
-          ],
-        ),
-      );
-      await _reloadInformationIfStillSelected(project.id);
     });
   }
 
@@ -947,18 +771,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                   onPressed: () => _openTools(project),
                   icon: const Icon(Icons.widgets_outlined),
                 ),
-                IconButton(
-                  key: const Key('dashboard-action-profile'),
-                  tooltip: 'Profil',
-                  constraints: const BoxConstraints(
-                    minWidth: 48,
-                    minHeight: 48,
-                  ),
-                  onPressed: _profileEditorAvailable(project)
-                      ? _focusProfile
-                      : null,
-                  icon: const Icon(Icons.badge_outlined),
-                ),
                 if (_canonicalSiteLocation(project) != null) ...[
                   IconButton(
                     key: const Key('dashboard-action-location'),
@@ -986,12 +798,45 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           ),
         ),
         const SizedBox(height: 8),
-        Semantics(
-          header: true,
-          child: Text(
-            'Hızlı Bilgiler',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Semantics(
+                header: true,
+                child: Text(
+                  'Hızlı Bilgiler',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ),
+            IconButton(
+              key: const Key('dashboard-quick-info-add'),
+              tooltip: 'Ekle',
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              onPressed:
+                  widget.onOpenProjectInformation == null ||
+                      _informationStatus != _LoadStatus.ready
+                  ? null
+                  : () => _openProjectInformation(project),
+              icon: const Icon(Icons.add_rounded),
+            ),
+            IconButton(
+              key: const Key('dashboard-quick-info-edit-toggle'),
+              tooltip: _hizliBilgilerEditMode ? 'Bitti' : 'Düzenle',
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              isSelected: _hizliBilgilerEditMode,
+              onPressed: _informationStatus != _LoadStatus.ready
+                  ? null
+                  : () => setState(
+                      () => _hizliBilgilerEditMode = !_hizliBilgilerEditMode,
+                    ),
+              icon: Icon(
+                _hizliBilgilerEditMode
+                    ? Icons.check_rounded
+                    : Icons.edit_outlined,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         _buildQuickInformation(project),
@@ -1006,208 +851,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           icon: const Icon(Icons.list_alt_rounded),
           label: const Text('Tüm proje bilgileri'),
         ),
-        if (_profileEditorAvailable(project)) ...[
-          const SizedBox(height: 8),
-          _buildProfileEditor(project, _information!),
-        ],
       ],
-    );
-  }
-
-  Widget _buildProfileEditor(
-    MobileProject project,
-    ProjectInformationSnapshot snapshot,
-  ) {
-    final fields = snapshot.profileFields
-        .where((field) => !field.isArchived)
-        .toList(growable: false);
-    return Builder(
-      builder: (context) {
-        _profileTileContext = context;
-        return Card(
-          key: const Key('project-profile-editor'),
-          child: ExpansionTile(
-            controller: _profileTileController,
-            leading: const Icon(Icons.edit_note_rounded),
-            title: const Text('Profil alanlarını düzenle'),
-            subtitle: const Text('Mevcut alanları düzenle, ekle veya sırala'),
-            childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 520 ? 3 : 2;
-                  final width =
-                      (constraints.maxWidth - (columns - 1) * 8) / columns;
-                  final height =
-                      64 + MediaQuery.textScalerOf(context).scale(52);
-                  return Wrap(
-                    key: const Key('project-profile-fields'),
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (var index = 0; index < fields.length; index++)
-                        SizedBox(
-                          key: ValueKey(
-                            'project-profile-field-${fields[index].id}',
-                          ),
-                          width: width,
-                          height: height,
-                          child: _buildFieldCell(
-                            project,
-                            fields,
-                            index,
-                            width,
-                            height,
-                          ),
-                        ),
-                      SizedBox(
-                        width: width,
-                        height: height,
-                        child: Tooltip(
-                          message: 'Özel alan ekle',
-                          child: OutlinedButton(
-                            key: const Key('project-profile-add-field'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.all(8),
-                            ),
-                            onPressed: _mutating
-                                ? null
-                                : () => _addField(project),
-                            child: const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_rounded),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Özel alan ekle',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFieldCell(
-    MobileProject project,
-    List<ProjectProfileField> fields,
-    int index,
-    double width,
-    double height,
-  ) {
-    final field = fields[index];
-    return DragTarget<ProjectProfileField>(
-      onWillAcceptWithDetails: (details) =>
-          !_mutating &&
-          details.data.projectId == project.id &&
-          details.data.id != field.id &&
-          fields.any(
-            (item) =>
-                item.id == details.data.id &&
-                item.revision == details.data.revision,
-          ),
-      onAcceptWithDetails: (details) {
-        final oldIndex = fields.indexWhere(
-          (item) => item.id == details.data.id,
-        );
-        if (oldIndex >= 0) {
-          unawaited(_reorderFields(project, fields, oldIndex, index));
-        }
-      },
-      builder: (context, candidates, rejected) => Card(
-        margin: EdgeInsets.zero,
-        color: candidates.isEmpty
-            ? null
-            : Theme.of(context).colorScheme.secondaryContainer,
-        child: InkWell(
-          onTap: _mutating ? null : () => _editField(field),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  field.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: Text(
-                    field.value.isEmpty ? 'Henüz girilmedi' : field.value,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Draggable<ProjectProfileField>(
-                      key: ValueKey('project-profile-drag-${field.id}'),
-                      data: field,
-                      maxSimultaneousDrags: _mutating ? 0 : 1,
-                      onDragStarted: () {
-                        _fieldAutoScroller?.stopAutoScroll();
-                        _fieldAutoScroller = EdgeDraggingAutoScroller(
-                          Scrollable.of(context),
-                          velocityScalar: 30,
-                        );
-                      },
-                      onDragUpdate: (details) {
-                        _fieldAutoScroller?.startAutoScrollIfNecessary(
-                          Rect.fromCenter(
-                            center: details.globalPosition,
-                            width: 40,
-                            height: 40,
-                          ),
-                        );
-                      },
-                      onDragEnd: (_) => _fieldAutoScroller?.stopAutoScroll(),
-                      feedback: Material(
-                        elevation: 6,
-                        borderRadius: BorderRadius.circular(12),
-                        child: SizedBox(
-                          width: width,
-                          height: height,
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Text(
-                              field.label,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ),
-                      child: const Tooltip(
-                        message: 'Sıralamak için sürükleyin',
-                        child: SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: Icon(Icons.drag_handle_rounded, size: 20),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -1244,11 +888,12 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
       _informationPins,
       _informationEntries,
     );
+    final hasRealPins = _informationPins.isNotEmpty;
     final items = _pinReadFailed
         ? const <_QuickItem>[]
-        : _informationPins.isEmpty
-        ? _quickItems(snapshot)
-        : pinned.items;
+        : hasRealPins
+        ? pinned.items
+        : _quickItems(snapshot);
     final hasFailure = snapshot.sourceStatuses.any(
       (status) => status.state == ProjectInformationReadState.failed,
     );
@@ -1279,6 +924,17 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
               ),
             ),
           ),
+        if (_hizliBilgilerEditMode && !hasRealPins)
+          const Card(
+            key: Key('dashboard-quick-info-edit-hint'),
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'Sabitlemek için "Tüm proje bilgileri"nden bir bilgi seçip '
+                'Hızlı Bilgilere ekleyin.',
+              ),
+            ),
+          ),
         LayoutBuilder(
           builder: (context, constraints) {
             final columns = constraints.maxWidth >= 520 ? 3 : 2;
@@ -1291,30 +947,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                 for (final item in items)
                   SizedBox(
                     width: width,
-                    child: Card(
-                      key: ValueKey('dashboard-quick-${item.key}'),
-                      margin: EdgeInsets.zero,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.labelMedium,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item.value,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    child: _hizliBilgilerEditMode && item.pin != null
+                        ? _buildEditableQuickItem(project, items, item, width)
+                        : _buildQuickItemCard(item, project),
                   ),
               ],
             );
@@ -1322,6 +957,249 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         ),
       ],
     );
+  }
+
+  Widget _buildQuickItemCard(
+    _QuickItem item,
+    MobileProject project, {
+    Widget? trailing,
+  }) {
+    final editable = _hizliBilgilerEditMode && item.pin != null;
+    return Card(
+      key: ValueKey('dashboard-quick-${item.key}'),
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: editable ? () => _editQuickItem(project, item) : null,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(item.value, maxLines: 3, overflow: TextOverflow.ellipsis),
+              if (trailing != null) ...[const SizedBox(height: 4), trailing],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEditableQuickItem(
+    MobileProject project,
+    List<_QuickItem> items,
+    _QuickItem item,
+    double width,
+  ) {
+    final pin = item.pin!;
+    return DragTarget<ProjectInformationPin>(
+      onWillAcceptWithDetails: (details) =>
+          !_pinMutating &&
+          details.data.projectId == project.id &&
+          details.data.id != pin.id,
+      onAcceptWithDetails: (details) {
+        final oldIndex = items.indexWhere(
+          (candidate) => candidate.pin?.id == details.data.id,
+        );
+        final newIndex = items.indexOf(item);
+        if (oldIndex >= 0) {
+          unawaited(_reorderPins(project, items, oldIndex, newIndex));
+        }
+      },
+      builder: (context, candidates, rejected) => _buildQuickItemCard(
+        item,
+        project,
+        trailing: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            IconButton(
+              key: ValueKey('dashboard-quick-remove-${item.key}'),
+              tooltip: 'Hızlı Bilgilerden kaldır',
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              onPressed: _pinMutating ? null : () => _removePin(project, item),
+              icon: const Icon(Icons.close_rounded, size: 18),
+            ),
+            Draggable<ProjectInformationPin>(
+              key: ValueKey('dashboard-quick-drag-${item.key}'),
+              data: pin,
+              maxSimultaneousDrags: _pinMutating ? 0 : 1,
+              onDragStarted: () {
+                _pinAutoScroller?.stopAutoScroll();
+                _pinAutoScroller = EdgeDraggingAutoScroller(
+                  Scrollable.of(context),
+                  velocityScalar: 30,
+                );
+              },
+              onDragUpdate: (details) {
+                _pinAutoScroller?.startAutoScrollIfNecessary(
+                  Rect.fromCenter(
+                    center: details.globalPosition,
+                    width: 40,
+                    height: 40,
+                  ),
+                );
+              },
+              onDragEnd: (_) => _pinAutoScroller?.stopAutoScroll(),
+              feedback: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: width,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      item.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+              child: const Tooltip(
+                message: 'Sıralamak için sürükleyin',
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Icon(Icons.drag_handle_rounded, size: 18),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Opens the correct existing source/edit surface for [item]. Profile-field
+  /// pins reuse the existing profile edit dialog inline; every other pin
+  /// kind's real edit surface lives in `Tüm proje bilgileri`, so edit mode
+  /// navigates there instead of duplicating N deep-link dialogs.
+  void _editQuickItem(MobileProject project, _QuickItem item) {
+    final pin = item.pin;
+    final snapshot = _information;
+    if (pin == null) return;
+    if (pin.key.space == ProjectInformationKeySpace.profileField &&
+        snapshot != null) {
+      for (final field in snapshot.profileFields) {
+        if (field.id == pin.key.id && !field.isArchived) {
+          unawaited(_editField(field));
+          return;
+        }
+      }
+    }
+    _openProjectInformation(project);
+  }
+
+  /// Removes [item]'s pin without a blocking confirmation dialog or
+  /// full-page loading: the source information is never touched, only pin
+  /// membership. Offers a nonblocking `Geri al` (Undo) that re-pins the same
+  /// key; a real project switch invalidates the Undo (guarded by
+  /// `widget.session.selectedProjectId`).
+  Future<void> _removePin(MobileProject project, _QuickItem item) async {
+    final pin = item.pin;
+    if (pin == null || _pinMutating) return;
+    setState(() => _pinMutating = true);
+    try {
+      await widget.projectInformation!.removePin(
+        RemoveProjectInformationPinCommand(
+          id: pin.id,
+          eventId: RecordId.randomUuid(),
+          projectId: project.id,
+          expectedRevision: pin.revision,
+        ),
+      );
+      if (!mounted) return;
+      unawaited(_reloadInformationIfStillSelected(project.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${item.label} Hızlı Bilgilerden kaldırıldı.'),
+          action: SnackBarAction(
+            label: 'Geri al',
+            onPressed: () => unawaited(_restorePin(project, pin.key)),
+          ),
+        ),
+      );
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kaldırma tamamlanamadı. Kayıt korundu.')),
+      );
+    } finally {
+      if (mounted) setState(() => _pinMutating = false);
+    }
+  }
+
+  Future<void> _restorePin(
+    MobileProject project,
+    ProjectInformationKey key,
+  ) async {
+    if (widget.session.selectedProjectId != project.id) return;
+    try {
+      await widget.projectInformation!.setPin(
+        SetProjectInformationPinCommand(
+          id: RecordId.randomUuid(),
+          eventId: RecordId.randomUuid(),
+          projectId: project.id,
+          key: key,
+        ),
+      );
+      if (!mounted) return;
+      unawaited(_reloadInformationIfStillSelected(project.id));
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Geri alma tamamlanamadı.')));
+    }
+  }
+
+  Future<void> _reorderPins(
+    MobileProject project,
+    List<_QuickItem> visibleItems,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    if (_pinMutating || widget.session.selectedProjectId != project.id) {
+      return;
+    }
+    final pins = [for (final item in visibleItems) item.pin!];
+    if (oldIndex < 0 ||
+        oldIndex >= pins.length ||
+        newIndex < 0 ||
+        newIndex >= pins.length) {
+      return;
+    }
+    final reordered = [...pins];
+    final moved = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, moved);
+    setState(() => _pinMutating = true);
+    try {
+      await widget.projectInformation!.reorderPins(
+        ReorderProjectInformationPinsCommand(
+          eventId: RecordId.randomUuid(),
+          projectId: project.id,
+          orderedPinIds: [for (final pin in reordered) pin.id],
+          expectedRevisions: {
+            for (final pin in reordered) pin.id: pin.revision,
+          },
+        ),
+      );
+      if (!mounted) return;
+      unawaited(_reloadInformationIfStillSelected(project.id));
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sıralama tamamlanamadı. Kayıt korundu.')),
+      );
+    } finally {
+      if (mounted) setState(() => _pinMutating = false);
+    }
   }
 }
 
@@ -1362,7 +1240,7 @@ _QuickItem? _resolvePinnedQuickItem(
       final value = _systemQuickValue(snapshot, key.id);
       return value == null
           ? null
-          : _QuickItem('pin-${pin.id}', value.$1, value.$2);
+          : _QuickItem('pin-${pin.id}', value.$1, value.$2, pin: pin);
     case ProjectInformationKeySpace.profileField:
       for (final field in snapshot.profileFields) {
         if (field.id == key.id && !field.isArchived) {
@@ -1370,6 +1248,7 @@ _QuickItem? _resolvePinnedQuickItem(
             'pin-${pin.id}',
             field.label,
             _quickValue(field.value),
+            pin: pin,
           );
         }
       }
@@ -1380,20 +1259,35 @@ _QuickItem? _resolvePinnedQuickItem(
         }
         final value = party.company?.name ?? party.workforceMember?.fullName;
         if (value != null && value.trim().isNotEmpty) {
-          return _QuickItem('pin-${pin.id}', 'Önemli kişi', value.trim());
+          return _QuickItem(
+            'pin-${pin.id}',
+            'Önemli kişi',
+            value.trim(),
+            pin: pin,
+          );
         }
       }
     case ProjectInformationKeySpace.inventoryBlock:
       for (final block in snapshot.blocks) {
         if (block.block.id == key.id && block.block.archivedAt == null) {
-          return _QuickItem('pin-${pin.id}', 'Blok', block.block.displayName);
+          return _QuickItem(
+            'pin-${pin.id}',
+            'Blok',
+            block.block.displayName,
+            pin: pin,
+          );
         }
       }
     case ProjectInformationKeySpace.inventoryFloor:
       for (final block in snapshot.blocks) {
         for (final floor in block.floors) {
           if (floor.floor.id == key.id && floor.floor.archivedAt == null) {
-            return _QuickItem('pin-${pin.id}', 'Kat', floor.floor.displayName);
+            return _QuickItem(
+              'pin-${pin.id}',
+              'Kat',
+              floor.floor.displayName,
+              pin: pin,
+            );
           }
         }
       }
@@ -1407,6 +1301,7 @@ _QuickItem? _resolvePinnedQuickItem(
                 'pin-${pin.id}',
                 'Mahal',
                 location.location!.displayName,
+                pin: pin,
               );
             }
           }
@@ -1419,6 +1314,7 @@ _QuickItem? _resolvePinnedQuickItem(
             'pin-${pin.id}',
             entry.label,
             _userEntryQuickValue(entry),
+            pin: pin,
           );
         }
       }
@@ -1498,11 +1394,16 @@ String _userEntryQuickValue(ProjectInformationEntry entry) {
 }
 
 class _QuickItem {
-  const _QuickItem(this.key, this.label, this.value);
+  const _QuickItem(this.key, this.label, this.value, {this.pin});
 
   final String key;
   final String label;
   final String value;
+
+  /// The pin this item was resolved from, or `null` for a default/computed
+  /// item (shown only when no explicit pin exists yet). Edit-mode
+  /// remove/reorder/edit affordances require a non-null [pin].
+  final ProjectInformationPin? pin;
 }
 
 List<_QuickItem> _quickItems(ProjectInformationSnapshot snapshot) {

@@ -845,6 +845,10 @@ void main() {
     await tester.tap(find.byKey(const Key('project-information-form-save')));
     await tester.pumpAndSettle();
     expect(mutations.updated.single.expectedRevision, 1);
+    // Drain this mutation's snackbar (pumpAndSettle only waits out pending
+    // animation frames, not an idle real Timer) so it can't queue behind
+    // and mask a later step's snackbar text.
+    await tester.pump(const Duration(seconds: 5));
 
     await tester.tap(actions);
     await tester.pumpAndSettle();
@@ -852,6 +856,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(mutations.archived.single.expectedRevision, 2);
     expect(mutations.archived.single.archived, isTrue);
+    await tester.pump(const Duration(seconds: 5));
 
     final archivedSection = find.byKey(
       const Key('project-information-archived-user-entries'),
@@ -876,6 +881,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(mutations.archived.last.expectedRevision, 3);
     expect(mutations.archived.last.archived, isFalse);
+    await tester.pump(const Duration(seconds: 5));
 
     await tester.scrollUntilVisible(
       actions,
@@ -884,19 +890,43 @@ void main() {
     );
     await tester.tap(actions);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Ana sayfada göster'));
+    await tester.tap(find.text('Hızlı Bilgilere ekle'));
     await tester.pumpAndSettle();
     expect(
       mutations.pinned.single.key.space,
       ProjectInformationKeySpace.userEntry,
     );
     expect(mutations.pinned.single.key.id, 'editable-entry');
+    // Drain the "eklendi" snackbar's auto-dismiss timer (pumpAndSettle only
+    // waits out pending animation frames, not a real Timer with nothing
+    // currently scheduled) so it can't mask the next snackbar's text.
+    await tester.pump(const Duration(seconds: 5));
 
     await tester.tap(actions);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Ana sayfadan kaldır'));
-    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hızlı Bilgilerden kaldır'));
+    await tester.pump();
+    // Issue #823: pin/unpin must never trigger the blocking full-page load.
+    expect(find.byKey(const Key('project-information-loading')), findsNothing);
     expect(mutations.unpinned.single.expectedRevision, 1);
+    await tester.pump();
+    expect(
+      find.text('Kapı kodu Hızlı Bilgilerden kaldırıldı.'),
+      findsOneWidget,
+    );
+    final undoAction = tester.widget<SnackBarAction>(
+      find.widgetWithText(SnackBarAction, 'Geri al'),
+    );
+    // Source entry is untouched by unpin.
+    expect(mutations.entries.single.id, 'editable-entry');
+
+    undoAction.onPressed();
+    await tester.pump();
+    expect(find.byKey(const Key('project-information-loading')), findsNothing);
+    await tester.pump(const Duration(seconds: 5));
+    expect(mutations.pinned.length, 2);
+    expect(mutations.pinned.last.key.id, 'editable-entry');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('revision conflict preserves entry and explains refresh', (
@@ -1535,11 +1565,49 @@ class _InformationMutations implements ProjectInformationMutationApplication {
     pins.removeWhere((pin) => pin.id == command.id);
   }
 
+  final List<ReorderProjectInformationPinsCommand> reordered = [];
+
+  @override
+  Future<List<ProjectInformationPin>> reorderPins(
+    ReorderProjectInformationPinsCommand command,
+  ) async {
+    reordered.add(command);
+    final byId = {for (final pin in pins) pin.id: pin};
+    pins
+      ..clear()
+      ..addAll([
+        for (final id in command.orderedPinIds)
+          if (byId[id] != null)
+            ProjectInformationPin(
+              id: byId[id]!.id,
+              projectId: byId[id]!.projectId,
+              key: byId[id]!.key,
+              sortOrder: command.orderedPinIds.indexOf(id),
+              revision: byId[id]!.revision + 1,
+              createdAt: byId[id]!.createdAt,
+              updatedAt: '2026-09-14T10:00:00.000Z',
+              sourceAvailable: byId[id]!.sourceAvailable,
+            ),
+      ]);
+    return List.unmodifiable(pins);
+  }
+
   ProjectSiteLocation? siteLocation;
 
   @override
   Future<ProjectSiteLocation?> getSiteLocation(String projectId) async =>
       siteLocation?.projectId == projectId ? siteLocation : null;
+
+  @override
+  Future<ProjectInformationCompanionReads> listCompanionReads(
+    String projectId, {
+    ProjectInformationArchiveFilter archiveFilter =
+        ProjectInformationArchiveFilter.active,
+  }) async => ProjectInformationCompanionReads(
+    userEntries: await listUserEntries(projectId, archiveFilter: archiveFilter),
+    pins: await listPins(projectId),
+    siteLocation: await getSiteLocation(projectId),
+  );
 
   @override
   Future<ProjectSiteLocation> setSiteLocation(
