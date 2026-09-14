@@ -12,6 +12,7 @@ import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/domain/project_information_models.dart';
 import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
+import 'package:chief_site_engineer/features/projects/project_information_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -52,10 +53,14 @@ void main() {
         yibf: 'Y-42',
       ).fields;
       String? openedProjectId;
+      ProjectInformationPresentationSeed? openedSeed;
 
       await tester.pumpWidget(
         fixture.app(
-          onOpenProjectInformation: (projectId) => openedProjectId = projectId,
+          onOpenProjectInformation: (projectId, seed) {
+            openedProjectId = projectId;
+            openedSeed = seed;
+          },
         ),
       );
       await tester.pumpAndSettle();
@@ -82,8 +87,46 @@ void main() {
       expect(allInfo.hitTestable(), findsOneWidget);
       await tester.tap(allInfo);
       expect(openedProjectId, project.id);
+
+      // Q05 S6C1: the Dashboard hands over its already-loaded, exact-project
+      // presentation state as a seed so the pushed page can paint
+      // immediately instead of duplicating the full read.
+      expect(openedSeed, isNotNull);
+      expect(openedSeed!.projectId, project.id);
+      expect(openedSeed!.snapshot.projectId, project.id);
+      expect(openedSeed!.snapshot.metadata?.address, 'İnönü Caddesi 12');
     },
   );
+
+  testWidgets('no exact-project presentation seed is offered when Dashboard '
+      'information for the project is not ready', (tester) async {
+    final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+    final fixture = _Fixture(projects: [project])
+      ..source.projectReads[project.id] = [Completer<MobileProject>().future];
+    addTearDown(fixture.dispose);
+    String? openedProjectId;
+    var openedSeedCalls = 0;
+    Object? openedSeed = 'unset';
+
+    await tester.pumpWidget(
+      fixture.app(
+        onOpenProjectInformation: (projectId, seed) {
+          openedProjectId = projectId;
+          openedSeed = seed;
+          openedSeedCalls += 1;
+        },
+      ),
+    );
+    await tester.pump();
+
+    final allInfo = find.byKey(const Key('dashboard-open-project-information'));
+    expect(allInfo, findsOneWidget);
+    final button = tester.widget<OutlinedButton>(allInfo);
+    expect(button.onPressed, isNull);
+    expect(openedSeedCalls, 0);
+    expect(openedProjectId, isNull);
+    expect(openedSeed, 'unset');
+  });
 
   testWidgets('secondary profile editor preserves edit add and archive', (
     tester,
@@ -91,7 +134,7 @@ void main() {
     final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
     final fixture = _Fixture(projects: [project]);
     addTearDown(fixture.dispose);
-    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_) {}));
+    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
     await tester.pumpAndSettle();
     await _openProfileEditor(tester);
 
@@ -189,7 +232,7 @@ void main() {
     final fixture = _Fixture(projects: [project])
       ..source.inventoryFailure = StateError('inventory unavailable');
     addTearDown(fixture.dispose);
-    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_) {}));
+    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
     await tester.pumpAndSettle();
 
     for (final key in const ['total-area', 'block-count', 'total-floors']) {
@@ -210,7 +253,7 @@ void main() {
     final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
     final fixture = _Fixture(projects: [project]);
     addTearDown(fixture.dispose);
-    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_) {}));
+    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
     await tester.pumpAndSettle();
     await _openProfileEditor(tester);
     final fields = List.of(fixture.agenda.projectProfileFields[project.id]!);
@@ -270,7 +313,7 @@ void main() {
           ),
       ];
       fixture.agenda.projectProfileFields[project.id] = fields;
-      await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_) {}));
+      await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
       await tester.pumpAndSettle();
       await _openProfileEditor(tester);
       final firstDrag = find.byKey(
@@ -325,7 +368,7 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
-      await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_) {}));
+      await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
       await tester.pumpAndSettle();
       await _openProfileEditor(tester);
       final grid = tester.widget<Wrap>(
@@ -359,7 +402,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        fixture.app(textScale: 1.8, onOpenProjectInformation: (_) {}),
+        fixture.app(textScale: 1.8, onOpenProjectInformation: (_, _) {}),
       );
       await tester.pumpAndSettle();
 
@@ -395,7 +438,7 @@ void main() {
       final fixture = _Fixture(projects: agenda.projects, agenda: agenda);
       addTearDown(fixture.dispose);
 
-      await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_) {}));
+      await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
       await tester.pumpAndSettle();
       await _renameVisibleProject(tester, '  Yeni Kuzey  ');
 
@@ -418,7 +461,9 @@ void main() {
         final agenda = _RenamingAgenda(projects: [project]);
         final fixture = _Fixture(projects: agenda.projects, agenda: agenda);
         addTearDown(fixture.dispose);
-        await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_) {}));
+        await tester.pumpWidget(
+          fixture.app(onOpenProjectInformation: (_, _) {}),
+        );
         await tester.pumpAndSettle();
         final fieldsBefore = List.of(agenda.projectProfileFields[project.id]!);
         await tester.tap(find.byKey(const Key('project-profile-name')));
@@ -465,7 +510,7 @@ void main() {
     final fixture = _Fixture(projects: agenda.projects, agenda: agenda);
     addTearDown(fixture.dispose);
     fixture.session.select(first.id, agenda.projects);
-    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_) {}));
+    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('project-profile-name')));
     await tester.pumpAndSettle();
@@ -504,7 +549,7 @@ void main() {
       address: 'Güney adresi',
     );
     fixture.session.select(first.id, agenda.projects);
-    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_) {}));
+    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
     await tester.pumpAndSettle();
     await _openProfileEditor(tester);
     final field = agenda.projectProfileFields[first.id]!.first;
@@ -552,7 +597,7 @@ void main() {
     await tester.pumpWidget(
       fixture.app(
         onOpenPlan: (projectId) => openedProject = projectId,
-        onOpenProjectInformation: (_) {},
+        onOpenProjectInformation: (_, _) {},
       ),
     );
     await tester.pumpAndSettle();
@@ -590,7 +635,7 @@ void main() {
           await tester.pumpWidget(
             fixture.app(
               textScale: 1.6,
-              onOpenProjectInformation: (_) {},
+              onOpenProjectInformation: (_, _) {},
               onOpenProjectAlbum: (projectId) => albumProjectId = projectId,
               onOpenCatalog: (projectId) => catalogProjectId = projectId,
             ),
@@ -685,7 +730,7 @@ void main() {
       address: 'Güney adresi',
     );
 
-    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_) {}));
+    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('dashboard-project-selection-required')),
@@ -1107,7 +1152,7 @@ class _Fixture {
     DashboardProjectAction? onOpenPlan,
     DashboardProjectAction? onOpenProjectAlbum,
     DashboardProjectAction? onOpenCatalog,
-    DashboardProjectAction? onOpenProjectInformation,
+    DashboardOpenProjectInformationAction? onOpenProjectInformation,
     DashboardTextAction? shareText,
     DashboardUriAction? launchUri,
     double textScale = 1,

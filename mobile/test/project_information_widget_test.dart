@@ -281,6 +281,181 @@ void main() {
     expect(find.text('A Projesi'), findsNothing);
   });
 
+  testWidgets(
+    'a valid exact-project Dashboard seed paints immediately without the '
+    'blocking loading surface, then a background revalidation replaces it '
+    'with fresh same-project data',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard();
+      source.metadataByProject[_projectA] = _metadata(
+        _projectA,
+        address: 'Seed Adresi',
+      );
+      final application = ProjectInformationApplication(source: source);
+      final seedSession = application.createSession();
+      final seedResult = await seedSession.loadProject(_projectA);
+      seedSession.clearProject();
+      final seedSnapshot = (seedResult as ProjectInformationReady).snapshot;
+
+      // Change the source after capturing the seed and block the page's own
+      // background revalidation read, so the seed-vs-fresh states can be
+      // observed as genuinely distinct, ordered frames rather than both
+      // resolving within the same pump.
+      source.metadataByProject[_projectA] = _metadata(
+        _projectA,
+        address: 'Güncel Adresi',
+      );
+      final delayedA = Completer<MobileProject>();
+      source.projectReads[_projectA] = [delayedA.future];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProjectInformationPage(
+            application: application,
+            projectId: _projectA,
+            seed: ProjectInformationPresentationSeed(
+              projectId: _projectA,
+              snapshot: seedSnapshot,
+              userEntries: const [],
+              pins: const [],
+              siteLocation: null,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('project-information-loading')),
+        findsNothing,
+      );
+      expect(_visibleProjectName(tester), 'A Projesi');
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('project-information-section-address')),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Konum ve Adres'));
+      await tester.pumpAndSettle();
+      expect(find.text('Seed Adresi'), findsOneWidget);
+      expect(find.text('Güncel Adresi'), findsNothing);
+
+      delayedA.complete(source.projects[_projectA]);
+      await tester.pumpAndSettle();
+      expect(find.text('Güncel Adresi'), findsOneWidget);
+      expect(find.text('Seed Adresi'), findsNothing);
+      expect(source.mutationCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'a mismatched-project seed is ignored: normal blocking load runs and no '
+    'other-project content is ever painted',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard(
+        includeProjectB: true,
+      );
+      final application = ProjectInformationApplication(source: source);
+      final seedSession = application.createSession();
+      final seedResult = await seedSession.loadProject(_projectB);
+      seedSession.clearProject();
+      final seedSnapshot = (seedResult as ProjectInformationReady).snapshot;
+      // Block A's own load so the still-visible loading surface (proving the
+      // mismatched seed was ignored and a normal load actually ran) can be
+      // observed before it resolves.
+      final delayedA = Completer<MobileProject>();
+      source.projectReads[_projectA] = [delayedA.future];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProjectInformationPage(
+            application: application,
+            projectId: _projectA,
+            seed: ProjectInformationPresentationSeed(
+              projectId: _projectB,
+              snapshot: seedSnapshot,
+              userEntries: const [],
+              pins: const [],
+              siteLocation: null,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.byKey(const Key('project-information-loading')),
+        findsOneWidget,
+      );
+      expect(find.text('B Projesi'), findsNothing);
+
+      delayedA.complete(source.projects[_projectA]);
+      await tester.pumpAndSettle();
+      expect(_visibleProjectName(tester), 'A Projesi');
+      expect(find.text('B Projesi'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a stale background revalidation started from a seed cannot overwrite a '
+    'subsequent real project switch',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard(
+        includeProjectB: true,
+      );
+      final delayedA = Completer<MobileProject>();
+      final application = ProjectInformationApplication(source: source);
+      final seedSession = application.createSession();
+      final seedResult = await seedSession.loadProject(_projectA);
+      seedSession.clearProject();
+      final seedSnapshot = (seedResult as ProjectInformationReady).snapshot;
+      // Re-arm the block for the page's own background revalidation.
+      source.projectReads[_projectA] = [delayedA.future];
+      const pageKey = ValueKey('seeded-project-information-page');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProjectInformationPage(
+            key: pageKey,
+            application: application,
+            projectId: _projectA,
+            seed: ProjectInformationPresentationSeed(
+              projectId: _projectA,
+              snapshot: seedSnapshot,
+              userEntries: const [],
+              pins: const [],
+              siteLocation: null,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.byKey(const Key('project-information-loading')),
+        findsNothing,
+      );
+      expect(_visibleProjectName(tester), 'A Projesi');
+
+      // Real project switch while A's seeded revalidation is still pending.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProjectInformationPage(
+            key: pageKey,
+            application: application,
+            projectId: _projectB,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(_visibleProjectName(tester), 'B Projesi');
+      expect(find.text('A Projesi'), findsNothing);
+
+      delayedA.complete(source.projects[_projectA]);
+      await tester.pumpAndSettle();
+      expect(_visibleProjectName(tester), 'B Projesi');
+      expect(find.text('A Projesi'), findsNothing);
+    },
+  );
+
   testWidgets('archived custom field is explicit and only restore mutates', (
     tester,
   ) async {
@@ -1179,6 +1354,12 @@ void main() {
     },
   );
 }
+
+String? _visibleProjectName(WidgetTester tester) => tester
+    .widget<Text>(
+      find.byKey(const Key('project-information-project-name')).first,
+    )
+    .data;
 
 Widget _testApp(
   _FakeProjectInformationSource source, {

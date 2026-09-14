@@ -1004,13 +1004,14 @@ class _MobileShellState extends State<MobileShell> {
           unawaited(_openPhoneCallResult(projectId)),
       onOpenProjectInformation: projectInformation == null
           ? null
-          : (projectId) => unawaited(
+          : (projectId, seed) => unawaited(
               Navigator.of(context).push<void>(
                 MaterialPageRoute(
                   builder: (_) => ProjectInformationPage(
                     application: projectInformation,
                     profileApplication: profileApplication,
                     projectId: projectId,
+                    seed: seed,
                   ),
                 ),
               ),

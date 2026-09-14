@@ -16,6 +16,34 @@ import 'package:url_launcher/url_launcher.dart' as url_launcher_pkg;
 typedef ProjectInformationTextAction = Future<void> Function(String text);
 typedef ProjectInformationUriAction = Future<bool> Function(Uri uri);
 
+/// Presentation-only first-paint seed for [ProjectInformationPage].
+///
+/// Lets a caller (e.g. the Dashboard) that already holds an equivalent,
+/// still-valid load for the exact same project hand it over so the page can
+/// render immediately instead of showing a blocking loading surface. This is
+/// never a durable cache or source of truth: the page still starts a fresh
+/// same-project background revalidation right after first paint, and only a
+/// non-stale, non-superseded, same-project revalidation may replace it.
+class ProjectInformationPresentationSeed {
+  const ProjectInformationPresentationSeed({
+    required this.projectId,
+    required this.snapshot,
+    required this.userEntries,
+    required this.pins,
+    required this.siteLocation,
+  });
+
+  /// Exact project identity this seed was captured for. Must equal
+  /// [snapshot]'s own `projectId` and the page's `projectId` before this
+  /// seed is trusted for first paint — a caller-side project mismatch alone
+  /// is grounds to ignore the seed and fall back to a normal load.
+  final String projectId;
+  final ProjectInformationSnapshot snapshot;
+  final List<ProjectInformationEntry> userEntries;
+  final List<ProjectInformationPin> pins;
+  final ProjectSiteLocation? siteLocation;
+}
+
 class ProjectInformationPage extends StatefulWidget {
   const ProjectInformationPage({
     required this.application,
@@ -24,6 +52,7 @@ class ProjectInformationPage extends StatefulWidget {
     this.copyText,
     this.shareText,
     this.launchUri,
+    this.seed,
     super.key,
   });
 
@@ -33,6 +62,10 @@ class ProjectInformationPage extends StatefulWidget {
   final ProjectInformationTextAction? copyText;
   final ProjectInformationTextAction? shareText;
   final ProjectInformationUriAction? launchUri;
+
+  /// Optional exact-project presentation seed for immediate first paint. See
+  /// [ProjectInformationPresentationSeed].
+  final ProjectInformationPresentationSeed? seed;
 
   @override
   State<ProjectInformationPage> createState() => _ProjectInformationPageState();
@@ -57,7 +90,19 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
   void initState() {
     super.initState();
     _session = widget.application.createSession();
-    unawaited(_load());
+    final seed = widget.seed;
+    final hasValidSeed =
+        seed != null &&
+        seed.projectId == widget.projectId &&
+        seed.snapshot.projectId == widget.projectId;
+    if (hasValidSeed) {
+      _snapshot = seed.snapshot;
+      _userEntries = seed.userEntries;
+      _pins = seed.pins;
+      _siteLocation = seed.siteLocation;
+      _status = _InformationLoadStatus.ready;
+    }
+    unawaited(_load(showLoading: !hasValidSeed));
   }
 
   @override
@@ -92,10 +137,10 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
     _query = '';
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool showLoading = true}) async {
     final generation = ++_loadGeneration;
     final projectId = widget.projectId;
-    if (mounted) {
+    if (mounted && showLoading) {
       setState(() {
         _snapshot = null;
         _failure = null;
