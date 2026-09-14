@@ -1121,7 +1121,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           content: Text('${item.label} Hızlı Bilgilerden kaldırıldı.'),
           action: SnackBarAction(
             label: 'Geri al',
-            onPressed: () => unawaited(_restorePin(project, pin.key)),
+            onPressed: () => unawaited(_restorePin(project, pin.id, pin.key)),
           ),
         ),
       );
@@ -1135,15 +1135,21 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     }
   }
 
+  /// [pinId] must be the exact id of the just-removed (soft-archived) pin
+  /// row — the production `setPin` implementation restores an archived row
+  /// in place by matching this id against `(project_id, source_space,
+  /// source_id)`; a fresh id would collide with the existing archived row
+  /// and fail with `pin_identity_mismatch`.
   Future<void> _restorePin(
     MobileProject project,
+    String pinId,
     ProjectInformationKey key,
   ) async {
     if (widget.session.selectedProjectId != project.id) return;
     try {
       await widget.projectInformation!.setPin(
         SetProjectInformationPinCommand(
-          id: RecordId.randomUuid(),
+          id: pinId,
           eventId: RecordId.randomUuid(),
           projectId: project.id,
           key: key,

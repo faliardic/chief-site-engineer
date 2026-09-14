@@ -1540,11 +1540,36 @@ class _InformationMutations implements ProjectInformationMutationApplication {
   Future<List<ProjectInformationPin>> listPins(String projectId) async =>
       pins.where((pin) => pin.projectId == projectId).toList(growable: false);
 
+  /// Models the real `SqliteProjectInformationMutationApplication.setPin`
+  /// identity contract: restoring a previously-removed pin for the same
+  /// `(space, id)` key must reuse the exact same pin id, or it fails with
+  /// `pin_identity_mismatch` — a fresh random id is rejected.
+  final Map<String, String> _archivedPinIdsByKey = {};
+
+  String _pinKeyString(ProjectInformationKey key) => '${key.space}:${key.id}';
+
   @override
   Future<ProjectInformationPin> setPin(
     SetProjectInformationPinCommand command,
   ) async {
     pinned.add(command);
+    final activeMatch = pins.where(
+      (existing) =>
+          existing.key.space == command.key.space &&
+          existing.key.id == command.key.id,
+    );
+    if (activeMatch.isNotEmpty) {
+      if (activeMatch.single.id != command.id) {
+        throw const ProjectInformationFailure('duplicate_active_pin');
+      }
+      return activeMatch.single;
+    }
+    final keyString = _pinKeyString(command.key);
+    final archivedId = _archivedPinIdsByKey[keyString];
+    if (archivedId != null && archivedId != command.id) {
+      throw const ProjectInformationFailure('pin_identity_mismatch');
+    }
+    _archivedPinIdsByKey.remove(keyString);
     final pin = ProjectInformationPin(
       id: command.id,
       projectId: command.projectId,
@@ -1562,6 +1587,11 @@ class _InformationMutations implements ProjectInformationMutationApplication {
   @override
   Future<void> removePin(RemoveProjectInformationPinCommand command) async {
     unpinned.add(command);
+    final removed = pins.where((pin) => pin.id == command.id);
+    if (removed.isNotEmpty) {
+      _archivedPinIdsByKey[_pinKeyString(removed.single.key)] =
+          removed.single.id;
+    }
     pins.removeWhere((pin) => pin.id == command.id);
   }
 

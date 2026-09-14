@@ -889,6 +889,119 @@ void main() {
     );
   });
 
+  test('Issue #823: the exact nonblocking-Undo code path (removePin then '
+      'setPin reusing the exact removed pin id) restores the same pin '
+      'through the real Sqlite implementation', () async {
+    final root = await Directory.systemTemp.createTemp('cse_pin_undo_');
+    addTearDown(() => root.delete(recursive: true));
+    final databasePath = '${root.path}/application.sqlite3';
+    const projectA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+    const entryId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+    const pinId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
+    String event(int value) =>
+        'dddddddd-dddd-4ddd-8ddd-${value.toString().padLeft(12, '0')}';
+    final database = AppDatabase(
+      path: databasePath,
+      factory: databaseFactoryFfi,
+      clock: () => _now,
+    );
+    await database.open();
+    await database.database.insert('projects', {
+      'id': projectA,
+      'name': projectA,
+      'revision': 1,
+      'created_at': '2026-09-14T09:00:00Z',
+      'updated_at': '2026-09-14T09:00:00Z',
+    });
+    await database.close();
+
+    final mutations = SqliteProjectInformationMutationApplication(
+      databasePath: databasePath,
+      databaseFactory: databaseFactoryFfi,
+      clock: () => _now,
+    );
+    final application = ProjectInformationApplication(
+      source: _FakeProjectInformationSource.standard(),
+      mutations: mutations,
+    );
+    await application.createUserEntry(
+      CreateProjectInformationEntryCommand(
+        id: entryId,
+        eventId: event(1),
+        projectId: projectA,
+        category: ProjectInformationCategory.technical,
+        label: 'Beton sınıfı',
+        value: const ProjectInformationEntryValue.text('C35'),
+      ),
+    );
+    const key = ProjectInformationKey(
+      space: ProjectInformationKeySpace.userEntry,
+      id: entryId,
+    );
+    final pin = await application.setPin(
+      SetProjectInformationPinCommand(
+        id: pinId,
+        eventId: event(2),
+        projectId: projectA,
+        key: key,
+      ),
+    );
+
+    // Exact nonblocking-Undo path: removePin, then setPin reusing the
+    // exact same pin id captured before removal (not a fresh random id —
+    // that would fail with pin_identity_mismatch against a real backend).
+    await application.removePin(
+      RemoveProjectInformationPinCommand(
+        id: pin.id,
+        eventId: event(3),
+        projectId: projectA,
+        expectedRevision: pin.revision,
+      ),
+    );
+    expect(await application.listPins(projectA), isEmpty);
+
+    final restored = await application.setPin(
+      SetProjectInformationPinCommand(
+        id: pin.id,
+        eventId: event(4),
+        projectId: projectA,
+        key: key,
+      ),
+    );
+    expect(restored.id, pinId);
+    expect(restored.key.id, entryId);
+    final listed = await application.listPins(projectA);
+    expect(listed.single.id, pinId);
+
+    // A fresh random id for the same source key is exactly the bug this
+    // test guards against: it must fail, not silently create a duplicate.
+    await application.removePin(
+      RemoveProjectInformationPinCommand(
+        id: pin.id,
+        eventId: event(5),
+        projectId: projectA,
+        expectedRevision: restored.revision,
+      ),
+    );
+    await expectLater(
+      application.setPin(
+        SetProjectInformationPinCommand(
+          id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+          eventId: event(6),
+          projectId: projectA,
+          key: key,
+        ),
+      ),
+      throwsA(
+        isA<ProjectInformationFailure>().having(
+          (failure) => failure.code,
+          'code',
+          'pin_identity_mismatch',
+        ),
+      ),
+    );
+  });
+
   test(
     'site location set/replace/clear enforces revision, isolation and append-only events',
     () async {
