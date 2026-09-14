@@ -546,14 +546,9 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
             : '${entry.label} geri yüklendi.',
       );
 
-  /// Adds/removes [entry]'s Hızlı Bilgiler pin. Unlike [_runEntryMutation],
-  /// this never sends the page into the blocking loading surface: the
-  /// mutation completes, then a non-blocking background revalidation
-  /// (`showLoading: false`) refreshes `_pins` while existing content stays
-  /// visible throughout (Issue #823 — pin/unpin/reorder must not trigger
-  /// full-page loading). Removal offers a nonblocking `Geri al` (Undo)
-  /// instead of a confirmation dialog; Undo only re-adds the pin membership
-  /// — it never touches the source record.
+  /// Adds/removes [entry]'s Hızlı Bilgiler pin without a blocking loading
+  /// surface. Removal captures the complete active order so `Geri al` can
+  /// restore both the pin identity and its exact prior position.
   Future<void> _togglePin(_InformationEntry entry) async {
     final key = entry.pinKey;
     if (key == null) return;
@@ -575,6 +570,7 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
           SnackBar(content: Text('${entry.label} Hızlı Bilgilere eklendi.')),
         );
       } else {
+        final priorOrder = [for (final pin in _pins) pin.id];
         await widget.application.removePin(
           RemoveProjectInformationPinCommand(
             id: existing.id,
@@ -590,7 +586,8 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
             content: Text('${entry.label} Hızlı Bilgilerden kaldırıldı.'),
             action: SnackBarAction(
               label: 'Geri al',
-              onPressed: () => unawaited(_restorePin(existing.id, key)),
+              onPressed: () =>
+                  unawaited(_restorePin(existing.id, key, priorOrder)),
             ),
           ),
         );
@@ -615,12 +612,13 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
     }
   }
 
-  /// [pinId] must be the exact id of the just-removed (soft-archived) pin
-  /// row — the production `setPin` implementation restores an archived row
-  /// in place by matching this id against `(project_id, source_space,
-  /// source_id)`; a fresh id would collide with the existing archived row
-  /// and fail with `pin_identity_mismatch`.
-  Future<void> _restorePin(String pinId, ProjectInformationKey key) async {
+  /// Restores the exact soft-archived pin identity and re-applies the complete
+  /// pre-remove order when pin membership has not changed concurrently.
+  Future<void> _restorePin(
+    String pinId,
+    ProjectInformationKey key,
+    List<String> priorOrder,
+  ) async {
     final projectId = widget.projectId;
     try {
       await widget.application.setPin(
@@ -632,8 +630,46 @@ class _ProjectInformationPageState extends State<ProjectInformationPage> {
         ),
       );
       if (!mounted || widget.projectId != projectId) return;
+      final currentPins = await widget.application.listPins(projectId);
+      if (!mounted || widget.projectId != projectId) return;
+      final currentIds = {for (final pin in currentPins) pin.id};
+      final priorIds = priorOrder.toSet();
+      final sameMembership =
+          currentPins.length == priorOrder.length &&
+          currentIds.length == priorIds.length &&
+          currentIds.containsAll(priorIds);
+      if (sameMembership) {
+        var sameOrder = true;
+        for (var index = 0; index < priorOrder.length; index += 1) {
+          if (currentPins[index].id != priorOrder[index]) {
+            sameOrder = false;
+            break;
+          }
+        }
+        if (!sameOrder) {
+          await widget.application.reorderPins(
+            ReorderProjectInformationPinsCommand(
+              eventId: RecordId.randomUuid(),
+              projectId: projectId,
+              orderedPinIds: priorOrder,
+              expectedRevisions: {
+                for (final pin in currentPins) pin.id: pin.revision,
+              },
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Bilgi geri eklendi; eşzamanlı değişiklik nedeniyle sıra korunamadı.',
+            ),
+          ),
+        );
+      }
+      if (!mounted || widget.projectId != projectId) return;
       unawaited(_load(showLoading: false));
-    } on ProjectInformationFailure {
+    } on Object {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,

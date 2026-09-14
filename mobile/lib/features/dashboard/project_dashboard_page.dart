@@ -798,42 +798,57 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Semantics(
-                header: true,
-                child: Text(
-                  'Hızlı Bilgiler',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+            Semantics(
+              header: true,
+              child: Text(
+                'Hızlı Bilgiler',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
-            IconButton(
-              key: const Key('dashboard-quick-info-add'),
-              tooltip: 'Ekle',
-              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-              onPressed:
-                  widget.onOpenProjectInformation == null ||
-                      _informationStatus != _LoadStatus.ready
-                  ? null
-                  : () => _openProjectInformation(project),
-              icon: const Icon(Icons.add_rounded),
-            ),
-            IconButton(
-              key: const Key('dashboard-quick-info-edit-toggle'),
-              tooltip: _hizliBilgilerEditMode ? 'Bitti' : 'Düzenle',
-              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-              isSelected: _hizliBilgilerEditMode,
-              onPressed: _informationStatus != _LoadStatus.ready
-                  ? null
-                  : () => setState(
-                      () => _hizliBilgilerEditMode = !_hizliBilgilerEditMode,
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  TextButton.icon(
+                    key: const Key('dashboard-quick-info-add'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
                     ),
-              icon: Icon(
-                _hizliBilgilerEditMode
-                    ? Icons.check_rounded
-                    : Icons.edit_outlined,
+                    onPressed:
+                        widget.onOpenProjectInformation == null ||
+                            _informationStatus != _LoadStatus.ready
+                        ? null
+                        : () => _openProjectInformation(project),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('+ Ekle'),
+                  ),
+                  TextButton.icon(
+                    key: const Key('dashboard-quick-info-edit-toggle'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                    ),
+                    onPressed: _informationStatus != _LoadStatus.ready
+                        ? null
+                        : () => setState(
+                            () => _hizliBilgilerEditMode =
+                                !_hizliBilgilerEditMode,
+                          ),
+                    icon: Icon(
+                      _hizliBilgilerEditMode
+                          ? Icons.check_rounded
+                          : Icons.edit_outlined,
+                    ),
+                    label: Text(
+                      _hizliBilgilerEditMode ? 'Bitti' : 'Düzenle',
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -948,7 +963,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                   SizedBox(
                     width: width,
                     child: _hizliBilgilerEditMode && item.pin != null
-                        ? _buildEditableQuickItem(project, items, item, width)
+                        ? _buildEditableQuickItem(project, item, width)
                         : _buildQuickItemCard(item, project),
                   ),
               ],
@@ -993,7 +1008,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
 
   Widget _buildEditableQuickItem(
     MobileProject project,
-    List<_QuickItem> items,
     _QuickItem item,
     double width,
   ) {
@@ -1003,15 +1017,8 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           !_pinMutating &&
           details.data.projectId == project.id &&
           details.data.id != pin.id,
-      onAcceptWithDetails: (details) {
-        final oldIndex = items.indexWhere(
-          (candidate) => candidate.pin?.id == details.data.id,
-        );
-        final newIndex = items.indexOf(item);
-        if (oldIndex >= 0) {
-          unawaited(_reorderPins(project, items, oldIndex, newIndex));
-        }
-      },
+      onAcceptWithDetails: (details) =>
+          unawaited(_reorderPins(project, details.data.id, pin.id)),
       builder: (context, candidates, rejected) => _buildQuickItemCard(
         item,
         project,
@@ -1021,7 +1028,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
             IconButton(
               key: ValueKey('dashboard-quick-remove-${item.key}'),
               tooltip: 'Hızlı Bilgilerden kaldır',
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
               onPressed: _pinMutating ? null : () => _removePin(project, item),
               icon: const Icon(Icons.close_rounded, size: 18),
             ),
@@ -1040,8 +1047,8 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                 _pinAutoScroller?.startAutoScrollIfNecessary(
                   Rect.fromCenter(
                     center: details.globalPosition,
-                    width: 40,
-                    height: 40,
+                    width: 48,
+                    height: 48,
                   ),
                 );
               },
@@ -1064,8 +1071,8 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
               child: const Tooltip(
                 message: 'Sıralamak için sürükleyin',
                 child: SizedBox(
-                  width: 40,
-                  height: 40,
+                  width: 48,
+                  height: 48,
                   child: Icon(Icons.drag_handle_rounded, size: 18),
                 ),
               ),
@@ -1099,11 +1106,12 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   /// Removes [item]'s pin without a blocking confirmation dialog or
   /// full-page loading: the source information is never touched, only pin
   /// membership. Offers a nonblocking `Geri al` (Undo) that re-pins the same
-  /// key; a real project switch invalidates the Undo (guarded by
-  /// `widget.session.selectedProjectId`).
+  /// key and restores the exact pre-remove order when the active pin set has
+  /// not changed; a real project switch invalidates the Undo.
   Future<void> _removePin(MobileProject project, _QuickItem item) async {
     final pin = item.pin;
     if (pin == null || _pinMutating) return;
+    final priorOrder = [for (final current in _informationPins) current.id];
     setState(() => _pinMutating = true);
     try {
       await widget.projectInformation!.removePin(
@@ -1121,7 +1129,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           content: Text('${item.label} Hızlı Bilgilerden kaldırıldı.'),
           action: SnackBarAction(
             label: 'Geri al',
-            onPressed: () => unawaited(_restorePin(project, pin.id, pin.key)),
+            onPressed: () => unawaited(
+              _restorePin(project, pin.id, pin.key, priorOrder),
+            ),
           ),
         ),
       );
@@ -1135,15 +1145,15 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     }
   }
 
-  /// [pinId] must be the exact id of the just-removed (soft-archived) pin
-  /// row — the production `setPin` implementation restores an archived row
-  /// in place by matching this id against `(project_id, source_space,
-  /// source_id)`; a fresh id would collide with the existing archived row
-  /// and fail with `pin_identity_mismatch`.
+  /// Restores the exact soft-archived pin identity and, when no concurrent pin
+  /// membership change occurred, re-applies [priorOrder]. `setPin` restores an
+  /// archived row at the end, so the follow-up full-set reorder is required
+  /// for a middle-pin Undo to restore the exact previous order.
   Future<void> _restorePin(
     MobileProject project,
     String pinId,
     ProjectInformationKey key,
+    List<String> priorOrder,
   ) async {
     if (widget.session.selectedProjectId != project.id) return;
     try {
@@ -1155,7 +1165,45 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           key: key,
         ),
       );
-      if (!mounted) return;
+      if (!mounted || widget.session.selectedProjectId != project.id) return;
+      final currentPins = await widget.projectInformation!.listPins(project.id);
+      if (!mounted || widget.session.selectedProjectId != project.id) return;
+      final currentIds = {for (final pin in currentPins) pin.id};
+      final priorIds = priorOrder.toSet();
+      final sameMembership =
+          currentPins.length == priorOrder.length &&
+          currentIds.length == priorIds.length &&
+          currentIds.containsAll(priorIds);
+      if (sameMembership) {
+        var sameOrder = true;
+        for (var index = 0; index < priorOrder.length; index += 1) {
+          if (currentPins[index].id != priorOrder[index]) {
+            sameOrder = false;
+            break;
+          }
+        }
+        if (!sameOrder) {
+          await widget.projectInformation!.reorderPins(
+            ReorderProjectInformationPinsCommand(
+              eventId: RecordId.randomUuid(),
+              projectId: project.id,
+              orderedPinIds: priorOrder,
+              expectedRevisions: {
+                for (final pin in currentPins) pin.id: pin.revision,
+              },
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Bilgi geri eklendi; eşzamanlı değişiklik nedeniyle sıra korunamadı.',
+            ),
+          ),
+        );
+      }
+      if (!mounted || widget.session.selectedProjectId != project.id) return;
       unawaited(_reloadInformationIfStillSelected(project.id));
     } on Object {
       if (!mounted) return;
@@ -1167,20 +1215,19 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
 
   Future<void> _reorderPins(
     MobileProject project,
-    List<_QuickItem> visibleItems,
-    int oldIndex,
-    int newIndex,
+    String draggedPinId,
+    String targetPinId,
   ) async {
     if (_pinMutating || widget.session.selectedProjectId != project.id) {
       return;
     }
-    final pins = [for (final item in visibleItems) item.pin!];
-    if (oldIndex < 0 ||
-        oldIndex >= pins.length ||
-        newIndex < 0 ||
-        newIndex >= pins.length) {
-      return;
-    }
+    final pins = [
+      for (final pin in _informationPins)
+        if (pin.projectId == project.id) pin,
+    ];
+    final oldIndex = pins.indexWhere((pin) => pin.id == draggedPinId);
+    final newIndex = pins.indexWhere((pin) => pin.id == targetPinId);
+    if (oldIndex < 0 || newIndex < 0 || oldIndex == newIndex) return;
     final reordered = [...pins];
     final moved = reordered.removeAt(oldIndex);
     reordered.insert(newIndex, moved);
