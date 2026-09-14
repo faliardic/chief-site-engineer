@@ -153,7 +153,7 @@ Aynı exact source revision + relevant environment için geçen test gereksiz te
 - Destructive reset/clean/stash yoktur.
 - Unexpected tracked/untracked veya dirty local work silinmez/üzerine yazılmaz.
 - Required review/validation/manual gate FAIL/PENDING iken Ready/merge yoktur.
-- Required gates PASS/GEREKMİYOR, blocker/REQUEST_CHANGES/scope/base-head drift/conflict/mergeability sorunu yoksa ChatGPT standing owner authority ile Ready + squash merge yapabilir.
+- Required gates PASS/GEREKMİYOR, blocker/REQUEST_CHANGES/scope/base-head drift/conflict/mergeability sorunu yoksa current task publication authority kapsamındaki authorized Builder/System Manager standing owner authority ile Ready + squash merge yapabilir.
 - Bu koşullar sağlandığında Ready/merge için Fatih'ten ikinci bir açık onay istenmez; standing owner authority yeterlidir. Tekrar onay talebi yeni bir owner gate oluşturmaz ve normal task completion akışını durdurmaz.
 - Yalnız task authority'nin açıkça ayırdığı gerçek owner/manual acceptance, release/store/signing, destructive production/device/data işlemi veya yeni product/authority kararı gerekiyorsa `OWNER_WAIT` kullanılır.
 - CRITICAL merge yalnız Issue-specific bütün validation/compatibility/manual gates sonrası mümkündür.
