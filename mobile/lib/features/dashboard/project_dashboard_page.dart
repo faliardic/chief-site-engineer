@@ -11,6 +11,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/project_information_models.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
+import 'package:chief_site_engineer/features/projects/project_information_page.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher_pkg;
@@ -18,6 +19,8 @@ import 'package:url_launcher/url_launcher.dart' as url_launcher_pkg;
 typedef DashboardCaptureAction =
     Future<bool> Function(String projectId, String localDay);
 typedef DashboardProjectAction = void Function(String projectId);
+typedef DashboardOpenProjectInformationAction =
+    void Function(String projectId, ProjectInformationPresentationSeed? seed);
 typedef DashboardProjectReadiness = void Function(List<MobileProject> projects);
 typedef DashboardTextAction = Future<void> Function(String text);
 typedef DashboardUriAction = Future<bool> Function(Uri uri);
@@ -68,7 +71,7 @@ class ProjectDashboardPage extends StatefulWidget {
   final DashboardProjectAction? onOpenWorkforce;
   final DashboardProjectAction? onOpenPhoneCall;
   final DashboardProjectAction? onOpenCatalog;
-  final DashboardProjectAction? onOpenProjectInformation;
+  final DashboardOpenProjectInformationAction? onOpenProjectInformation;
   final DashboardProjectReadiness? onFirstSuccessfulProjectRead;
   final DateTime Function() clock;
 
@@ -647,6 +650,38 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     if (action != null) action(projectId);
   }
 
+  /// Exact-project presentation seed for [onOpenProjectInformation], or
+  /// `null` when the currently loaded Dashboard information does not belong
+  /// to [project] or is not fully usable (loading/error/partial pin-read
+  /// failure). A `null` seed makes the pushed page fall back to its normal
+  /// blocking load — this never fabricates or reuses stale/other-project
+  /// data.
+  ProjectInformationPresentationSeed? _projectInformationSeed(
+    MobileProject project,
+  ) {
+    final snapshot = _information;
+    if (_informationStatus != _LoadStatus.ready ||
+        _pinReadFailed ||
+        snapshot == null ||
+        snapshot.projectId != project.id) {
+      return null;
+    }
+    return ProjectInformationPresentationSeed(
+      projectId: project.id,
+      snapshot: snapshot,
+      userEntries: _informationEntries,
+      pins: _informationPins,
+      siteLocation: _siteLocation,
+    );
+  }
+
+  void _openProjectInformation(MobileProject project) {
+    widget.onOpenProjectInformation?.call(
+      project.id,
+      _projectInformationSeed(project),
+    );
+  }
+
   Future<void> _openTools(MobileProject project) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -967,10 +1002,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
               widget.onOpenProjectInformation == null ||
                   _informationStatus != _LoadStatus.ready
               ? null
-              : () => _openProjectAction(
-                  widget.onOpenProjectInformation,
-                  project.id,
-                ),
+              : () => _openProjectInformation(project),
           icon: const Icon(Icons.list_alt_rounded),
           label: const Text('Tüm proje bilgileri'),
         ),
