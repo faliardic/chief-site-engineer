@@ -50,6 +50,7 @@ System Manager: LOCAL_SYSTEM_MANAGER | GITHUB_SYSTEM_MANAGER
 Resolved provider
 Local capability required: YES | NO
 Manual acceptance owner
+Execution time budget
 Routing/model/effort/speed + READ/WRITE
 Scope/Git authority/required gates
 ```
@@ -64,11 +65,15 @@ Fatih emulator/device/manual acceptance sahibi olabilir. Bu nedenle GitHub manag
 
 GitHub-managed work sonrası local write'a dönmeden önce official local clone remote truth ile güvenli senkronize edilir; local status/drift kontrol edilir ve dirty work korunur. Destructive reset/clean/stash yoktur.
 
-## 3. Provider adapters
+## 3. Provider adapters ve execution budget
 
 `LOCAL_SYSTEM_MANAGER` current local provider'ı gerektiğinde Claude Code olabilir; provider-specific bootstrap `CLAUDE.md` ve `.claude/` sınırında tutulur. Codex aynı local manager rolüne geri bağlanabilir. Provider değişimi risk, topology, authority veya publication kuralını değiştirmez.
 
 Provider bootstrap yalnız seçilen manager/provider gerçekten local execution yapacaksa zorunlu okunur. `GITHUB_SYSTEM_MANAGER` task'ında sırf tarihsel current provider Claude Code diye local bootstrap zorunlu değildir.
+
+Her `LOCAL_SYSTEM_MANAGER` Builder handoff'u ChatGPT'nin task-specific belirlediği açık `Execution time budget: <süre>` alanını taşır. Bütçe kapsam, risk, validation/build/device işi ve current blocker'a göre seçilir; global sabit süre yoktur. Bütçe dolduğunda provider yeni yaklaşım veya scope açmaz, mevcut çalışmayı güvenle korur ve exact blocker + kalan tek aksiyonu bildirir.
+
+Local execution gerektiğinde ChatGPT kullanıcının ayrıca `Execution Agent ile çalış` demesini beklemez. `Sıradaki aktör: Execution Agent` diyerek current authority'yi tekrar etmeyen, kopyalanabilir 10–15 satırlık exact handoff hazırlar. Kullanıcıdan bu prompt'u ayrıca istemesi veya `devam` demesi beklenmez.
 
 ## 4. Yeni sohbet, resume ve ROADMAP
 
@@ -109,7 +114,7 @@ Owner talebi canonical workflow'u değiştiriyorsa önce owner kararı Issue/PR 
 - Topology, roster, System Manager, role, READ/WRITE, model, effort veya speed sessizce değişmez.
 - Required independent reviewer identity, owner review veya device gate bir ADS Reviewer ile otomatik karşılanmaz.
 
-`MULTI_FEATURE_PARALLEL` yalnız owner-approved parent orchestration mode'dur; `SINGLE/PARALLEL_READ` yerine geçmez. Pilot limitleri `MAX_OPEN_FEATURES = 3` ve CSE'nin mevcut owner-acceptance pending sınırlarıdır. Her feature ayrı Issue, branch/worktree veya GitHub branch, Draft PR, scope/allowlist, risk lane, System Manager, topology lock ve tek writer taşır.
+`MULTI_FEATURE_PARALLEL` yalnız owner-approved parent orchestration mode'dur; `SINGLE/PARALLEL_READ` yerine geçmez. Pilot limitleri `MAX_OPEN_FEATURES = 3` ve `MAX_OWNER_ACCEPTANCE_PENDING = 1` olarak korunur. Her feature ayrı Issue, branch/worktree veya GitHub branch, Draft PR, scope/allowlist, risk lane, System Manager, topology lock ve tek writer taşır.
 
 Pairwise relation `INDEPENDENT | COORDINATION_REQUIRED | DEPENDENCY_BLOCKED` olarak kaydedilir. `SHARED_INTEGRATION_SURFACE` exact dar path/contract ve tek owner belirtir. Stale status authority değildir. Integration evidence exact feature revision + exact target-master revision'a bağlıdır.
 
@@ -175,6 +180,8 @@ Remaining gate + owner
 Kullanıcıya teslim edilen sonuç şu satırla biter:
 
 `Sıradaki aksiyon — <ChatGPT|Execution Agent|Fatih|Yok>: <tek uygulanabilir talimat>.`
+
+Bir aksiyon tamamlandığında yalnız sonraki işin adı verilmez; aynı yanıtta seçilen aktörün başlayabileceği hazır talimat da hazırlanır. `Execution Agent` için 10–15 satırlık exact handoff ve execution time budget; Fatih için yalnız kısa manual/device kontrolü verilir. ChatGPT kendi standing authority'sindeki sonraki koordinasyon işini kullanıcıdan yeni `devam` istemeden yürütür.
 
 `Execution Agent` burada local execution gerektiğinde `LOCAL_SYSTEM_MANAGER` Builder'ının kullanıcı-facing kısa adıdır. GitHub-managed source task'larında sıradaki aktör doğrudan ChatGPT olabilir.
 
