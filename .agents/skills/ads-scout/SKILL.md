@@ -17,6 +17,14 @@ implementation üretme. Production dosyası düzenleme, commit, push, production
 branch/PR oluşturma veya mevcut PR'yi değiştirme. Yeni product authority, owner
 izni ya da Git yetkisi çıkarma.
 
+Yetkili parent kayıtta `MULTI_FEATURE_PARALLEL` seçilmişse kendi feature task ve
+READ kapsamını aşma. Parent/başka feature status'u, relation kaydı veya shared
+surface sahipliği Scout'a yeni scope, routing ya da WRITE yetkisi vermez. Bulguda
+başka feature'ı etkileyen shared contract/dependency/conflict varsa task/feature,
+branch + exact revision, exact target-main revision, etkilenen alan ve freshness
+kaynağını `SCOUT_RESULT` içinde Builder dikkatine ekle; sibling lane'e doğrudan
+sürekli trafik üretme. Stale status'u readiness/completion kanıtı sayma.
+
 Builder çalışırken ara düşünce veya tekrar tekrar mesaj gönderme. Araştırmayı tek
 toplu handoff'ta şu kontratla bitir:
 

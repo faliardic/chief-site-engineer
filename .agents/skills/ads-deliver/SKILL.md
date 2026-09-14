@@ -14,6 +14,13 @@ başlangıç routing ve doğrulama yeterlidir; tam şablon, ayrı Issue veya ba�
 review yalnız proje/görev kapısı gerektiriyorsa aranır. Hafif akış routing
 kilidini ve izinleri kaldırmaz.
 
+Ayrıca [SYSTEM_MANAGERS.md](../../../SYSTEM_MANAGERS.md) veya benimsenmiş
+`.agents/ads/SYSTEM_MANAGERS.md` sözleşmesini kullan. Başlamadan kayıtlı
+`LOCAL_SYSTEM_MANAGER` veya `GITHUB_SYSTEM_MANAGER` seçimini, resolved provider'ı,
+local capability gereksinimini ve manual acceptance owner'ını doğrula. System
+Manager execution boyunca kilitlidir; provider, topology, risk ve authority ile
+aynı kavram değildir. Sessiz manager değişimi yapma.
+
 Kayıtlı topology `SINGLE` ise tek Builder olarak ilerle; ayrı ADS Scout/Reviewer
 lane'i bekleme veya açma. `PARALLEL_READ` ise yalnız 1 Builder/WRITE,
 1 Scout/READ ve 1 Reviewer/READ roster'ını kabul et. Builder tek production
@@ -22,15 +29,27 @@ verme. Topology, roster, lane routing'i ve READ/WRITE yetkileri execution boyunc
 kilitlidir; bu skill lane açmaz ve controller görevi görmez.
 
 - Tamamlanabilir bir davranışı al; kısa yaklaşım belirle; tek production writer ol.
-- Bir görev, bir aktif yürütme ve bir final teslim kullan. Araştırma, test, teşhis,
-  kapsam içi düzeltme ve self-review iç çalışmadır; ara sonuçla işi kullanıcıya
-  geri verme veya `devam` isteme. `PARALLEL_READ` süreçleri aynı kilitli execution
+- Bir görev, bir aktif feature yürütmesi ve bir final teslim kullan. Açık parent
+  mode varsa bu kural yalnız kendi feature envelope'un için geçerlidir. Araştırma,
+  test, teşhis, kapsam içi düzeltme ve self-review iç çalışmadır; ara sonuçla işi
+  kullanıcıya geri verme veya `devam` isteme. `PARALLEL_READ` süreçleri aynı kilitli execution
   envelope'a aittir; ayrı production görevleri değildir.
-- Başlamadan task/revision identity, topology, izinli lane roster'ı, her lane'in
-  model/reasoning effort/speed/READ-WRITE kaydı ve routing authority kilidini
-  doğrula. Execution içinde bunları kendiliğinden değiştirme veya lane ekleme.
+- Başlamadan task/revision identity, System Manager + provider kaydı, topology,
+  izinli lane roster'ı, her lane'in model/reasoning effort/speed/READ-WRITE kaydı
+  ve routing authority kilidini doğrula. Execution içinde bunları kendiliğinden
+  değiştirme veya lane ekleme.
 - İncele, uygula, ilgili testleri yap; test/analyzer/build/format/fixture veya kendi
   regression sorunlarını kapsam içindeyse teşhis edip aynı döngüde düzelt.
+- `GITHUB_SYSTEM_MANAGER` altında yalnız gerçekten gözlenen `GITHUB_HOSTED`
+  doğrulamayı PASS say. GitHub Actions/check/tooling yoksa local test çalışmış gibi
+  davranma. `HUMAN_MANUAL` ve `LOCAL_ONLY` kalan gate'leri exact olarak ayır.
+- `GITHUB_SYSTEM_MANAGER` sırasında acceptance için gerçekten zorunlu ADB, physical
+  device, local filesystem, local-only profiler, signing veya CI'da olmayan tooling
+  gerekirse `LOCAL_CAPABILITY_REQUIRED` handoff'u üret. Bu handoff yeni scope,
+  risk downgrade, topology veya WRITE authority üretmez.
+- `LOCAL_SYSTEM_MANAGER` altında Codex/Claude Code gibi concrete provider değişimi
+  manager değişimi değildir; yine de kayıtlı provider/routing/host authority
+  sınırlarını sessizce değiştirme.
 - Her alt adım için 'devam' isteme. Yetkili commit/push'u gereksiz ayrı işe bölme.
 - Engelde ürün/test/ortam/yayın/yetki ayrımını yap. Küçük deneyle öğrenilebiliyorsa
   araştır; yeni kanıtla ilerleme sağlanıyorsa CONTINUE et. İç değerlendirme dış
@@ -50,8 +69,10 @@ kilitlidir; bu skill lane açmaz ve controller görevi görmez.
   Yerel alt ajan zorunlu bağımsız review/owner kapısını kaldırmaz.
 - Karar gerektiğinde tek talep ve yetkili checkpoint üretip ilgili aktif
   yürütmeyi sona erdir. Varsayılan polling, tekrar model çağrısı, sahte yanıt
-  veya başka production işe geçiş yapma. `PAUSED` raporunda bekleme nedeni ile
-  görev/revision'ı koru; timeout onay değildir.
+  veya başka production işe geçiş yapma. Açık parent roster'daki başka bağımsız
+  feature'ın kendi yetkili yürütmesi bu feature'ın beklemesiyle yetki kazanmaz veya
+  kaybetmez. `PAUSED` raporunda bekleme nedeni ile görev/revision'ı koru; timeout
+  onay değildir.
 - Yanıt geldiğinde görev/revision/rol/kapsam uyumunu doğrula; aynı işe dön.
 - Test, acceptance veya güvenlik politikasını sırf işi bitirmek için zayıflatma.
 - Kanıtı güncel diff/ortama göre kullan. Bütçe dolarsa çalışmayı koru ve kaldığı
@@ -69,7 +90,21 @@ kendin düzelt, ilgili kontrolleri tekrar çalıştır ve yeni exact revision'ı
 sun. Scout/Reviewer ara düşüncelerini Fatih'e taşıma. Tek kanonik finalde Builder
 revision'ı, `REVIEW_PASS`/`CHANGES_REQUIRED` sonucu ve kalan gerçek gate'i bildir.
 
-Teslim: davranış, gerçek revision, doğrulama, ayrı commit/push/merge durumu ve
-kalan kabul. Zorunlu kabul eksikse READY_FOR_ACCEPTANCE; tüm koşullar sağlanınca
-DONE. DONE ajan beyanıdır; gerekli kanıt/review/kabulün yerine geçmez. Sonraki
-göreve geçmek ayrı, sınırlandırılmış kuyruk yetkisi gerektirir.
+Yetkili parent kayıtta `MULTI_FEATURE_PARALLEL` seçilmişse yalnız kendi feature
+task/branch/worktree, kayıtlı System Manager ve WRITE yetkin içinde kal; exact
+target-main revision'ı, parent lock revision'ını, kendi feature lock/routing
+kaydını ve ilişki sınıfını koru. Başka feature'ı etkileyen gerçek status, shared
+contract, dependency, conflict veya integration readiness değişiminde ADS kaynak
+reposundaki `TEMPLATES.md` ya da benimsenmiş projedeki
+`.agents/ads/TEMPLATES.md` içinden ilgili bounded handoff'u yetkili kayıt/kanala
+bir kez üret; rutin ilerleme için trafik üretme. Handoff yeni
+scope/routing/manager/WRITE/Git yetkisi değildir.
+Stale event'i kanıt sayma; mekanik olmayan conflict'i owning feature'a, gerçek product/acceptance/
+authority kararını `OWNER_ATTENTION_REQUIRED` ile owner'a döndür. Başka feature
+branch'ine yazma, dördüncü feature açma veya otomatik merge yapma.
+
+Teslim: davranış, gerçek revision, System Manager, doğrulama sınıfları, ayrı
+commit/push/merge durumu ve kalan kabul. Zorunlu kabul eksikse
+READY_FOR_ACCEPTANCE; tüm koşullar sağlanınca DONE. DONE ajan beyanıdır; gerekli
+kanıt/review/kabulün yerine geçmez. Sonraki göreve geçmek ayrı, sınırlandırılmış
+kuyruk yetkisi gerektirir.
