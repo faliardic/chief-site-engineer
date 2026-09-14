@@ -1,7 +1,9 @@
 # ADS source
 
 Repository: `faliardic/ai-development-system`
-Revision: `28e5ca5a8d4f47718e9a8685b0f4812065d23595`
+Revision: `eeee859d6f9ae659078fe4e29a3d82219cb19991`
 Core: `.agents/ads/CORE.md`
+System managers: `.agents/ads/SYSTEM_MANAGERS.md`
+Templates: `.agents/ads/TEMPLATES.md`
 
-Bu kayıt yetki vermez. Benimseme, hedef AGENTS.md mevcut proje kuralları korunarak çekirdeğe bağlandıktan ve skill keşfi ayrıca doğrulandıktan sonra etkin sayılır.
+Bu kayıt yetki vermez. CSE project rules remain stronger authority. Adoption is active only through root `AGENTS.md` and this exact pinned revision.

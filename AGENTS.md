@@ -1,295 +1,193 @@
-# CSE Repository Execution Agent Instructions
+# CSE Repository Execution Instructions
 
 Bu dosya repository kökünde bütün CSE çalışmalarına uygulanır ve günlük execution için tek zorunlu giriş noktasıdır.
 
-Bu belgede tanımlanan **Repository Execution Agent** (kısaca: **Execution Agent**), repository-local terminal, dosya değişikliği, test, analyzer, build ve local Git/commit/push işlerini yürüten provider-neutral roldür. Bu rolün **current provider'ı Claude Code**'dur; Claude'a özgü bootstrap/adapter ayrıntıları repository root'undaki `CLAUDE.md` ve varsa `.claude/` sınırında tutulur. **Codex**, aynı role geri bağlanabilecek uyumlu bir gelecek provider'dır; bu belgedeki yetki, risk lane, topology, validation, Git ve publication kuralları provider değişiminde aynı kalır. Provider adı bu belgede tek başına yetki veya kural değişikliği üretmez.
+## 1. Authority ve güncel gerçek
 
-## 1. Güncel gerçek ve kaynak otoritesi
+Güncel gerçek sırası:
 
-- Güncel repository gerçeği: GitHub `master`, current Issue/PR/branch ve owner kararları.
-- Kalıcı ürün amacı ve veri ilkeleri: `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`.
-- Güncel ürün kapsamı: `docs/v2/CSE_V2_SCOPE.md`.
-- **Güncel yürütme sırası ve ilk genel yayın öncesi tek kanonik queue: `ROADMAP.md` içindeki Q01–Q26 kuyruğu.**
-- Kritik Git ve veri güvenliği: `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`.
-- Lane ve publication ayrıntıları: `docs/protocols/CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`.
-- Test/gate ayrıntıları: `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`.
-- AI-assisted execution çekirdeği: [pinned ADS CORE](.agents/ads/CORE.md);
-  kabul edilmiş kaynak revision kaydı: [ADS SOURCE](.agents/ads/SOURCE.md).
-- Claude Code current provider bootstrap/adapter'ı: repository root `CLAUDE.md`.
+1. GitHub `master`, current Issue/PR/branch ve owner kararları;
+2. bu `AGENTS.md`;
+3. CSE project-specific protokolleri;
+4. source-pinned ADS contract ve skills.
 
-CSE, repo içine source-pinned alınmış ADS sistemini kullanır. Önce bu `AGENTS.md`,
-ardından `.agents/ads/CORE.md` ve göreve uygun `.agents/skills/ads-*/SKILL.md`
-okunur. Çelişkide CSE kuralları üstündür: ADS; CSE ürün kararlarını,
-`FAST | STANDARD | CRITICAL` risk lane'ini, veri güvenliği sınırlarını,
-validation/manual-device acceptance, zorunlu ChatGPT/owner review veya
-publication/release kapılarını gevşetemez.
+Kalıcı kaynaklar:
 
-Pinned ADS CORE, kaynak reposunda geçmiş provider adını (`Codex`) rol sahipliği
-örneği olarak kullanır. Bu source-pinned metin, yalnızca provider adı farklı diye
-fork edilmez veya sessizce yeniden yazılmaz. CSE, ADS'nin `Builder/WRITE`,
-`Scout/READ`, `Reviewer/READ` rollerini bu belgedeki `Execution Agent`
-(current: Claude Code) ile provider-neutral biçimde eşler; bu yalnızca bir CSE
-katmanı adlandırma alias'ıdır ve ADS authority veya içeriğini değiştirmez.
+- ürün amacı/veri ilkeleri: `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`;
+- ürün kapsamı: `docs/v2/CSE_V2_SCOPE.md`;
+- pre-release kanonik sıra: `ROADMAP.md` Q01–Q26;
+- kritik Git/veri güvenliği: `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`;
+- lane/publication: `docs/protocols/CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`;
+- minimum validation: `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`;
+- model/review routing: ilgili CSE routing policy;
+- ADS core: `.agents/ads/CORE.md`;
+- ADS System Managers: `.agents/ads/SYSTEM_MANAGERS.md`;
+- ADS templates: `.agents/ads/TEMPLATES.md`;
+- accepted ADS source record: `.agents/ads/SOURCE.md`.
 
-CSE'ye source-pinned kopyalanmış ADS skill'lerindeki kaynak-repo bağlamlı
-`CORE.md` referansı bu repository'de `.agents/ads/CORE.md` olarak çözülür;
-repository root'unda `CORE.md` aranmaz. Bu yalnız bir path alias'ıdır; ADS
-authority veya içeriğini değiştirmez.
+CSE project rules always remain stronger than ADS. ADS; `FAST | STANDARD | CRITICAL` risk lanes, data/repository safety, ROADMAP ordering, manual/device acceptance, review/publication gates, backup/restore/recovery boundaries or release rules cannot weaken.
 
-Sabit master SHA, schema, app version, aktif Issue/PR veya roadmap ilerlemesi kalıcı protokollerde tutulmaz. Bunlar her görevde GitHub/repository üzerinden okunur.
+Current ADS pin:
+`faliardic/ai-development-system@eeee859d6f9ae659078fe4e29a3d82219cb19991`.
 
-README, eski Issue/PR, `.cse/state`, task/result, ZIP, handoff, podcast veya sohbet hafızası current GitHub gerçeğini override edemez.
+README, stale Issue/PR, `.cse/state`, task/result, ZIP, handoff, podcast veya sohbet hafızası current GitHub gerçeğini override edemez.
 
-## 2. Yeni sohbet ve resume
+## 2. System Managers — canonical execution surfaces
 
-Yeni görevde zorunlu okuma:
+CSE iki canonical System Manager kullanır:
 
-1. `AGENTS.md`
-2. current provider bootstrap'ı (Claude Code için repository root `CLAUDE.md`)
-3. [pinned ADS CORE](.agents/ads/CORE.md) ve görevde ilgili ADS skill'i
-4. current GitHub `master`, açık Issue/PR ve aktif görev
-5. `ROADMAP.md` içindeki ilk genel yayın öncesi Q01–Q26 kanonik yürütme kuyruğu
-6. yalnız değişen sözleşmenin gerektirdiği koşullu kaynak
+- `LOCAL_SYSTEM_MANAGER`: local repository/terminal/tooling execution. Concrete provider Claude Code, Codex veya başka authorized local repository execution agent olabilir.
+- `GITHUB_SYSTEM_MANAGER`: ChatGPT + connected GitHub capabilities üzerinden Issue/source/branch/commit/PR/review ve gerçekten mevcut GitHub-hosted validation execution.
 
-Koşullu okuma:
+System Manager, provider, risk lane ve topology ayrı kavramlardır.
 
-- ürün/veri kararı: Unified Source;
-- ürün kapsamı: V2 Scope;
-- yürütme sırası: Roadmap Q01–Q26 queue;
-- Git veya kullanıcı verisi riski: Project Instructions;
-- test/gate kararı: Minimum Validation;
-- STANDARD/CRITICAL publication: Workflow Acceleration;
-- kritik model/review ihtiyacı: Model Routing;
-- kalıcı kritik handoff: Execution Agent Instruction Comment Protocol (dosya: `CSE_CODEX_INSTRUCTION_COMMENT_PROTOCOL.md`).
+Her task başlangıcında ayrı ayrı kaydet:
 
-Aynı görev resume ediliyorsa değişmeyen uzun kaynaklar tekrar okunmaz. Kullanıcı `devam` dediğinde current GitHub durumu bulunur ve sıradaki gerçek işlem yapılır.
+```text
+CSE risk lane: FAST | STANDARD | CRITICAL
+ADS topology: SINGLE | PARALLEL_READ
+System Manager: LOCAL_SYSTEM_MANAGER | GITHUB_SYSTEM_MANAGER
+Resolved provider
+Local capability required: YES | NO
+Manual acceptance owner
+Routing/model/effort/speed + READ/WRITE
+Scope/Git authority/required gates
+```
 
-GitHub'a erişilemiyorsa güncel durum tahmin edilmez ve production işi başlatılmaz.
+System Manager capability-first seçilir. Sabit `GitHub > Claude > Codex` sırası yoktur.
 
-### 2.1 Kanonik roadmap yönlendirme kuralı
+`GITHUB_SYSTEM_MANAGER` seçildiğinde ChatGPT, current task authority source implementation + commit/push/Draft PR'yi kapsıyorsa yetkili branch üzerinde repository dosyalarını değiştirebilir. Her dosya mutasyonunda tekrar owner onayı istenmez. Bu owner-approved kural, `CSE_PROJECT_INSTRUCTIONS.md` içindeki önceki “GitHub Contents API yalnız documentation-only” ve “production write yalnız repository-local Execution Agent” ifadelerine **dar, daha yeni execution-surface istisnasıdır**. Bunun dışında Project Instructions içindeki force-push, destructive reset/clean, user-data, CRITICAL, release/signing/device ve safety sınırlarının tamamı aynen geçerlidir.
 
-ChatGPT/Work Mode sıradaki production veya release işini sohbet hafızasından, eski SHA'dan, tarihsel Issue'dan veya kendi oluşturduğu paralel backlog'dan seçmez.
+`GITHUB_SYSTEM_MANAGER` fiziksel device, ADB, local filesystem, local-only profiler, local emulator, signing material veya GitHub/CI'da bulunmayan tooling'e sahipmiş gibi davranmaz. Task acceptance için bunlardan biri gerçekten gerekirse completed GitHub work korunur ve `LOCAL_CAPABILITY_REQUIRED` handoff'u üretilir.
 
-Her yeni görev, `devam`, `sırada ne var`, `yayından önce ne kaldı` veya eşdeğer koordinasyon talebinde:
+Fatih emulator/device/manual acceptance sahibi olabilir. Bu nedenle GitHub manager'ın ADB/device erişimi olmaması normal source development'ı otomatik blocker yapmaz. Manual gate gerekmeyen task'a sırf GitHub manager kullanıldığı için yeni gate eklenmez.
 
-1. önce current açık production Issue/PR ve varsa yetkili parent orchestration kaydı kontrol edilir;
-2. varsayılan parent mode `NONE` iken açık production Issue/PR required review/validation/manual gate'lerine ulaşmadan yeni production child başlatılmaz;
-3. yalnız owner-approved `MULTI_FEATURE_PARALLEL` parent lock varsa, ROADMAP sırası ve kaydedilmiş ilişkiler korunarak önceden adlandırılmış feature roster'ı paralel yürüyebilir;
-4. açık ve yetkili iş yoksa `ROADMAP.md` Q01→Q26 kuyruğunda current GitHub gerçeğine göre tamamlanmamış ilk uygulanabilir madde seçilir;
-5. `DECISION GATE` maddesi Fatih kararı olmadan implementation'a çevrilmez;
-6. `CRITICAL` maddesi exact Issue, allowlist, compatibility ve required manual/device gate olmadan çalıştırılmaz;
-7. completed/merged bir queue maddesi yeniden feature işi gibi açılmaz; yalnız kanıtlanmış regresyonda dar bug child açılır;
-8. Fatih queue sırasını değiştirirse production işe geçmeden önce owner kararı ROADMAP'e truth-sync edilir;
-9. ROADMAP durum etiketi ile current GitHub Issue/PR durumu çelişirse current GitHub gerçeği status için, ROADMAP ise sıra için otoritedir.
+GitHub-managed work sonrası local write'a dönmeden önce official local clone remote truth ile güvenli senkronize edilir; local status/drift kontrol edilir ve dirty work korunur. Destructive reset/clean/stash yoktur.
 
-Bu kuralın amacı, her sohbette aynı yayın yol haritasını sürdürmek ve owner kararı olmadan madde atlamayı, yeniden sıralamayı veya feature şişmesini engellemektir.
+## 3. Provider adapters
 
-Owner talebi AGENTS.md veya canonical çalışma kuralını değiştiriyorsa asıl teknik/ürün işi durur. Önce karar current GitHub authority olarak kaydedilir; en dar protokol değişikliği hazırlanır, review ve publication güvenlik kapılarından geçirilir. Master güncellenip güncel AGENTS.md yeniden okunduktan sonra asıl teknik işe dönülür.
+`LOCAL_SYSTEM_MANAGER` current local provider'ı gerektiğinde Claude Code olabilir; provider-specific bootstrap `CLAUDE.md` ve `.claude/` sınırında tutulur. Codex aynı local manager rolüne geri bağlanabilir. Provider değişimi risk, topology, authority veya publication kuralını değiştirmez.
 
-## 3. Zorunlu aktör yönlendirmesi ve sıradaki aksiyon
+Provider bootstrap yalnız seçilen manager/provider gerçekten local execution yapacaksa zorunlu okunur. `GITHUB_SYSTEM_MANAGER` task'ında sırf tarihsel current provider Claude Code diye local bootstrap zorunlu değildir.
 
-ChatGPT/Work Mode her kullanıcı talebinde execution başlamadan önce sıradaki tek işi ve sorumlu aktörü belirler:
+## 4. Yeni sohbet, resume ve ROADMAP
 
-- **ChatGPT:** current GitHub okuma, planlama, Issue/PR koordinasyonu, review, gate doğrulaması ve standing owner yetkisiyle otomatik Ready/squash merge;
-- **Execution Agent (current provider: Claude Code):** repository-local terminal, automated test, analyzer, build/APK hazırlığı, dosya değişikliği, format/diff ve local Git/commit/push;
-- **Fatih:** yalnız manuel ürün/device kabulü ve nihai görsel/davranış PASS/FAIL kararı; PowerShell/terminal komutu çalıştırmaz;
-- **Execution Agent device exception:** Fatih exact package, cihaz ve veri-koruma sınırıyla açıkça devrederse emulator/ADB/device işlemi ChatGPT'nin göreve özel verdiği execution time budget içinde Execution Agent'a geçebilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
+Yeni görevde minimum okuma:
 
-Repository veya local execution gerekiyorsa ChatGPT, kullanıcının `Execution Agent ile çalış` demesini beklemez. Açıkça `Sıradaki aktör: Execution Agent` der ve current Issue/kuralları tekrar etmeyen, 10–15 satırı geçmeyen exact handoff verir. `CSE_PROJECT_INSTRUCTIONS.md` içindeki açık documentation-only owner istisnası dışında ChatGPT/Work Mode, GitHub Contents API üzerinden repository dosyası değiştirmez.
+1. `AGENTS.md`;
+2. `.agents/ads/CORE.md` + `.agents/ads/SYSTEM_MANAGERS.md` + task-appropriate ADS skill;
+3. current GitHub `master`, open Issue/PR ve active task;
+4. `ROADMAP.md` Q01–Q26 current queue;
+5. yalnız task riskinin gerektirdiği CSE protocol.
 
-ChatGPT/koordinatör task başında birbirinden ayrı olarak CSE risk lane'ini,
-ADS execution topology'sini ve lane routing'ini seçer. `SINGLE`, tek
-`Builder/WRITE` ile yürür. `PARALLEL_READ`, yalnız tam olarak 1 `Builder/WRITE` +
-1 `Scout/READ` + 1 `Reviewer/READ` kullanır; yalnız Builder production writer'dır.
-Scout ve Reviewer aynı task'ın read-only lane'leridir, ek production işi veya
-branch/PR değildir. Ayrıntılı davranış pinned ADS CORE ve ilgili skill'den okunur.
-Bu üç lane rolü, Execution Agent'ın current provider'ı Claude Code subagent
-desteğini kullanıyorsa dahi aynı sınırla bağlıdır: yalnız Builder production
-writer'dır; Scout ve Reviewer subagent olarak çalıştırılsa bile kesin READ-only
-kalır ve production WRITE yetkisi kazanmaz.
+Resume sırasında değişmeyen uzun belgeleri tekrar okuma. GitHub erişimi yoksa current production truth tahmin edilmez.
 
-`SINGLE | PARALLEL_READ` feature-içi topology'dir. Varsayılan parent mode
-`NONE` ve tek feature execution'ıdır. `MULTI_FEATURE_PARALLEL` yalnız ayrı owner
-authority'si ve exact parent lock ile seçilebilen orchestration mode'dur; bu
-protokolde bulunması pilotu etkinleştirmez. İlk pilotta `MAX_OPEN_FEATURES = 3`
-ve `MAX_OWNER_ACCEPTANCE_PENDING = 1` olur; bekleyen review/owner/authority gate'i
-açık feature sayısına dahildir. Her feature ayrı Issue, canonical-repo-derived
-worktree, branch, Draft PR, scope/allowlist/protected path, routing/topology lock
-ve tek Builder/WRITE taşır.
+ROADMAP yönlendirmesi:
 
-Her Execution Agent handoff'u ChatGPT'nin göreve özel belirlediği açık `Execution time budget: <süre>` alanını taşır. Bütçe; kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre seçilir.
+- önce current açık production Issue/PR ve owner-approved parent orchestration kontrol edilir;
+- parent mode `NONE` iken mevcut production task required gates'e ulaşmadan yeni production child açılmaz;
+- yalnız owner-approved `MULTI_FEATURE_PARALLEL` parent lock varsa predeclared roster paralel ilerleyebilir;
+- açık uygun task yoksa ROADMAP Q01→Q26 içinde current GitHub gerçeğine göre tamamlanmamış ilk uygulanabilir madde seçilir;
+- `DECISION GATE` Fatih kararı olmadan implementation'a dönüşmez;
+- `CRITICAL` exact Issue/allowlist/compatibility/manual-device gates olmadan yürütülmez;
+- completed/merged madde ancak kanıtlı regression ile dar bug task olarak yeniden açılır;
+- GitHub status ve ROADMAP çelişirse status için GitHub, sıra için ROADMAP otoritedir.
 
-ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istemeden yürütülür. Kullanıcıya teslim edilen her sonuç şu satırla biter:
+Owner talebi canonical workflow'u değiştiriyorsa önce owner kararı Issue/PR authority olarak kaydedilir ve en dar governance change uygulanır; sonra product execution'a dönülür.
+
+## 5. Topology ve tek writer
+
+`SINGLE`: yalnız bir Builder/WRITE.
+
+`PARALLEL_READ`: tam olarak 1 Builder/WRITE + 1 Scout/READ + 1 Reviewer/READ.
+
+- Builder seçilen System Manager üzerinde tek production writer'dır.
+- Scout ve Reviewer kesin READ-only'dir.
+- Aynı feature içinde `LOCAL_SYSTEM_MANAGER` ve `GITHUB_SYSTEM_MANAGER` eşzamanlı iki writer olamaz.
+- Tek feature = tek production branch + tek Draft PR.
+- Stacked PR veya path-partitioned multi-writer yoktur.
+- Topology, roster, System Manager, role, READ/WRITE, model, effort veya speed sessizce değişmez.
+- Required independent reviewer identity, owner review veya device gate bir ADS Reviewer ile otomatik karşılanmaz.
+
+`MULTI_FEATURE_PARALLEL` yalnız owner-approved parent orchestration mode'dur; `SINGLE/PARALLEL_READ` yerine geçmez. Pilot limitleri `MAX_OPEN_FEATURES = 3` ve CSE'nin mevcut owner-acceptance pending sınırlarıdır. Her feature ayrı Issue, branch/worktree veya GitHub branch, Draft PR, scope/allowlist, risk lane, System Manager, topology lock ve tek writer taşır.
+
+Pairwise relation `INDEPENDENT | COORDINATION_REQUIRED | DEPENDENCY_BLOCKED` olarak kaydedilir. `SHARED_INTEGRATION_SURFACE` exact dar path/contract ve tek owner belirtir. Stale status authority değildir. Integration evidence exact feature revision + exact target-master revision'a bağlıdır.
+
+## 6. Risk lanes
+
+Her task yalnız bir CSE lane kullanır:
+
+### FAST
+Dar docs/text/icon/tooltip/spacing/layout/presentation/basic navigation veya persistence contract değiştirmeyen küçük UI işi.
+
+### STANDARD
+Birden fazla ekran/modül, session/project context veya persistence/release-critical olmayan orta ölçekli davranış değişikliği.
+
+### CRITICAL
+Schema/migration, backup/restore, stable identity/revision, transaction/event/history, attachment/user-file integrity, destructive operation, security/privacy, permission/signing/application ID, background/reboot, DWG conversion data-loss risk, real user data root veya release/store işi.
+
+Detailed lane/publication rules `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` ve `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` içindedir. Concrete CRITICAL trigger yoksa iş sırf dosya/saat sayısı nedeniyle ağır sürece yükseltilmez.
+
+## 7. Validation ve test ownership
+
+Validation gerçek execution surface ile etiketlenir:
+
+- `GITHUB_HOSTED`: gerçekten çalışmış GitHub Actions/check/tooling;
+- `HUMAN_MANUAL`: Fatih'in gerçek manuel/device acceptance'ı;
+- `LOCAL_ONLY`: local host/device/tooling gerektiren kontrol.
+
+GitHub Actions/check çalışmadıysa PASS uydurulmaz. Source/diff review, test execution değildir. Required local-only validation varsa GitHub source work korunur ve yalnız exact local gate `LOCAL_CAPABILITY_REQUIRED` ile devredilir.
+
+Fatih terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; manuel ürün/device acceptance ve nihai davranış PASS/FAIL kararının sahibidir. Local mechanical emulator/ADB/device execution ancak exact package/device/data-safety owner delegation ile `LOCAL_SYSTEM_MANAGER`a verilebilir.
+
+Aynı exact source revision + relevant environment için geçen test gereksiz tekrarlanmaz. Full suite her mikro adımda değil, CSE protocolünün gerektirdiği milestone/release gate'inde çalıştırılır.
+
+## 8. Git, publication ve Issue disposition
+
+- Force-push yoktur.
+- Destructive reset/clean/stash yoktur.
+- Unexpected tracked/untracked veya dirty local work silinmez/üzerine yazılmaz.
+- Required review/validation/manual gate FAIL/PENDING iken Ready/merge yoktur.
+- Required gates PASS/GEREKMİYOR, blocker/REQUEST_CHANGES/scope/base-head drift/conflict/mergeability sorunu yoksa ChatGPT standing owner authority ile Ready + squash merge yapabilir.
+- CRITICAL merge yalnız Issue-specific bütün validation/compatibility/manual gates sonrası mümkündür.
+- Release/store, signing ve destructive production/device/data işlemleri ayrı explicit owner approval ister.
+- `Closes #...` yalnız merge ile gerçekten tamamlanan tek amaçlı Issue için; parent/umbrella/manual-acceptance/release/continuing kapsam `Refs #...` olarak açık kalır.
+- Merge sonrası local `master` bir sonraki local write öncesi safe `--ff-only` sync mantığıyla güncellenir; dirty work korunur.
+
+#502 recoverability/owner-data preservation, #503 restore safety ve #504 recovery boundaries P0 otoriteleridir. Worktree/manager ayrımı runtime resource izolasyonu kanıtı değildir; physical device, signing, recovery/migration fixture, shared build outputs ve güvenli parallel mutation'ı kanıtlanmamış global caches gerektiğinde serial owner lease kullanır.
+
+## 9. Çıktı ve kullanıcıya aktarım
+
+Kullanıcıya önce sade Türkçe anlam ver; SHA/branch/allowlist/test harness ikinci katmandır.
+
+Her teslim şunları ayırır:
+
+```text
+Değişen davranış
+Exact revision
+System Manager + provider
+Validation: GITHUB_HOSTED | HUMAN_MANUAL | LOCAL_ONLY
+Review/gate durumu
+Commit/push/PR/merge ayrı gerçek durumları
+Remaining gate + owner
+```
+
+Kullanıcıya teslim edilen sonuç şu satırla biter:
 
 `Sıradaki aksiyon — <ChatGPT|Execution Agent|Fatih|Yok>: <tek uygulanabilir talimat>.`
 
-Bir aksiyon tamamlandığında yalnız sonraki işin adı söylenmez; aynı yanıtta başlamaya hazır talimat da hazırlanır:
+`Execution Agent` burada local execution gerektiğinde `LOCAL_SYSTEM_MANAGER` Builder'ının kullanıcı-facing kısa adıdır. GitHub-managed source task'larında sıradaki aktör doğrudan ChatGPT olabilir.
 
-- **Execution Agent:** `Hazır Execution Agent talimatı:` altında current kaynakları tekrar etmeyen, kopyalanabilir 10–15 satırlık exact görev;
-- **Fatih:** `Hazır Fatih talimatı:` altında yalnız kısa manuel ürün/device kontrolü ve beklenen sonuç; terminal komutu verilmez;
-- **ChatGPT:** mevcut owner yetkisi varsa sonraki koordinasyon işlemini kendiliğinden yürütür; yeni yetki gerekiyorsa yalnız gerekli tek onay cümlesini verir;
-- **Yok:** devam işi veya hazırlanacak talimat bulunmadığını açıklar.
+## 10. ADS path resolution
 
-Kullanıcıdan sıradaki prompt'u yazması, `devam` demesi veya Execution Agent talimatını ayrıca istemesi beklenmez. Hazır talimat, seçilen aktörün ek açıklama istemeden başlayabileceği kadar self-contained olur.
+Adopted skill'lerde source-context path'ler CSE içinde şöyle çözülür:
 
-Devam işi kalmadığında `Sıradaki aksiyon — Yok: İş tamamlandı.` yazılır; yapay yeni iş üretilmez.
+- `CORE.md` -> `.agents/ads/CORE.md`;
+- `SYSTEM_MANAGERS.md` -> `.agents/ads/SYSTEM_MANAGERS.md`;
+- `TEMPLATES.md` -> `.agents/ads/TEMPLATES.md`.
 
-## 4. Zorunlu risk lane seçimi
+Root'a bu ADS dosyalarının kopyası oluşturulmaz. Path alias ADS bytes veya authority değiştirmez.
 
-Her iş yalnız bir CSE risk lane'i kullanır: `FAST | STANDARD | CRITICAL`.
-Execution topology ayrıca ve bağımsız olarak ADS'ye göre `SINGLE | PARALLEL_READ`
-seçilir; `Builder | Scout | Reviewer` ise agent rolüdür. Bu üç kavram birbirinin
-yerine kullanılamaz. Provider adı (Claude Code, Codex) da bu üç kavramın yerine
-geçmez veya bunları yeniden yorumlamaz.
+## 11. Ana karar
 
-FAST/STANDARD için varsayılan one-pass akışı:
-
-`reproduce once -> fix -> one focused validation -> only-needed manual/device check -> gated automatic Ready/squash merge`
-
-Doğrudan, tekrarlanabilir owner/device kanıtı ve yeterince belirlenmiş source root cause varsa düzeltme öncesi deterministic automated FAIL zorunlu değildir. Owner/device kanıtı, hatayı temsil edemeyen yapay test harness'inden üstündür; widget/fake test PASS'i cihazdaki hatayı geçersiz kılmaz. Bir başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir; kararı değiştirmeyen diagnostic/test döngüleri yapılmaz.
-
-Focused validation yeterliyse analyzer yalnız material ihtiyaçta, manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde yapılır. Manuel/device kabul gerekmeyen non-CRITICAL işte Execution Agent automated PASS sonrası commit/push manuel PASS beklemez. Gereken kabulde Fatih PASS/FAIL kapısı korunur; gerekli kontrol FAIL/PENDING ise publication kapalı kalır. Required review ile task-specific validation/manual kapıları PASS veya açıkça GEREKMİYOR olduktan ve blocker, REQUEST_CHANGES, scope/allowlist/base/head drift, conflict veya mergeability sorunu bulunmadıktan sonra ChatGPT standing owner yetkisiyle PR'yi ayrıca Fatih'e sormadan otomatik Ready yapar ve squash merge eder. CRITICAL PR'de bu yetki ancak Issue'ya özel bütün validation/compatibility/manual kapıları geçtikten sonra kullanılır; release/store ve destructive production/device/data işlemleri ayrı açık owner onayı ister.
-
-### FAST
-
-Dar documentation, metin, icon, tooltip, spacing, layout, presentation, basit navigation veya persistence contract'ını değiştirmeyen küçük UI işi.
-
-FAST varsayılanı:
-
-- temiz ve senkron yerel `master`;
-- tek davranış;
-- ChatGPT'nin açıkça belirlediği göreve özel execution time budget;
-- Issue, `.cse` task/result ve routing YAML yok;
-- current GitHub `master` ruleset'i PR istiyorsa tek kısa ömürlü branch ve tek minimal Draft PR; bu zorunluluk işi STANDARD'a yükseltmez;
-- Execution Agent format, changed-path review, `git diff --check` ve minimum yeterli automated doğrulamayı yapar;
-- bağımsız review, geniş CI, full suite ve cihaz kontrolü yalnız somut ihtiyaç varsa;
-- test/analyzer/build execution Execution Agent'ta, manuel ürün/device kabulü Fatih'tedir;
-- gereken manuel/device kabulde Fatih `PASS` bildirmeden commit veya push yapılmaz; kabul gerekmiyorsa Execution Agent automated PASS yeterlidir;
-- gerekli doğrulama/kabul FAIL/PENDING durumundayken yeni işe geçilmez.
-
-### STANDARD
-
-Birden fazla ekran/modül, session/project context veya persistence/release-critical olmayan orta ölçekli behavior değişikliği.
-
-STANDARD varsayılanı:
-
-- tek kısa Issue veya self-contained görev özeti;
-- tek kısa ömürlü branch;
-- açık execution time budget içinde mümkünse inceleme, fix, focused validation ve yetkili commit/push tek adımda;
-- test/analyzer/build execution Execution Agent'ta, manuel ürün/device kabulü Fatih'te;
-- `.cse` ve routing YAML varsayılan olarak yok;
-- bağımsız diff review değer üretiyorsa tek Draft PR;
-- mevcut iş master'a alınmadan yeni production branch açılmaz;
-- stacked PR yasaktır.
-
-### CRITICAL
-
-Schema/migration, backup/restore, stable identity/revision, transaction/event/history, attachment veya kullanıcı dosyası bütünlüğü, destructive işlem, security/privacy, permission/signing/application ID, background/reboot, DWG conversion data-loss riski, gerçek kullanıcı data root'u veya release/store işi.
-
-CRITICAL varsayılanı:
-
-- exact Issue, allowlist ve stop conditions;
-- branch ve Draft PR;
-- gerekli `.cse` provenance;
-- Issue'ya özel validation/compatibility/device/release gate;
-- bağımsız derin review;
-- Issue'ya özel bütün validation/compatibility/manual kapıları sonrası standing yetkiyle otomatik Ready/squash merge; release/store ve destructive işlemler için ayrı owner kararı.
-
-Somut CRITICAL trigger yoksa iş ağır sürece yükseltilmez.
-
-## 5. Göreve özel süre bütçesi ve test sahipliği
-
-Her Execution Agent execution/correction/commit görevi, handoff'ta ChatGPT tarafından açıkça verilen execution time budget ile sınırlıdır. Global sabit süre varsayılanı yoktur. Yetkili kapsam ve süreye sığan inceleme, düzenleme, focused validation ve commit/push gereksiz ayrı mikro adımlara bölünmez; publication kapıları korunur.
-
-Bütçe dolduğunda Execution Agent durur:
-
-- yeni yaklaşım başlatılmaz;
-- kapsam genişletilmez;
-- mevcut çalışma güvenle korunur; tamamlanan değişiklik, exact blocker ve kalan tek adım raporlanır.
-
-Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Execution Agent tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
-
-Execution Agent kaynak düzenleme, format, diff ve Git kapsam kontrollerini yapar; automated execution sonuçlarını raporlar. Fatih'e yalnız manuel kabul adımları verilir; nihai davranış kabulü Execution Agent'a devredilmez.
-
-Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro adımda değil, birleşik milestone veya release kapısında çalıştırılır.
-
-## 6. Değişmez güvenlik sınırları
-
-- CSE owner-only, local-first ve mobile-first kalır.
-- Gerçek kullanıcı data root'u açık CRITICAL authority olmadan okunmaz/değiştirilmez.
-- Production/debug paketleri sıradan automation tarafından başlatılmaz, temizlenmez veya mutate edilmez.
-- Stable identity, optimistic revision, append-only event/history, transaction, backup/restore ve attachment bütünlüğü korunur.
-- #502 pre-update recoverability/owner-data preservation, #503 restore safety ve #504 recovery sınırları P0 otoriteleridir; parent orchestration bunları daraltamaz.
-- Force-push, destructive reset/clean/stash, hard-delete ve beklenmeyen kullanıcı değişikliğinin üzerine yazma yasaktır.
-- Beklenmeyen tracked/untracked değişiklikte işlem durur; otomatik temizleme yapılmaz.
-- Gerekli review/validation/manual kapısı FAIL/PENDING iken veya blocker, REQUEST_CHANGES, scope/allowlist/base/head drift, conflict ya da mergeability sorunu varken Ready/merge yapılmaz.
-- Gate'ler PASS/GEREKMİYOR olduğunda ChatGPT standing owner yetkisiyle Ready/squash merge'i otomatik yürütür; Fatih bu standing yetkiyi sonraki bir owner talimatıyla iptal edebilir veya askıya alabilir.
-- Release/store ve destructive production/device/data işlemleri standing Ready/merge yetkisinin dışındadır ve ayrı açık owner onayı gerektirir.
-- Repository defaults blanket permission bypass (ör. `--dangerously-skip-permissions` veya eşdeğeri) kullanmaz; provider-specific izin/hook/setting yalnız o provider'ın adapter sınırında (Claude Code için `.claude/`) tutulur ve CSE'nin genel authority modeli sayılmaz.
-
-## 7. Git, publication ve Issue disposition
-
-- FAST: Execution Agent automated PASS ve gerekiyorsa Fatih manuel/device PASS sonrası tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa tek minimal Draft PR, required review/gate PASS sonrası ChatGPT'nin otomatik Ready/squash merge'i ve `master` sync.
-- STANDARD: parent mode `NONE` iken en fazla bir aktif production branch/PR; squash merge varsayılanı.
-- CRITICAL: Issue'ya özel branch/PR/review zinciri.
-- `PARALLEL_READ` lane'leri aynı task ve tek production branch/PR içinde kalır;
-  Scout/Reviewer yeni production branch, PR veya writer oluşturmaz.
-- Açık `MULTI_FEATURE_PARALLEL` parent lock'unda en fazla üç predeclared feature
-  envelope'u bulunur. Her envelope ayrı branch/worktree/Draft PR ve tek writer
-  taşır; iki aktif writer aynı path'i reserve edemez veya yazamaz.
-- Pairwise ilişki `INDEPENDENT | COORDINATION_REQUIRED | DEPENDENCY_BLOCKED`
-  olarak kaydedilir. `SHARED_INTEGRATION_SURFACE` exact path/contract ve tam olarak bir
-  owning feature belirtir; sibling consumer ayrı yetki olmadan read-only kalır.
-- Feature'lar serial integrate edilir. Kanıt exact feature revision + exact
-  target-master revision'a ve gerekliyse exact PR merge candidate'a bağlıdır;
-  master ilerleyince kalan feature conflict/protected drift'i yeniden değerlendirir
-  ve yalnız etkilenen validation/review/acceptance'ı yeniler.
-- Parent status koordinasyon içindir; ROADMAP veya feature authority'sinin yerine
-  geçmez. Stale durum kanıt/authority değildir; otomatik dördüncü/replacement
-  feature, merge, device veya release yoktur.
-- Force-push yapılmaz.
-- Stacked PR oluşturulmaz.
-- Protokol kabul edildiğinde zaten açık olan legacy/stacked production PR'lar bir defalık geçiş kuyruğudur; yeni stack açma yetkisi vermez. Kuyruk çözülene kadar yeni production branch açılmaz; mevcut PR'lar current master'a birer birer uyarlanır ve her biri required review/validation/manual ve drift/mergeability kapılarından geçmeden Ready/merge edilmez.
-- Cihaz APK'sı mümkün olduğunda güncel birleşik master'dan üretilir.
-- Merge sonrası local master bir sonraki local işten önce `--ff-only` senkronlanır.
-- Tek amaçlı implementation Issue'su PR ile bütünüyle sonuçlanıyorsa PR body `Closes #...` kullanır.
-- Parent, umbrella, manuel acceptance, release veya devam işi içeren Issue'lar `Refs #...` kullanır ve açık kalır.
-- Standing merge yetkisi, yalnız incelenen PR body'de açıkça `Closes` ile belirtilen tek amaçlı Issue'nun merge ile otomatik kapanışını da kapsar; belirsizlikte `Refs` kullanılır ve otomatik Issue closure yapılmaz.
-
-## 8. Evidence ve çıktı
-
-FAST completion en fazla şu bilgileri taşır:
-
-```text
-Değişen davranış: <tek cümle>
-Değişen dosyalar: <liste>
-Execution Agent kontrolleri: format / diff-check
-Execution Agent automated validation: PENDING | PASS | FAIL
-Fatih manuel kabulü: GEREKMİYOR (<gerekçe>) | PENDING | PASS | FAIL
-Commit/push: yapılmadı | <sha>
-PR: GEREKMİYOR | <numara>
-Issue disposition: YOK | Closes #... | Refs #...
-```
-
-STANDARD sonucu kısa Issue/PR kaydıdır. CRITICAL ayrıntılı provenance taşıyabilir.
-
-Aynı bilgi Issue, comment, task, result, state ve PR body içinde tekrar edilmez.
-
-ChatGPT kullanıcıya teslim ettiği her yanıtta önce sade Türkçeyle şunları anlatır:
-
-- ne yaptığını;
-- bunun uygulama veya çalışma açısından ne anlama geldiğini;
-- işlemin başarılı mı, eksik mi, engelli mi olduğunu.
-
-Bağlayıcı anlatım kuralı:
-
-- Fatih'e verilen her bilgi, durum özeti, test sonucu, blocker açıklaması, Execution Agent sonucu ve teknik karar her zaman onun tek okumada anlayacağı sade Türkçeyle anlatılır.
-- Yanıt teknik jargonla başlamaz. Teknik terim gerekiyorsa aynı cümlede veya hemen ardından günlük dilde ne anlama geldiği açıklanır.
-- SHA, branch, divergence, allowlist, test harness, YAML ve benzeri teknik kanıtlar ana anlatımın yerine geçmez; sade açıklamadan sonra ikinci katmanda verilir.
-- Fatih açıkça ham teknik çıktı istemedikçe ham Execution Agent/test çıktısı ana cevap olarak kopyalanmaz; sonuç önce anlamı ve etkisiyle açıklanır.
-
-SHA, branch, divergence, allowlist, YAML ve benzeri teknik kanıtlar bu açıklamadan sonra ikinci katmanda verilir. Teknik terim gerekliyse hemen günlük dilde karşılığı açıklanır. Ham Execution Agent çıktısı ana cevap olarak kopyalanmaz; ChatGPT sonucu owner'ın tek okumada anlayacağı dile çevirir. Kısalık, anlaşılabilirliği bozacak kadar bilgi eksiltme gerekçesi değildir.
-
-## 9. Ana karar
-
-> Non-CRITICAL işte göreve özel süre bütçesiyle one-pass teslim, tek focused validation ve yalnız gereken manuel kabul; publication current GitHub ruleset'inin izin verdiği en hafif branch/PR yoluyla yürür. Required gate'ler geçince ChatGPT standing owner yetkisiyle Ready/squash merge'i ve açık `Closes` disposition'ını otomatik yürütür; gerçek veri/release ve destructive işlem riskinde ayrı owner onayıyla tam güvenlik süreci uygulanır. Sıradaki pre-release iş her zaman ROADMAP Q01–Q26 kuyruğundan, current GitHub gerçeğiyle birlikte seçilir. Repository Execution Agent rolü provider-neutral kalır; current provider Claude Code'dan uyumlu bir gelecek provider'a (ör. Codex) geçiş bu belgedeki authority, risk lane, topology, Git ve publication kurallarını değiştirmez.
+> CSE owner-only, local-first/mobile-first ürün olmaya devam eder; execution surface artık provider kotasına bağlı değildir. GitHub-capable normal source/Git/Issue/PR work `GITHUB_SYSTEM_MANAGER` ile, local-only capability gerçekten gerektiğinde `LOCAL_SYSTEM_MANAGER` ile yürütülebilir. CSE risk lanes, data/repository safety, publication, manual acceptance ve release/destructive gates her iki manager için aynen bağlayıcıdır.
