@@ -994,6 +994,190 @@ void main() {
       );
     },
   );
+
+  testWidgets('Şantiye konumu row shows unset state and offers Konum seç', (
+    tester,
+  ) async {
+    final source = _FakeProjectInformationSource.standard();
+    final mutations = _InformationMutations();
+    await tester.pumpWidget(_testApp(source, mutations: mutations));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('project-information-section-address')),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Konum ve Adres'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('project-information-site-location')),
+      findsOneWidget,
+    );
+    expect(find.text('Haritadan seçilmedi.'), findsOneWidget);
+    expect(find.text('Konum seç'), findsOneWidget);
+    expect(
+      find.byKey(const Key('project-information-site-location-map')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('project-information-site-location-clear')),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'existing Şantiye konumu exposes Değiştir/Haritada aç/paylaş/kaldır',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard();
+      final mutations = _InformationMutations()
+        ..siteLocation = const ProjectSiteLocation(
+          projectId: _projectA,
+          latitude: 41.015137,
+          longitude: 28.97953,
+          revision: 1,
+          createdAt: '2026-09-13T09:00:00.000Z',
+          updatedAt: '2026-09-13T09:00:00.000Z',
+        );
+      await tester.pumpWidget(_testApp(source, mutations: mutations));
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('project-information-section-address')),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Konum ve Adres'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Değiştir'), findsOneWidget);
+      expect(find.text('Konum seç'), findsNothing);
+      expect(
+        find.byKey(const Key('project-information-site-location-map')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('project-information-site-location-share')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('project-information-site-location-clear')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('Kaldır clears the site location after explicit confirmation', (
+    tester,
+  ) async {
+    final source = _FakeProjectInformationSource.standard();
+    final mutations = _InformationMutations()
+      ..siteLocation = const ProjectSiteLocation(
+        projectId: _projectA,
+        latitude: 41.015137,
+        longitude: 28.97953,
+        revision: 1,
+        createdAt: '2026-09-13T09:00:00.000Z',
+        updatedAt: '2026-09-13T09:00:00.000Z',
+      );
+    await tester.pumpWidget(_testApp(source, mutations: mutations));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('project-information-section-address')),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Konum ve Adres'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('project-information-site-location-clear')),
+    );
+    await tester.pumpAndSettle();
+    // Cancel first: value must be preserved.
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+    expect(find.text('Değiştir'), findsOneWidget);
+    expect(mutations.siteLocation, isNotNull);
+
+    await tester.tap(
+      find.byKey(const Key('project-information-site-location-clear')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('project-information-site-location-confirm-clear')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(mutations.siteLocation, isNull);
+    expect(find.text('Haritadan seçilmedi.'), findsOneWidget);
+    expect(find.text('Konum seç'), findsOneWidget);
+  });
+
+  testWidgets(
+    'project switch clears the previously shown Şantiye konumu before showing '
+    'the new project state',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard(
+        includeProjectB: true,
+      );
+      final mutations = _InformationMutations()
+        ..siteLocation = const ProjectSiteLocation(
+          projectId: _projectA,
+          latitude: 41.015137,
+          longitude: 28.97953,
+          revision: 1,
+          createdAt: '2026-09-13T09:00:00.000Z',
+          updatedAt: '2026-09-13T09:00:00.000Z',
+        );
+      final application = ProjectInformationApplication(
+        source: source,
+        mutations: mutations,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProjectInformationPage(
+            application: application,
+            projectId: _projectA,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('project-information-section-address')),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Konum ve Adres'));
+      await tester.pumpAndSettle();
+      expect(find.text('Değiştir'), findsOneWidget);
+
+      // Project B has no site location for the fake source/mutations.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProjectInformationPage(
+            application: application,
+            projectId: _projectB,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('project-information-section-address')),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Konum ve Adres'));
+      await tester.pumpAndSettle();
+
+      // Project B never shows project A's stale location while loading or
+      // after load — the row reflects only its own canonical state.
+      expect(find.text('Konum seç'), findsOneWidget);
+      expect(find.text('Değiştir'), findsNothing);
+    },
+  );
 }
 
 Widget _testApp(

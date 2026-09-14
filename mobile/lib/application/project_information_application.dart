@@ -1601,7 +1601,7 @@ class SqliteProjectInformationMutationApplication
   @override
   Future<ProjectSiteLocation> setSiteLocation(
     SetProjectSiteLocationCommand command,
-  ) {
+  ) async {
     _requireUuid(command.eventId, 'invalid_event_id');
     _requireUuid(command.projectId, 'invalid_project_id');
     if (!command.latitude.isFinite ||
@@ -1643,8 +1643,18 @@ class SqliteProjectInformationMutationApplication
             occurredAt: timestamp,
           );
         } else {
+          // The row's identity (project_id) is stable even after a clear —
+          // `cleared_at` only marks it inactive, it is never physically
+          // deleted. A clear leaves this branch active on the next save, so
+          // a cleared row is treated as a fresh first-set (no
+          // expectedRevision) that resurrects the same row via UPDATE
+          // instead of INSERT, rather than a stale-revision conflict.
           final currentRevision = rows.single['revision']! as int;
-          if (currentRevision != command.expectedRevision) {
+          final wasCleared = rows.single['cleared_at'] != null;
+          final expectedRevisionForActiveRow = wasCleared
+              ? null
+              : currentRevision;
+          if (command.expectedRevision != expectedRevisionForActiveRow) {
             throw const ProjectInformationRevisionConflict();
           }
           final changed = await transaction.update(
@@ -1667,7 +1677,9 @@ class SqliteProjectInformationMutationApplication
             id: command.eventId,
             projectId: command.projectId,
             sequence: currentRevision + 1,
-            eventType: 'site_location.updated',
+            eventType: wasCleared
+                ? 'site_location.set'
+                : 'site_location.updated',
             occurredAt: timestamp,
           );
         }
@@ -1683,7 +1695,9 @@ class SqliteProjectInformationMutationApplication
   }
 
   @override
-  Future<void> clearSiteLocation(ClearProjectSiteLocationCommand command) {
+  Future<void> clearSiteLocation(
+    ClearProjectSiteLocationCommand command,
+  ) async {
     _requireUuid(command.eventId, 'invalid_event_id');
     _requireUuid(command.projectId, 'invalid_project_id');
     return _withDatabase(
