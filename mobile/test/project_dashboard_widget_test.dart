@@ -67,6 +67,8 @@ void main() {
 
       expect(find.text('Aktif Proje'), findsOneWidget);
       expect(find.text('Hızlı Bilgiler'), findsOneWidget);
+      expect(find.text('+ Ekle'), findsOneWidget);
+      expect(find.text('Düzenle'), findsOneWidget);
       expect(find.text('Kuzey'), findsOneWidget);
       expect(
         find.descendant(
@@ -180,6 +182,16 @@ void main() {
       expect(find.descendant(of: header, matching: create), findsOneWidget);
       expect(find.descendant(of: header, matching: tools), findsOneWidget);
       for (final action in [create, tools]) {
+        expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+      }
+      final quickAdd = find.byKey(const Key('dashboard-quick-info-add'));
+      final quickEdit = find.byKey(
+        const Key('dashboard-quick-info-edit-toggle'),
+      );
+      expect(find.text('+ Ekle'), findsOneWidget);
+      expect(find.text('Düzenle'), findsOneWidget);
+      for (final action in [quickAdd, quickEdit]) {
         expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
         expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
       }
@@ -524,56 +536,69 @@ void main() {
   );
 
   testWidgets(
-    'Issue #823: Hızlı Bilgiler edit mode removes a pin without full-page '
-    'loading, offers nonblocking Geri al, and never deletes the source entry',
+    'Issue #823: Hızlı Bilgiler middle-pin Undo restores exact prior order '
+    'without full-page loading or deleting source entries',
     (tester) async {
       final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
       final mutations = _DashboardMutations();
-      mutations.entries.add(_dashboardUserEntry(project.id, 0));
-      mutations.pins.add(
-        _dashboardPin(
-          project.id,
-          'pin-0',
-          const ProjectInformationKey(
-            space: ProjectInformationKeySpace.userEntry,
-            id: 'entry-0',
+      for (var index = 0; index < 3; index += 1) {
+        mutations.entries.add(_dashboardUserEntry(project.id, index));
+        mutations.pins.add(
+          _dashboardPin(
+            project.id,
+            'pin-$index',
+            ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'entry-$index',
+            ),
+            index,
           ),
-          0,
-        ),
-      );
+        );
+      }
       final fixture = _Fixture(projects: [project], mutations: mutations);
       addTearDown(fixture.dispose);
 
       await tester.pumpWidget(fixture.app());
       await tester.pumpAndSettle();
-      expect(find.text('Pin 0'), findsOneWidget);
+      expect(
+        mutations.pins.map((pin) => pin.id).toList(),
+        ['pin-0', 'pin-1', 'pin-2'],
+      );
 
       await tester.tap(
         find.byKey(const Key('dashboard-quick-info-edit-toggle')),
       );
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('dashboard-quick-remove-pin-pin-0')),
-        findsOneWidget,
+      final remove = find.byKey(
+        const Key('dashboard-quick-remove-pin-pin-1'),
       );
+      final drag = find.byKey(const Key('dashboard-quick-drag-pin-pin-1'));
+      expect(remove, findsOneWidget);
+      expect(drag, findsOneWidget);
+      for (final control in [remove, drag]) {
+        expect(tester.getSize(control).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+      }
 
-      await tester.tap(
-        find.byKey(const Key('dashboard-quick-remove-pin-pin-0')),
-      );
+      await tester.tap(remove);
       await tester.pump();
-      // Non-blocking: the full-page/quick-info loading surfaces never
-      // appear at any point during or after the mutation.
       expect(find.byKey(const Key('dashboard-loading-projects')), findsNothing);
       expect(
         find.byKey(const Key('dashboard-project-information-loading')),
         findsNothing,
       );
       await tester.pumpAndSettle();
-      expect(mutations.unpinned.single.id, 'pin-0');
-      expect(find.text('Pin 0'), findsNothing);
-      expect(find.text('Pin 0 Hızlı Bilgilerden kaldırıldı.'), findsOneWidget);
-      // Source entry is never touched by unpin.
-      expect(mutations.entries.single.id, 'entry-0');
+      expect(mutations.unpinned.single.id, 'pin-1');
+      expect(
+        mutations.pins.map((pin) => pin.id).toList(),
+        ['pin-0', 'pin-2'],
+      );
+      expect(find.text('Pin 1 Hızlı Bilgilerden kaldırıldı.'), findsOneWidget);
+      expect(mutations.entries.map((entry) => entry.id).toList(), [
+        'entry-0',
+        'entry-1',
+        'entry-2',
+      ]);
 
       await tester.tap(find.text('Geri al'));
       await tester.pump();
@@ -582,54 +607,102 @@ void main() {
         findsNothing,
       );
       await tester.pumpAndSettle();
-      expect(mutations.pinned.single.key.id, 'entry-0');
-      expect(find.text('Pin 0'), findsOneWidget);
+      expect(mutations.pinned.single.key.id, 'entry-1');
+      expect(
+        mutations.pins.map((pin) => pin.id).toList(),
+        ['pin-0', 'pin-1', 'pin-2'],
+      );
+      expect(mutations.reordered, hasLength(1));
+      expect(mutations.reordered.single.orderedPinIds, [
+        'pin-0',
+        'pin-1',
+        'pin-2',
+      ]);
+      expect(find.text('Pin 1'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets('Issue #823: Hızlı Bilgiler edit mode drag-reorders pins without '
-      'full-page loading', (tester) async {
-    final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
-    final mutations = _DashboardMutations();
-    for (var index = 0; index < 2; index += 1) {
-      mutations.entries.add(_dashboardUserEntry(project.id, index));
+  testWidgets(
+    'Issue #823: drag reorder covers the full active set beyond the six '
+    'visible cards and includes an unavailable pin',
+    (tester) async {
+      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final mutations = _DashboardMutations();
+      for (var index = 0; index < 7; index += 1) {
+        mutations.entries.add(_dashboardUserEntry(project.id, index));
+        mutations.pins.add(
+          _dashboardPin(
+            project.id,
+            'pin-$index',
+            ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'entry-$index',
+            ),
+            index,
+          ),
+        );
+      }
       mutations.pins.add(
         _dashboardPin(
           project.id,
-          'pin-$index',
-          ProjectInformationKey(
+          'missing-pin',
+          const ProjectInformationKey(
             space: ProjectInformationKeySpace.userEntry,
-            id: 'entry-$index',
+            id: 'removed-entry',
           ),
-          index,
+          7,
+          sourceAvailable: false,
         ),
       );
-    }
-    final fixture = _Fixture(projects: [project], mutations: mutations);
-    addTearDown(fixture.dispose);
+      final fixture = _Fixture(projects: [project], mutations: mutations);
+      addTearDown(fixture.dispose);
 
-    await tester.pumpWidget(fixture.app());
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('dashboard-quick-info-edit-toggle')));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('dashboard-quick-info-edit-toggle')));
+      await tester.pumpAndSettle();
 
-    final firstDrag = find.byKey(const Key('dashboard-quick-drag-pin-pin-0'));
-    final secondCard = find.byKey(const Key('dashboard-quick-pin-pin-1'));
-    final gesture = await tester.startGesture(tester.getCenter(firstDrag));
-    await gesture.moveTo(tester.getCenter(secondCard));
-    await tester.pump();
-    await gesture.up();
-    await tester.pump();
-    expect(
-      find.byKey(const Key('dashboard-project-information-loading')),
-      findsNothing,
-    );
-    await tester.pumpAndSettle();
+      final firstDrag = find.byKey(const Key('dashboard-quick-drag-pin-pin-0'));
+      final secondCard = find.byKey(const Key('dashboard-quick-pin-pin-1'));
+      final gesture = await tester.startGesture(tester.getCenter(firstDrag));
+      await gesture.moveTo(tester.getCenter(secondCard));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
 
-    expect(mutations.reordered.single.orderedPinIds, ['pin-1', 'pin-0']);
-    expect(tester.takeException(), isNull);
-  });
+      expect(mutations.reordered, hasLength(1));
+      expect(mutations.reordered.single.orderedPinIds, [
+        'pin-1',
+        'pin-0',
+        'pin-2',
+        'pin-3',
+        'pin-4',
+        'pin-5',
+        'pin-6',
+        'missing-pin',
+      ]);
+      expect(
+        mutations.reordered.single.expectedRevisions.keys.toSet(),
+        {
+          'pin-0',
+          'pin-1',
+          'pin-2',
+          'pin-3',
+          'pin-4',
+          'pin-5',
+          'pin-6',
+          'missing-pin',
+        },
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('project switch rejects delayed user entries and pins', (
     tester,
@@ -688,8 +761,6 @@ void main() {
       final project = _project('33333333-3333-4333-8333-333333333333', 'Kuzey');
       final fixture = _Fixture(projects: [project]);
       addTearDown(fixture.dispose);
-      // A postal address exists, but no canonical site location — Konum
-      // must not invent one from it.
       fixture.source.metadataByProject[project.id] = _metadata(
         project.id,
         address: 'İnönü Caddesi 12',
@@ -773,7 +844,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Harita açılamadı.'), findsOneWidget);
-    // No mutation — the location remains exactly as set.
     expect(mutations.siteLocation?.projectId, project.id);
   });
 
@@ -814,8 +884,6 @@ void main() {
       fixture.session.select(second.id, [first, second]);
       await tester.pumpAndSettle();
 
-      // Second project has no site location of its own — Konum must hide,
-      // never showing/using the first project's stale point.
       expect(find.byKey(const Key('dashboard-action-location')), findsNothing);
       expect(launches, isEmpty);
     },
@@ -904,33 +972,46 @@ class _DashboardMutations implements ProjectInformationMutationApplication {
     ReorderProjectInformationPinsCommand command,
   ) async {
     reordered.add(command);
-    final byId = {for (final pin in pins) pin.id: pin};
-    pins
-      ..clear()
-      ..addAll([
-        for (final id in command.orderedPinIds)
-          if (byId[id] != null)
-            ProjectInformationPin(
-              id: byId[id]!.id,
-              projectId: byId[id]!.projectId,
-              key: byId[id]!.key,
-              sortOrder: command.orderedPinIds.indexOf(id),
-              revision: byId[id]!.revision + 1,
-              createdAt: byId[id]!.createdAt,
-              updatedAt: '2026-09-14T10:00:00.000Z',
-              sourceAvailable: byId[id]!.sourceAvailable,
-            ),
-      ]);
-    return List.unmodifiable(pins);
+    final active = pins
+        .where((pin) => pin.projectId == command.projectId)
+        .toList(growable: false);
+    final activeIds = {for (final pin in active) pin.id};
+    final orderedIds = command.orderedPinIds.toSet();
+    if (command.orderedPinIds.length != active.length ||
+        orderedIds.length != activeIds.length ||
+        !orderedIds.containsAll(activeIds)) {
+      throw const ProjectInformationFailure('pin_order_must_cover_active_set');
+    }
+    if (command.expectedRevisions.keys.toSet().length != activeIds.length ||
+        !command.expectedRevisions.keys.toSet().containsAll(activeIds)) {
+      throw const ProjectInformationFailure('pin_revision_set_mismatch');
+    }
+    for (final pin in active) {
+      if (command.expectedRevisions[pin.id] != pin.revision) {
+        throw const ProjectInformationRevisionConflict();
+      }
+    }
+    final byId = {for (final pin in active) pin.id: pin};
+    pins.removeWhere((pin) => pin.projectId == command.projectId);
+    pins.addAll([
+      for (var index = 0; index < command.orderedPinIds.length; index += 1)
+        ProjectInformationPin(
+          id: byId[command.orderedPinIds[index]]!.id,
+          projectId: byId[command.orderedPinIds[index]]!.projectId,
+          key: byId[command.orderedPinIds[index]]!.key,
+          sortOrder: index,
+          revision: byId[command.orderedPinIds[index]]!.revision + 1,
+          createdAt: byId[command.orderedPinIds[index]]!.createdAt,
+          updatedAt: '2026-09-14T10:00:00.000Z',
+          sourceAvailable: byId[command.orderedPinIds[index]]!.sourceAvailable,
+        ),
+    ]);
+    return listPins(command.projectId);
   }
 
   final List<SetProjectInformationPinCommand> pinned = [];
   final List<RemoveProjectInformationPinCommand> unpinned = [];
 
-  /// Models the real `SqliteProjectInformationMutationApplication.setPin`
-  /// identity contract: restoring a previously-removed pin for the same
-  /// `(space, id)` key must reuse the exact same pin id, or it fails with
-  /// `pin_identity_mismatch` — a fresh random id is rejected.
   final Map<String, String> _archivedPinIdsByKey = {};
 
   String _pinKeyString(ProjectInformationKey key) => '${key.space}:${key.id}';
@@ -957,11 +1038,12 @@ class _DashboardMutations implements ProjectInformationMutationApplication {
       throw const ProjectInformationFailure('pin_identity_mismatch');
     }
     _archivedPinIdsByKey.remove(keyString);
+    final projectPins = pins.where((pin) => pin.projectId == command.projectId);
     final pin = ProjectInformationPin(
       id: command.id,
       projectId: command.projectId,
       key: command.key,
-      sortOrder: pins.length,
+      sortOrder: projectPins.length,
       revision: 1,
       createdAt: '2026-09-14T10:00:00.000Z',
       updatedAt: '2026-09-14T10:00:00.000Z',
