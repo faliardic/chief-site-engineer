@@ -1090,7 +1090,7 @@ void main() {
   test(
     'format 1 backup restores populated Inventory with exact replayable truth',
     () async {
-      expect(AppDatabase.schemaVersion, 27);
+      expect(AppDatabase.schemaVersion, 28);
       final fixture = await _seedPopulatedInventory(
         directories,
         attachmentGateway: _inventoryPhotoGateway(directories),
@@ -2318,6 +2318,8 @@ void main() {
         'DROP TRIGGER floor_location_active_location_archive_guard',
       );
       for (final table in const [
+        'project_site_location_events',
+        'project_site_locations',
         'project_information_pin_events',
         'project_information_pins',
         'project_information_entry_events',

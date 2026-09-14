@@ -915,6 +915,35 @@ class _DashboardMutations implements ProjectInformationMutationApplication {
     return selected;
   }
 
+  ProjectSiteLocation? siteLocation;
+
+  @override
+  Future<ProjectSiteLocation?> getSiteLocation(String projectId) async =>
+      siteLocation?.projectId == projectId ? siteLocation : null;
+
+  @override
+  Future<ProjectSiteLocation> setSiteLocation(
+    SetProjectSiteLocationCommand command,
+  ) async {
+    final saved = ProjectSiteLocation(
+      projectId: command.projectId,
+      latitude: command.latitude,
+      longitude: command.longitude,
+      revision: (siteLocation?.revision ?? 0) + 1,
+      createdAt: '2026-09-13T10:00:00.000Z',
+      updatedAt: '2026-09-13T10:00:00.000Z',
+    );
+    siteLocation = saved;
+    return saved;
+  }
+
+  @override
+  Future<void> clearSiteLocation(
+    ClearProjectSiteLocationCommand command,
+  ) async {
+    siteLocation = null;
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -939,6 +968,8 @@ class _Fixture {
     DashboardProjectAction? onOpenProjectAlbum,
     DashboardProjectAction? onOpenCatalog,
     DashboardProjectAction? onOpenProjectInformation,
+    DashboardTextAction? shareText,
+    DashboardUriAction? launchUri,
     double textScale = 1,
   }) => MaterialApp(
     builder: (context, child) => MediaQuery(
@@ -964,6 +995,8 @@ class _Fixture {
         onOpenProjectAlbum: onOpenProjectAlbum,
         onOpenCatalog: onOpenCatalog,
         onOpenProjectInformation: onOpenProjectInformation,
+        shareText: shareText,
+        launchUri: launchUri,
         clock: () => DateTime.utc(2026, 9, 4, 9),
       ),
     ),

@@ -51,6 +51,7 @@ void main() {
     expect(gradle, contains('CSE_KEY_PROPERTIES_FILE'));
     expect(permissions, {
       'android.permission.CAMERA',
+      'android.permission.INTERNET',
       'android.permission.POST_NOTIFICATIONS',
       'android.permission.RECEIVE_BOOT_COMPLETED',
       'android.permission.SCHEDULE_EXACT_ALARM',
@@ -60,7 +61,9 @@ void main() {
     expect(RegExp('tools:node="remove"').allMatches(manifest), hasLength(4));
     expect(manifest, isNot(contains('USE_EXACT_ALARM')));
     expect(manifest, isNot(contains('FOREGROUND_SERVICE')));
-    expect(manifest, isNot(contains('android.permission.INTERNET')));
+    // Owner-approved exception (Issue #815): interactive OSM tile loading
+    // from the site-location map picker only.
+    expect(manifest, contains('android.permission.INTERNET'));
   });
 
   test('Şefim identity split and host-only acceptance are fail-closed', () {

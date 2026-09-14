@@ -427,7 +427,9 @@ void main() {
           contains('android:name="$permission"\n        tools:node="remove"'),
         );
       }
-      expect(manifest, isNot(contains('android.permission.INTERNET')));
+      // Owner-approved exception (Issue #815): interactive OSM tile loading
+      // from the site-location map picker only.
+      expect(manifest, contains('android.permission.INTERNET'));
       expect(manifest, contains('SCHEDULE_EXACT_ALARM'));
       expect(manifest, isNot(contains('USE_EXACT_ALARM')));
       expect(manifest, isNot(contains('FOREGROUND_SERVICE')));

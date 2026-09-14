@@ -1170,6 +1170,47 @@ class _InformationMutations implements ProjectInformationMutationApplication {
     pins.removeWhere((pin) => pin.id == command.id);
   }
 
+  ProjectSiteLocation? siteLocation;
+
+  @override
+  Future<ProjectSiteLocation?> getSiteLocation(String projectId) async =>
+      siteLocation?.projectId == projectId ? siteLocation : null;
+
+  @override
+  Future<ProjectSiteLocation> setSiteLocation(
+    SetProjectSiteLocationCommand command,
+  ) async {
+    final current = siteLocation?.projectId == command.projectId
+        ? siteLocation
+        : null;
+    if (current?.revision != command.expectedRevision) {
+      throw const ProjectInformationRevisionConflict();
+    }
+    final saved = ProjectSiteLocation(
+      projectId: command.projectId,
+      latitude: command.latitude,
+      longitude: command.longitude,
+      revision: (current?.revision ?? 0) + 1,
+      createdAt: current?.createdAt ?? '2026-09-13T10:00:00.000Z',
+      updatedAt: '2026-09-13T10:00:00.000Z',
+    );
+    siteLocation = saved;
+    return saved;
+  }
+
+  @override
+  Future<void> clearSiteLocation(
+    ClearProjectSiteLocationCommand command,
+  ) async {
+    final current = siteLocation;
+    if (current == null ||
+        current.projectId != command.projectId ||
+        current.revision != command.expectedRevision) {
+      throw const ProjectInformationRevisionConflict();
+    }
+    siteLocation = null;
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

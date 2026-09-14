@@ -18,12 +18,12 @@ ANDROID_NAMESPACE = "{http://schemas.android.com/apk/res/android}"
 TOOLS_NAMESPACE = "{http://schemas.android.com/tools}"
 ANDROID_PERMISSION_ALLOWLIST = {
     "android.permission.CAMERA",
+    "android.permission.INTERNET",
     "android.permission.POST_NOTIFICATIONS",
     "android.permission.RECEIVE_BOOT_COMPLETED",
     "android.permission.SCHEDULE_EXACT_ALARM",
 }
 FORBIDDEN_PRODUCTION_PERMISSIONS = {
-    "android.permission.INTERNET",
     "android.permission.READ_EXTERNAL_STORAGE",
     "android.permission.READ_MEDIA_IMAGES",
     "android.permission.READ_MEDIA_VIDEO",
