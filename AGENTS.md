@@ -154,6 +154,8 @@ Aynı exact source revision + relevant environment için geçen test gereksiz te
 - Unexpected tracked/untracked veya dirty local work silinmez/üzerine yazılmaz.
 - Required review/validation/manual gate FAIL/PENDING iken Ready/merge yoktur.
 - Required gates PASS/GEREKMİYOR, blocker/REQUEST_CHANGES/scope/base-head drift/conflict/mergeability sorunu yoksa ChatGPT standing owner authority ile Ready + squash merge yapabilir.
+- Bu koşullar sağlandığında Ready/merge için Fatih'ten ikinci bir açık onay istenmez; standing owner authority yeterlidir. Tekrar onay talebi yeni bir owner gate oluşturmaz ve normal task completion akışını durdurmaz.
+- Yalnız task authority'nin açıkça ayırdığı gerçek owner/manual acceptance, release/store/signing, destructive production/device/data işlemi veya yeni product/authority kararı gerekiyorsa `OWNER_WAIT` kullanılır.
 - CRITICAL merge yalnız Issue-specific bütün validation/compatibility/manual gates sonrası mümkündür.
 - Release/store, signing ve destructive production/device/data işlemleri ayrı explicit owner approval ister.
 - `Closes #...` yalnız merge ile gerçekten tamamlanan tek amaçlı Issue için; parent/umbrella/manual-acceptance/release/continuing kapsam `Refs #...` olarak açık kalır.
@@ -180,6 +182,8 @@ Remaining gate + owner
 Kullanıcıya teslim edilen sonuç şu satırla biter:
 
 `Sıradaki aksiyon — <ChatGPT|Execution Agent|Fatih|Yok>: <tek uygulanabilir talimat>.`
+
+`Sıradaki aksiyon — Fatih` yalnız gerçekten owner product/authority kararı, manual/device acceptance veya ayrı release/destructive onayı bekleniyorsa kullanılır; sırf Draft PR'ı Ready yapıp merge etmek için tekrar onay istemek amacıyla kullanılmaz.
 
 Bir aksiyon tamamlandığında yalnız sonraki işin adı verilmez; aynı yanıtta seçilen aktörün başlayabileceği hazır talimat da hazırlanır. `Execution Agent` için 10–15 satırlık exact handoff ve execution time budget; Fatih için yalnız kısa manual/device kontrolü verilir. ChatGPT kendi standing authority'sindeki sonraki koordinasyon işini kullanıcıdan yeni `devam` istemeden yürütür.
 
