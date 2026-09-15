@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
@@ -144,10 +145,21 @@ class CanonicalProjectInformationReadSource
 }
 
 class ProjectInformationApplication {
-  const ProjectInformationApplication({required this.source, this.mutations});
+  ProjectInformationApplication({required this.source, this.mutations})
+    : _pinChanges = StreamController<String>.broadcast();
 
   final ProjectInformationReadSource source;
   final ProjectInformationMutationApplication? mutations;
+  final StreamController<String> _pinChanges;
+
+  /// Emits the exact `projectId` after `setPin`/`removePin`/`reorderPins`
+  /// succeeds through this shared instance, regardless of which page issued
+  /// it. Dashboard and "Tüm proje bilgileri" hold separate widget state but
+  /// the same injected [ProjectInformationApplication]; without this, a pin
+  /// added on one page never reaches the other page's already-loaded Hızlı
+  /// Bilgiler list until an unrelated reload (e.g. a project switch or app
+  /// restart) happens to occur.
+  Stream<String> get pinChanges => _pinChanges.stream;
 
   ProjectInformationSession createSession() =>
       ProjectInformationSession._(this);
@@ -191,14 +203,24 @@ class ProjectInformationApplication {
 
   Future<ProjectInformationPin> setPin(
     SetProjectInformationPinCommand command,
-  ) => _mutations.setPin(command);
+  ) async {
+    final pin = await _mutations.setPin(command);
+    _pinChanges.add(command.projectId);
+    return pin;
+  }
 
   Future<List<ProjectInformationPin>> reorderPins(
     ReorderProjectInformationPinsCommand command,
-  ) => _mutations.reorderPins(command);
+  ) async {
+    final pins = await _mutations.reorderPins(command);
+    _pinChanges.add(command.projectId);
+    return pins;
+  }
 
-  Future<void> removePin(RemoveProjectInformationPinCommand command) =>
-      _mutations.removePin(command);
+  Future<void> removePin(RemoveProjectInformationPinCommand command) async {
+    await _mutations.removePin(command);
+    _pinChanges.add(command.projectId);
+  }
 
   Future<ProjectSiteLocation?> getSiteLocation(String projectId) =>
       _mutations.getSiteLocation(projectId);

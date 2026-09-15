@@ -822,6 +822,70 @@ void main() {
   );
 
   testWidgets(
+    'Issue #823: a pin added through the shared application from another '
+    'page appears in Hızlı Bilgiler without full-page loading, and a pin '
+    'change for a different, non-selected project never leaks in',
+    (tester) async {
+      final first = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final second = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Güney');
+      final mutations = _DashboardMutations();
+      mutations.entries.add(_dashboardUserEntry(first.id, 0));
+      mutations.entries.add(_dashboardUserEntry(second.id, 1));
+      final fixture = _Fixture(projects: [first, second], mutations: mutations);
+      addTearDown(fixture.dispose);
+      fixture.session.select(first.id, [first, second]);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+
+      // No pins yet: Hızlı Bilgiler shows the computed fallback set.
+      expect(find.text('Pin 0'), findsNothing);
+
+      // Simulated: the pin is added from "Tüm proje bilgileri" — a
+      // different page instance that shares this exact same
+      // ProjectInformationApplication in production — never through any
+      // Dashboard-owned mutation call.
+      await fixture.projectInformation.setPin(
+        const SetProjectInformationPinCommand(
+          id: 'pin-0',
+          eventId: 'evt-pin-0',
+          projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          key: ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: 'entry-0',
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      expect(find.text('Pin 0'), findsOneWidget);
+
+      // A pin change for the *other*, non-selected project must never leak
+      // into the currently active project's Hızlı Bilgiler.
+      await fixture.projectInformation.setPin(
+        const SetProjectInformationPinCommand(
+          id: 'pin-1',
+          eventId: 'evt-pin-1',
+          projectId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          key: ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: 'entry-1',
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Pin 1'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Issue #823: drag reorder covers the full active set beyond the six '
     'visible cards and includes an unavailable pin',
     (tester) async {
@@ -1312,6 +1376,12 @@ class _Fixture {
   late final _DashboardInformationSource source;
   final ProjectInformationMutationApplication? mutations;
   final ActiveProjectSession session = ActiveProjectSession();
+  // The exact same shared application instance the built Dashboard widget
+  // receives — exposed so a test can call setPin/removePin/reorderPins on
+  // it directly, simulating a mutation made by another page (e.g. "Tüm
+  // proje bilgileri") that shares this same instance in production.
+  late final ProjectInformationApplication projectInformation =
+      ProjectInformationApplication(source: source, mutations: mutations);
 
   Widget app({
     VoidCallback? onCreateProject,
@@ -1335,10 +1405,7 @@ class _Fixture {
     home: Scaffold(
       body: ProjectDashboardPage(
         agenda: agenda,
-        projectInformation: ProjectInformationApplication(
-          source: source,
-          mutations: mutations,
-        ),
+        projectInformation: projectInformation,
         livingPlan: const UnavailableConstructionLivingPlanApplication(),
         session: session,
         onCreateProject: onCreateProject ?? () {},
