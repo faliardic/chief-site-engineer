@@ -844,9 +844,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                           ? Icons.check_rounded
                           : Icons.edit_outlined,
                     ),
-                    label: Text(
-                      _hizliBilgilerEditMode ? 'Bitti' : 'Düzenle',
-                    ),
+                    label: Text(_hizliBilgilerEditMode ? 'Bitti' : 'Düzenle'),
                   ),
                 ],
               ),
@@ -1106,12 +1104,18 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   /// Removes [item]'s pin without a blocking confirmation dialog or
   /// full-page loading: the source information is never touched, only pin
   /// membership. Offers a nonblocking `Geri al` (Undo) that re-pins the same
-  /// key and restores the exact pre-remove order when the active pin set has
-  /// not changed; a real project switch invalidates the Undo.
+  /// key and, only if safe, restores the exact pre-remove order; a real
+  /// project switch invalidates the Undo.
   Future<void> _removePin(MobileProject project, _QuickItem item) async {
     final pin = item.pin;
     if (pin == null || _pinMutating) return;
-    final priorOrder = [for (final current in _informationPins) current.id];
+    // Captured at remove time — the exact pre-remove pin set (id +
+    // revision), so a later Undo tap can detect a legitimate concurrent
+    // reorder rather than blindly overwriting it.
+    final priorPins = [
+      for (final current in _informationPins)
+        (id: current.id, revision: current.revision),
+    ];
     setState(() => _pinMutating = true);
     try {
       await widget.projectInformation!.removePin(
@@ -1129,9 +1133,8 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           content: Text('${item.label} Hızlı Bilgilerden kaldırıldı.'),
           action: SnackBarAction(
             label: 'Geri al',
-            onPressed: () => unawaited(
-              _restorePin(project, pin.id, pin.key, priorOrder),
-            ),
+            onPressed: () =>
+                unawaited(_restorePin(project, pin.id, pin.key, priorPins)),
           ),
         ),
       );
@@ -1145,15 +1148,23 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     }
   }
 
-  /// Restores the exact soft-archived pin identity and, when no concurrent pin
-  /// membership change occurred, re-applies [priorOrder]. `setPin` restores an
-  /// archived row at the end, so the follow-up full-set reorder is required
-  /// for a middle-pin Undo to restore the exact previous order.
+  /// Restores the exact soft-archived pin identity (stage 1) and, only if
+  /// safe, re-applies the complete pre-remove order (stage 2 — best effort).
+  /// `setPin` restores an archived row at the end, so the follow-up
+  /// full-set reorder is what restores a middle-pin Undo's exact position.
+  ///
+  /// Stage 2 only restores [priorPins]' order when every *other* pin's
+  /// revision still matches what it was at remove time: unchanged
+  /// membership alone is not proof nothing happened — a legitimate
+  /// concurrent reorder bumps revisions without changing the pin-id set,
+  /// and must never be silently overwritten. A stage-2 failure (or an
+  /// unsafe-to-restore concurrent change) is reported as a distinct partial
+  /// success, never as a total Undo failure — the pin is already restored.
   Future<void> _restorePin(
     MobileProject project,
     String pinId,
     ProjectInformationKey key,
-    List<String> priorOrder,
+    List<({String id, int revision})> priorPins,
   ) async {
     if (widget.session.selectedProjectId != project.id) return;
     try {
@@ -1165,36 +1176,33 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           key: key,
         ),
       );
-      if (!mounted || widget.session.selectedProjectId != project.id) return;
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Geri alma tamamlanamadı.')));
+      return;
+    }
+    if (!mounted || widget.session.selectedProjectId != project.id) return;
+    unawaited(_reloadInformationIfStillSelected(project.id));
+
+    try {
       final currentPins = await widget.projectInformation!.listPins(project.id);
       if (!mounted || widget.session.selectedProjectId != project.id) return;
-      final currentIds = {for (final pin in currentPins) pin.id};
-      final priorIds = priorOrder.toSet();
-      final sameMembership =
-          currentPins.length == priorOrder.length &&
-          currentIds.length == priorIds.length &&
-          currentIds.containsAll(priorIds);
-      if (sameMembership) {
-        var sameOrder = true;
-        for (var index = 0; index < priorOrder.length; index += 1) {
-          if (currentPins[index].id != priorOrder[index]) {
-            sameOrder = false;
-            break;
-          }
-        }
-        if (!sameOrder) {
-          await widget.projectInformation!.reorderPins(
-            ReorderProjectInformationPinsCommand(
-              eventId: RecordId.randomUuid(),
-              projectId: project.id,
-              orderedPinIds: priorOrder,
-              expectedRevisions: {
-                for (final pin in currentPins) pin.id: pin.revision,
-              },
-            ),
-          );
-        }
-      } else {
+      final priorById = {for (final pin in priorPins) pin.id: pin.revision};
+      final remainingPriorIds = priorById.keys
+          .where((id) => id != pinId)
+          .toSet();
+      final currentById = {for (final pin in currentPins) pin.id: pin.revision};
+      final remainingCurrentIds = currentById.keys
+          .where((id) => id != pinId)
+          .toSet();
+      final safeToRestoreOrder =
+          remainingPriorIds.length == remainingCurrentIds.length &&
+          remainingPriorIds.containsAll(remainingCurrentIds) &&
+          remainingPriorIds.every((id) => currentById[id] == priorById[id]);
+      if (!safeToRestoreOrder) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -1202,14 +1210,36 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
             ),
           ),
         );
+        return;
       }
-      if (!mounted || widget.session.selectedProjectId != project.id) return;
-      unawaited(_reloadInformationIfStillSelected(project.id));
+      final priorOrder = [for (final pin in priorPins) pin.id];
+      final sameOrder =
+          currentPins.length == priorOrder.length &&
+          List.generate(
+            currentPins.length,
+            (index) => currentPins[index].id == priorOrder[index],
+          ).every((match) => match);
+      if (!sameOrder) {
+        await widget.projectInformation!.reorderPins(
+          ReorderProjectInformationPinsCommand(
+            eventId: RecordId.randomUuid(),
+            projectId: project.id,
+            orderedPinIds: priorOrder,
+            expectedRevisions: {
+              for (final pin in currentPins) pin.id: pin.revision,
+            },
+          ),
+        );
+        if (!mounted || widget.session.selectedProjectId != project.id) {
+          return;
+        }
+        unawaited(_reloadInformationIfStillSelected(project.id));
+      }
     } on Object {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Geri alma tamamlanamadı.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bilgi geri eklendi; sıra korunamadı.')),
+      );
     }
   }
 

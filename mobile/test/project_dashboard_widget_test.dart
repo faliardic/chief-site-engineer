@@ -560,18 +560,17 @@ void main() {
 
       await tester.pumpWidget(fixture.app());
       await tester.pumpAndSettle();
-      expect(
-        mutations.pins.map((pin) => pin.id).toList(),
-        ['pin-0', 'pin-1', 'pin-2'],
-      );
+      expect(mutations.pins.map((pin) => pin.id).toList(), [
+        'pin-0',
+        'pin-1',
+        'pin-2',
+      ]);
 
       await tester.tap(
         find.byKey(const Key('dashboard-quick-info-edit-toggle')),
       );
       await tester.pumpAndSettle();
-      final remove = find.byKey(
-        const Key('dashboard-quick-remove-pin-pin-1'),
-      );
+      final remove = find.byKey(const Key('dashboard-quick-remove-pin-pin-1'));
       final drag = find.byKey(const Key('dashboard-quick-drag-pin-pin-1'));
       expect(remove, findsOneWidget);
       expect(drag, findsOneWidget);
@@ -589,10 +588,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(mutations.unpinned.single.id, 'pin-1');
-      expect(
-        mutations.pins.map((pin) => pin.id).toList(),
-        ['pin-0', 'pin-2'],
-      );
+      expect(mutations.pins.map((pin) => pin.id).toList(), ['pin-0', 'pin-2']);
       expect(find.text('Pin 1 Hızlı Bilgilerden kaldırıldı.'), findsOneWidget);
       expect(mutations.entries.map((entry) => entry.id).toList(), [
         'entry-0',
@@ -608,10 +604,11 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(mutations.pinned.single.key.id, 'entry-1');
-      expect(
-        mutations.pins.map((pin) => pin.id).toList(),
-        ['pin-0', 'pin-1', 'pin-2'],
-      );
+      expect(mutations.pins.map((pin) => pin.id).toList(), [
+        'pin-0',
+        'pin-1',
+        'pin-2',
+      ]);
       expect(mutations.reordered, hasLength(1));
       expect(mutations.reordered.single.orderedPinIds, [
         'pin-0',
@@ -619,6 +616,207 @@ void main() {
         'pin-2',
       ]);
       expect(find.text('Pin 1'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: Undo never overwrites a legitimate concurrent reorder of '
+    'the remaining pins',
+    (tester) async {
+      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final mutations = _DashboardMutations();
+      for (var index = 0; index < 3; index += 1) {
+        mutations.entries.add(_dashboardUserEntry(project.id, index));
+        mutations.pins.add(
+          _dashboardPin(
+            project.id,
+            'pin-$index',
+            ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'entry-$index',
+            ),
+            index,
+          ),
+        );
+      }
+      final fixture = _Fixture(projects: [project], mutations: mutations);
+      addTearDown(fixture.dispose);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-info-edit-toggle')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-remove-pin-pin-1')),
+      );
+      await tester.pumpAndSettle();
+      expect(mutations.pins.map((pin) => pin.id).toList(), ['pin-0', 'pin-2']);
+
+      // A legitimate concurrent action reorders the two remaining pins
+      // while the Undo snackbar is still showing — this must survive.
+      final beforeReorder = {
+        for (final pin in mutations.pins) pin.id: pin.revision,
+      };
+      await mutations.reorderPins(
+        ReorderProjectInformationPinsCommand(
+          eventId: 'concurrent-reorder',
+          projectId: project.id,
+          orderedPinIds: ['pin-2', 'pin-0'],
+          expectedRevisions: beforeReorder,
+        ),
+      );
+      expect(mutations.reordered, hasLength(1));
+
+      await tester.tap(find.text('Geri al'));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // setPin (stage 1) still succeeds — the pin itself is restored.
+      expect(mutations.pinned.single.key.id, 'entry-1');
+      expect(mutations.pins.map((pin) => pin.id).toSet(), {
+        'pin-0',
+        'pin-1',
+        'pin-2',
+      });
+      // Stage 2 must NOT have issued a second, order-restoring reorderPins
+      // call that would have overwritten the concurrent ['pin-2', 'pin-0']
+      // reorder — only the one concurrent call above exists.
+      expect(mutations.reordered, hasLength(1));
+      // The concurrent reorder's relative order survives; the restored pin
+      // is appended, not spliced back into its old middle position.
+      expect(mutations.pins.map((pin) => pin.id).toList(), [
+        'pin-2',
+        'pin-0',
+        'pin-1',
+      ]);
+      expect(
+        find.text(
+          'Bilgi geri eklendi; eşzamanlı değişiklik nedeniyle sıra korunamadı.',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: a post-restore order-fix failure is reported as partial '
+    'success, not total Undo failure, and still revalidates',
+    (tester) async {
+      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final mutations = _DashboardMutations();
+      for (var index = 0; index < 3; index += 1) {
+        mutations.entries.add(_dashboardUserEntry(project.id, index));
+        mutations.pins.add(
+          _dashboardPin(
+            project.id,
+            'pin-$index',
+            ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'entry-$index',
+            ),
+            index,
+          ),
+        );
+      }
+      final fixture = _Fixture(projects: [project], mutations: mutations);
+      addTearDown(fixture.dispose);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-info-edit-toggle')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-remove-pin-pin-1')),
+      );
+      await tester.pumpAndSettle();
+
+      // The concurrent state is unchanged (safe to restore order), but the
+      // order-restoring reorderPins call itself fails transiently.
+      mutations.reorderFailure = const ProjectInformationFailure(
+        'synthetic_reorder_failure',
+      );
+
+      await tester.tap(find.text('Geri al'));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // Stage 1 (setPin) succeeded: the pin is genuinely restored — this
+      // must never be reported as if Undo failed entirely.
+      expect(mutations.pinned.single.key.id, 'entry-1');
+      expect(mutations.pins.map((pin) => pin.id).toSet(), {
+        'pin-0',
+        'pin-1',
+        'pin-2',
+      });
+      expect(mutations.reordered, hasLength(1));
+      expect(find.text('Bilgi geri eklendi; sıra korunamadı.'), findsOneWidget);
+      expect(find.text('Geri alma tamamlanamadı.'), findsNothing);
+      // Nonblocking revalidation still ran: the restored pin is visible on
+      // Hızlı Bilgiler, not stuck showing the pre-Undo two-pin state.
+      expect(find.text('Pin 1'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: a stale Undo snackbar after a real project switch is a '
+    'safe no-op — it never mutates the newly active project',
+    (tester) async {
+      final first = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final second = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Güney');
+      final mutations = _DashboardMutations();
+      mutations.entries.add(_dashboardUserEntry(first.id, 0));
+      mutations.pins.add(
+        _dashboardPin(
+          first.id,
+          'pin-0',
+          const ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: 'entry-0',
+          ),
+          0,
+        ),
+      );
+      final fixture = _Fixture(projects: [first, second], mutations: mutations);
+      addTearDown(fixture.dispose);
+      fixture.session.select(first.id, [first, second]);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-info-edit-toggle')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-remove-pin-pin-0')),
+      );
+      await tester.pumpAndSettle();
+      expect(mutations.unpinned.single.id, 'pin-0');
+      final undo = find.text('Geri al');
+      expect(undo, findsOneWidget);
+
+      // A real project switch happens while the Undo snackbar is still up.
+      expect(fixture.session.select(second.id, [first, second]), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.text('Güney'), findsOneWidget);
+
+      await tester.tap(undo, warnIfMissed: false);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // The stale Undo must be a safe no-op: no setPin call at all, and
+      // project A's removed pin stays removed.
+      expect(mutations.pinned, isEmpty);
+      expect(mutations.pins.map((pin) => pin.id).toList(), isEmpty);
       expect(tester.takeException(), isNull);
     },
   );
@@ -660,7 +858,9 @@ void main() {
 
       await tester.pumpWidget(fixture.app());
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('dashboard-quick-info-edit-toggle')));
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-info-edit-toggle')),
+      );
       await tester.pumpAndSettle();
 
       final firstDrag = find.byKey(const Key('dashboard-quick-drag-pin-pin-0'));
@@ -687,19 +887,16 @@ void main() {
         'pin-6',
         'missing-pin',
       ]);
-      expect(
-        mutations.reordered.single.expectedRevisions.keys.toSet(),
-        {
-          'pin-0',
-          'pin-1',
-          'pin-2',
-          'pin-3',
-          'pin-4',
-          'pin-5',
-          'pin-6',
-          'missing-pin',
-        },
-      );
+      expect(mutations.reordered.single.expectedRevisions.keys.toSet(), {
+        'pin-0',
+        'pin-1',
+        'pin-2',
+        'pin-3',
+        'pin-4',
+        'pin-5',
+        'pin-6',
+        'missing-pin',
+      });
       expect(tester.takeException(), isNull);
     },
   );
@@ -971,12 +1168,18 @@ class _DashboardMutations implements ProjectInformationMutationApplication {
   );
 
   final List<ReorderProjectInformationPinsCommand> reordered = [];
+  Object? reorderFailure;
 
   @override
   Future<List<ProjectInformationPin>> reorderPins(
     ReorderProjectInformationPinsCommand command,
   ) async {
     reordered.add(command);
+    final failure = reorderFailure;
+    if (failure != null) {
+      reorderFailure = null;
+      throw failure;
+    }
     final active = pins
         .where((pin) => pin.projectId == command.projectId)
         .toList(growable: false);

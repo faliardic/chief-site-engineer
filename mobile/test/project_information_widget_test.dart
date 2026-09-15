@@ -929,6 +929,345 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'Issue #823: Undo never overwrites a legitimate concurrent reorder of '
+    'the remaining pins',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard();
+      const otherA = ProjectInformationKey(
+        space: ProjectInformationKeySpace.systemValue,
+        id: 'other-a',
+      );
+      const otherB = ProjectInformationKey(
+        space: ProjectInformationKeySpace.systemValue,
+        id: 'other-b',
+      );
+      final mutations = _InformationMutations()
+        ..entries.add(
+          _userEntry(
+            'editable-entry',
+            'Kapı kodu',
+            archived: false,
+            category: ProjectInformationCategory.project,
+          ),
+        )
+        ..pins.addAll([
+          ProjectInformationPin(
+            id: 'pin-other-a',
+            projectId: _projectA,
+            key: otherA,
+            sortOrder: 0,
+            revision: 1,
+            createdAt: '2026-09-14T09:00:00.000Z',
+            updatedAt: '2026-09-14T09:00:00.000Z',
+            sourceAvailable: true,
+          ),
+          ProjectInformationPin(
+            id: 'pin-editable',
+            projectId: _projectA,
+            key: const ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'editable-entry',
+            ),
+            sortOrder: 1,
+            revision: 1,
+            createdAt: '2026-09-14T09:00:00.000Z',
+            updatedAt: '2026-09-14T09:00:00.000Z',
+            sourceAvailable: true,
+          ),
+          ProjectInformationPin(
+            id: 'pin-other-b',
+            projectId: _projectA,
+            key: otherB,
+            sortOrder: 2,
+            revision: 1,
+            createdAt: '2026-09-14T09:00:00.000Z',
+            updatedAt: '2026-09-14T09:00:00.000Z',
+            sourceAvailable: true,
+          ),
+        ]);
+      await tester.pumpWidget(_testApp(source, mutations: mutations));
+      await tester.pumpAndSettle();
+
+      final actions = find.byKey(
+        const ValueKey('project-information-actions-user-editable-entry'),
+      );
+      await tester.tap(actions);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hızlı Bilgilerden kaldır'));
+      await tester.pumpAndSettle();
+      expect(mutations.unpinned.single.id, 'pin-editable');
+      expect(mutations.pins.map((pin) => pin.id).toList(), [
+        'pin-other-a',
+        'pin-other-b',
+      ]);
+      final undoAction = tester.widget<SnackBarAction>(
+        find.widgetWithText(SnackBarAction, 'Geri al'),
+      );
+      // Drain the "kaldırıldı" snackbar's auto-dismiss timer — otherwise
+      // the Undo-tap's own snackbar just queues behind it and is invisible
+      // to a `find.text` check no matter how long we pump.
+      // showSnackBar() only queues behind a still-visible snackbar — it does
+      // not preempt it — so force the prior "kaldırıldı" snackbar closed
+      // immediately rather than depending on its own auto-dismiss timer.
+      tester
+          .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger))
+          .removeCurrentSnackBar();
+      await tester.pump();
+
+      // A legitimate concurrent action reorders the two remaining pins
+      // while the Undo snackbar is still showing — this must survive.
+      final beforeReorder = {
+        for (final pin in mutations.pins) pin.id: pin.revision,
+      };
+      await mutations.reorderPins(
+        ReorderProjectInformationPinsCommand(
+          eventId: 'concurrent-reorder',
+          projectId: _projectA,
+          orderedPinIds: ['pin-other-b', 'pin-other-a'],
+          expectedRevisions: beforeReorder,
+        ),
+      );
+      expect(mutations.reordered, hasLength(1));
+
+      undoAction.onPressed();
+      // Two chained awaits (setPin, then listPins) run before the snackbar
+      // appears; pump repeatedly to let both resolve and the snackbar
+      // entrance animation start, then check right away — a later drain
+      // would dismiss it before the assertion.
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        find.text(
+          'Bilgi geri eklendi; eşzamanlı değişiklik nedeniyle sıra korunamadı.',
+        ),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 5));
+
+      // Stage 1 (setPin) still succeeds — the pin itself is restored.
+      expect(mutations.pinned.last.key.id, 'editable-entry');
+      expect(mutations.pins.map((pin) => pin.id).toSet(), {
+        'pin-other-a',
+        'pin-other-b',
+        'pin-editable',
+      });
+      // No second, order-restoring reorderPins call was issued — only the
+      // one concurrent call above exists.
+      expect(mutations.reordered, hasLength(1));
+      // The concurrent reorder's relative order survives; the restored pin
+      // is appended, not spliced back into its old middle position.
+      expect(mutations.pins.map((pin) => pin.id).toList(), [
+        'pin-other-b',
+        'pin-other-a',
+        'pin-editable',
+      ]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: a post-restore order-fix failure is reported as partial '
+    'success, not total Undo failure, and still revalidates',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard();
+      final mutations = _InformationMutations()
+        ..entries.add(
+          _userEntry(
+            'editable-entry',
+            'Kapı kodu',
+            archived: false,
+            category: ProjectInformationCategory.project,
+          ),
+        )
+        ..pins.addAll([
+          ProjectInformationPin(
+            id: 'pin-other-a',
+            projectId: _projectA,
+            key: const ProjectInformationKey(
+              space: ProjectInformationKeySpace.systemValue,
+              id: 'other-a',
+            ),
+            sortOrder: 0,
+            revision: 1,
+            createdAt: '2026-09-14T09:00:00.000Z',
+            updatedAt: '2026-09-14T09:00:00.000Z',
+            sourceAvailable: true,
+          ),
+          ProjectInformationPin(
+            id: 'pin-editable',
+            projectId: _projectA,
+            key: const ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'editable-entry',
+            ),
+            sortOrder: 1,
+            revision: 1,
+            createdAt: '2026-09-14T09:00:00.000Z',
+            updatedAt: '2026-09-14T09:00:00.000Z',
+            sourceAvailable: true,
+          ),
+          // A pin after the removed/middle one — restoring the removed pin
+          // at the end (fake `setPin` semantics, matching real behavior)
+          // must differ from its original middle position, so a reorder is
+          // actually attempted and the injected failure below is exercised.
+          ProjectInformationPin(
+            id: 'pin-other-b',
+            projectId: _projectA,
+            key: const ProjectInformationKey(
+              space: ProjectInformationKeySpace.systemValue,
+              id: 'other-b',
+            ),
+            sortOrder: 2,
+            revision: 1,
+            createdAt: '2026-09-14T09:00:00.000Z',
+            updatedAt: '2026-09-14T09:00:00.000Z',
+            sourceAvailable: true,
+          ),
+        ]);
+      await tester.pumpWidget(_testApp(source, mutations: mutations));
+      await tester.pumpAndSettle();
+
+      final actions = find.byKey(
+        const ValueKey('project-information-actions-user-editable-entry'),
+      );
+      await tester.tap(actions);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hızlı Bilgilerden kaldır'));
+      await tester.pumpAndSettle();
+      final undoAction = tester.widget<SnackBarAction>(
+        find.widgetWithText(SnackBarAction, 'Geri al'),
+      );
+      // showSnackBar() only queues behind a still-visible snackbar — it does
+      // not preempt it — so force the prior "kaldırıldı" snackbar closed
+      // immediately rather than depending on its own auto-dismiss timer.
+      tester
+          .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger))
+          .removeCurrentSnackBar();
+      await tester.pump();
+
+      // The concurrent state is unchanged (safe to restore order), but the
+      // order-restoring reorderPins call itself fails transiently.
+      mutations.reorderFailure = const ProjectInformationFailure(
+        'synthetic_reorder_failure',
+      );
+
+      undoAction.onPressed();
+      // Two chained awaits (setPin, then listPins) run before the snackbar
+      // appears; pump twice to let both resolve, then check right away —
+      // a later drain would dismiss it before the assertion.
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Bilgi geri eklendi; sıra korunamadı.'), findsOneWidget);
+      expect(find.text('Geri alma tamamlanamadı.'), findsNothing);
+      await tester.pump(const Duration(seconds: 5));
+
+      // Stage 1 (setPin) succeeded — must never be reported as total
+      // Undo failure.
+      expect(mutations.pinned.last.key.id, 'editable-entry');
+      expect(mutations.pins.map((pin) => pin.id).toSet(), {
+        'pin-other-a',
+        'pin-other-b',
+        'pin-editable',
+      });
+      expect(mutations.reordered, hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: a stale Undo snackbar after a real project switch is a '
+    'safe no-op — it never calls setPin against the newly active project',
+    (tester) async {
+      final source = _FakeProjectInformationSource.standard(
+        includeProjectB: true,
+      );
+      final mutations = _InformationMutations()
+        ..entries.add(
+          _userEntry(
+            'editable-entry',
+            'Kapı kodu',
+            archived: false,
+            category: ProjectInformationCategory.project,
+          ),
+        )
+        ..pins.add(
+          ProjectInformationPin(
+            id: 'pin-editable',
+            projectId: _projectA,
+            key: const ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'editable-entry',
+            ),
+            sortOrder: 0,
+            revision: 1,
+            createdAt: '2026-09-14T09:00:00.000Z',
+            updatedAt: '2026-09-14T09:00:00.000Z',
+            sourceAvailable: true,
+          ),
+        );
+      final application = ProjectInformationApplication(
+        source: source,
+        mutations: mutations,
+      );
+      const pageKey = ValueKey('stable-project-information-page');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProjectInformationPage(
+            key: pageKey,
+            application: application,
+            projectId: _projectA,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final actions = find.byKey(
+        const ValueKey('project-information-actions-user-editable-entry'),
+      );
+      await tester.tap(actions);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hızlı Bilgilerden kaldır'));
+      await tester.pumpAndSettle();
+      expect(mutations.unpinned.single.id, 'pin-editable');
+      final undoAction = tester.widget<SnackBarAction>(
+        find.widgetWithText(SnackBarAction, 'Geri al'),
+      );
+
+      // A real project switch happens on this exact page instance while
+      // the Undo snackbar is still showing.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProjectInformationPage(
+            key: pageKey,
+            application: application,
+            projectId: _projectB,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const Key('project-information-project-name')).first,
+            )
+            .data,
+        'B Projesi',
+      );
+
+      undoAction.onPressed();
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // The stale Undo must be a safe no-op: no setPin call at all.
+      expect(mutations.pinned, isEmpty);
+      expect(mutations.pins, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('revision conflict preserves entry and explains refresh', (
     tester,
   ) async {
@@ -1596,12 +1935,18 @@ class _InformationMutations implements ProjectInformationMutationApplication {
   }
 
   final List<ReorderProjectInformationPinsCommand> reordered = [];
+  Object? reorderFailure;
 
   @override
   Future<List<ProjectInformationPin>> reorderPins(
     ReorderProjectInformationPinsCommand command,
   ) async {
     reordered.add(command);
+    final failure = reorderFailure;
+    if (failure != null) {
+      reorderFailure = null;
+      throw failure;
+    }
     final byId = {for (final pin in pins) pin.id: pin};
     pins
       ..clear()
