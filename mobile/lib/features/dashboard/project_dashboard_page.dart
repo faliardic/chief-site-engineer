@@ -85,7 +85,7 @@ enum _LoadStatus { loading, ready, error }
 
 class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   StreamSubscription<void>? _projectSubscription;
-  StreamSubscription<String>? _pinChangesSubscription;
+  StreamSubscription<String>? _informationChangesSubscription;
   ProjectInformationSession? _informationSession;
   List<MobileProject> _projects = const [];
   ProjectInformationSnapshot? _information;
@@ -170,15 +170,21 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     _projectSubscription = widget.agenda.projectChanges.listen(
       (_) => unawaited(_loadProjects(showLoading: false)),
     );
-    // A pin can be added/removed/reordered from "Tüm proje bilgileri" — a
-    // separate page instance sharing this same ProjectInformationApplication
+    // A pin or a user-entry value can be changed from "Tüm proje bilgileri" —
+    // a separate page instance sharing this same ProjectInformationApplication
     // — while this Dashboard instance stays mounted underneath it on the
     // navigation stack. Without this, Dashboard's already-loaded Hızlı
-    // Bilgiler never learns about that mutation. Filtered to the currently
-    // selected project by `_reloadInformationIfStillSelected` itself.
-    _pinChangesSubscription = widget.projectInformation?.pinChanges.listen(
-      (projectId) => unawaited(_reloadInformationIfStillSelected(projectId)),
-    );
+    // Bilgiler never learns about that mutation (stale value). The shared
+    // stream is the single trigger, emitted exactly once per successful
+    // mutation, and filtered to the currently selected project by
+    // `_reloadInformationIfStillSelected` itself.
+    _informationChangesSubscription = widget
+        .projectInformation
+        ?.informationChanges
+        .listen(
+          (projectId) =>
+              unawaited(_reloadInformationIfStillSelected(projectId)),
+        );
     unawaited(_loadProjects());
   }
 
@@ -187,7 +193,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     _pinAutoScroller?.stopAutoScroll();
     _informationSession?.clearProject();
     _projectSubscription?.cancel();
-    _pinChangesSubscription?.cancel();
+    _informationChangesSubscription?.cancel();
     widget.session.removeListener(_handleActiveProjectChanged);
     super.dispose();
   }

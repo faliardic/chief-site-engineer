@@ -887,7 +887,7 @@ void main() {
 
   testWidgets(
     'Issue #823: a Dashboard-owned pin mutation revalidates exactly once, '
-    'even though the shared pinChanges broadcast is active',
+    'even though the shared informationChanges broadcast is active',
     (tester) async {
       final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
       final mutations = _DashboardMutations();
@@ -949,6 +949,93 @@ void main() {
       expect(mutations.reordered, hasLength(1));
       expect(mutations.reordered.single.orderedPinIds, ['pin-2', 'pin-0']);
       expect(mutations.companionReads - beforeReorder, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: editing a pinned user entry through the shared application '
+    'refreshes Hızlı Bilgiler immediately, exactly once, without a blocking '
+    'loading surface and without leaking another project',
+    (tester) async {
+      final first = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final second = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Güney');
+      final mutations = _DashboardMutations();
+      mutations.entries.add(
+        ProjectInformationEntry(
+          id: 'entry-0',
+          projectId: first.id,
+          category: ProjectInformationCategory.technical,
+          label: 'Pin 0',
+          value: const ProjectInformationEntryValue.text('ESKI'),
+          revision: 1,
+          createdAt: '2026-09-13T09:00:00.000Z',
+          updatedAt: '2026-09-13T09:00:00.000Z',
+        ),
+      );
+      mutations.entries.add(_dashboardUserEntry(second.id, 1));
+      mutations.pins.add(
+        _dashboardPin(
+          first.id,
+          'pin-0',
+          const ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: 'entry-0',
+          ),
+          0,
+        ),
+      );
+      final fixture = _Fixture(projects: [first, second], mutations: mutations);
+      addTearDown(fixture.dispose);
+      fixture.session.select(first.id, [first, second]);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      expect(find.text('ESKI'), findsOneWidget);
+
+      // Simulated: the value is edited from "Tüm proje bilgileri" — a separate
+      // page instance sharing this exact same application in production.
+      final before = mutations.companionReads;
+      await fixture.projectInformation.updateUserEntry(
+        const UpdateProjectInformationEntryCommand(
+          id: 'entry-0',
+          eventId: 'evt-update-0',
+          projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          expectedRevision: 1,
+          category: ProjectInformationCategory.technical,
+          label: 'Pin 0',
+          value: ProjectInformationEntryValue.text('YENI'),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('YENI'), findsOneWidget);
+      expect(find.text('ESKI'), findsNothing);
+      expect(mutations.companionReads - before, 1);
+
+      // A change for the other, non-selected project never leaks in and never
+      // revalidates the visible project.
+      final afterUpdate = mutations.companionReads;
+      await fixture.projectInformation.updateUserEntry(
+        const UpdateProjectInformationEntryCommand(
+          id: 'entry-1',
+          eventId: 'evt-update-1',
+          projectId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          expectedRevision: 1,
+          category: ProjectInformationCategory.technical,
+          label: 'Pin 1',
+          value: ProjectInformationEntryValue.text('SIZINTI'),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(mutations.companionReads - afterUpdate, 0);
+      expect(find.text('SIZINTI'), findsNothing);
+      expect(find.text('YENI'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1308,6 +1395,38 @@ class _DashboardMutations implements ProjectInformationMutationApplication {
       pins: await listPins(projectId),
       siteLocation: await getSiteLocation(projectId),
     );
+  }
+
+  final List<UpdateProjectInformationEntryCommand> updatedEntries = [];
+
+  @override
+  Future<ProjectInformationEntry> updateUserEntry(
+    UpdateProjectInformationEntryCommand command,
+  ) async {
+    updatedEntries.add(command);
+    final index = entries.indexWhere((entry) => entry.id == command.id);
+    if (index < 0) {
+      throw const ProjectInformationFailure('entry_not_found');
+    }
+    final current = entries[index];
+    if (current.revision != command.expectedRevision) {
+      throw const ProjectInformationRevisionConflict();
+    }
+    final next = ProjectInformationEntry(
+      id: current.id,
+      projectId: current.projectId,
+      category: command.category,
+      label: command.label,
+      value: command.value,
+      unit: command.unit,
+      note: command.note,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-09-14T11:00:00.000Z',
+      archivedAt: current.archivedAt,
+    );
+    entries[index] = next;
+    return next;
   }
 
   final List<ReorderProjectInformationPinsCommand> reordered = [];
