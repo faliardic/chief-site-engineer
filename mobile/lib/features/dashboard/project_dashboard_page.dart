@@ -1138,7 +1138,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         ),
       );
       if (!mounted) return;
-      unawaited(_reloadInformationIfStillSelected(project.id));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${item.label} Hızlı Bilgilerden kaldırıldı.'),
@@ -1195,7 +1194,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
       return;
     }
     if (!mounted || widget.session.selectedProjectId != project.id) return;
-    unawaited(_reloadInformationIfStillSelected(project.id));
 
     try {
       final currentPins = await widget.projectInformation!.listPins(project.id);
@@ -1241,10 +1239,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
             },
           ),
         );
-        if (!mounted || widget.session.selectedProjectId != project.id) {
-          return;
-        }
-        unawaited(_reloadInformationIfStillSelected(project.id));
       }
     } on Object {
       if (!mounted) return;
@@ -1284,8 +1278,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           },
         ),
       );
-      if (!mounted) return;
-      unawaited(_reloadInformationIfStillSelected(project.id));
     } on Object {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

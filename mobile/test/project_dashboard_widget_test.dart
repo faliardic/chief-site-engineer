@@ -886,6 +886,74 @@ void main() {
   );
 
   testWidgets(
+    'Issue #823: a Dashboard-owned pin mutation revalidates exactly once, '
+    'even though the shared pinChanges broadcast is active',
+    (tester) async {
+      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final mutations = _DashboardMutations();
+      for (var index = 0; index < 3; index += 1) {
+        mutations.entries.add(_dashboardUserEntry(project.id, index));
+        mutations.pins.add(
+          _dashboardPin(
+            project.id,
+            'pin-$index',
+            ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'entry-$index',
+            ),
+            index,
+          ),
+        );
+      }
+      final fixture = _Fixture(projects: [project], mutations: mutations);
+      addTearDown(fixture.dispose);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-info-edit-toggle')),
+      );
+      await tester.pumpAndSettle();
+
+      // Dashboard-owned remove: the broadcast is the single revalidation
+      // trigger, so the explicit reload that used to run alongside it must be
+      // gone — exactly one nonblocking companion-read turn, no full-page
+      // loading.
+      final beforeRemove = mutations.companionReads;
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-remove-pin-pin-1')),
+      );
+      await tester.pump();
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
+      expect(mutations.unpinned.single.id, 'pin-1');
+      expect(mutations.companionReads - beforeRemove, 1);
+
+      // Dashboard-owned drag reorder: exactly one further revalidation.
+      final beforeReorder = mutations.companionReads;
+      final drag = find.byKey(const Key('dashboard-quick-drag-pin-pin-0'));
+      final target = find.byKey(const Key('dashboard-quick-pin-pin-2'));
+      final gesture = await tester.startGesture(tester.getCenter(drag));
+      await gesture.moveTo(tester.getCenter(target));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
+      expect(mutations.reordered, hasLength(1));
+      expect(mutations.reordered.single.orderedPinIds, ['pin-2', 'pin-0']);
+      expect(mutations.companionReads - beforeReorder, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Issue #823: drag reorder covers the full active set beyond the six '
     'visible cards and includes an unavailable pin',
     (tester) async {
@@ -1216,6 +1284,11 @@ class _DashboardMutations implements ProjectInformationMutationApplication {
 
   ProjectSiteLocation? siteLocation;
 
+  /// Counts Dashboard information revalidation turns (entries into the shared
+  /// companion-read boundary). Used to prove a Dashboard-owned pin mutation is
+  /// revalidated exactly once by the shared `pinChanges` broadcast.
+  int companionReads = 0;
+
   @override
   Future<ProjectSiteLocation?> getSiteLocation(String projectId) async =>
       siteLocation?.projectId == projectId ? siteLocation : null;
@@ -1225,11 +1298,17 @@ class _DashboardMutations implements ProjectInformationMutationApplication {
     String projectId, {
     ProjectInformationArchiveFilter archiveFilter =
         ProjectInformationArchiveFilter.active,
-  }) async => ProjectInformationCompanionReads(
-    userEntries: await listUserEntries(projectId, archiveFilter: archiveFilter),
-    pins: await listPins(projectId),
-    siteLocation: await getSiteLocation(projectId),
-  );
+  }) async {
+    companionReads += 1;
+    return ProjectInformationCompanionReads(
+      userEntries: await listUserEntries(
+        projectId,
+        archiveFilter: archiveFilter,
+      ),
+      pins: await listPins(projectId),
+      siteLocation: await getSiteLocation(projectId),
+    );
+  }
 
   final List<ReorderProjectInformationPinsCommand> reordered = [];
   Object? reorderFailure;
