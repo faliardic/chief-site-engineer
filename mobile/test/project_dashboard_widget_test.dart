@@ -67,6 +67,8 @@ void main() {
 
       expect(find.text('Aktif Proje'), findsOneWidget);
       expect(find.text('Hızlı Bilgiler'), findsOneWidget);
+      expect(find.text('+ Ekle'), findsOneWidget);
+      expect(find.text('Düzenle'), findsOneWidget);
       expect(find.text('Kuzey'), findsOneWidget);
       expect(
         find.descendant(
@@ -128,103 +130,6 @@ void main() {
     expect(openedSeed, 'unset');
   });
 
-  testWidgets('secondary profile editor preserves edit add and archive', (
-    tester,
-  ) async {
-    final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
-    final fixture = _Fixture(projects: [project]);
-    addTearDown(fixture.dispose);
-    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
-    await tester.pumpAndSettle();
-    await _openProfileEditor(tester);
-
-    final totalFloors = fixture.agenda.projectProfileFields[project.id]!
-        .singleWhere(
-          (field) =>
-              field.builtinField == ProjectProfileBuiltinField.totalFloors,
-        );
-    final totalFloorsCell = find.byKey(
-      ValueKey('project-profile-field-${totalFloors.id}'),
-    );
-    await tester.scrollUntilVisible(
-      totalFloorsCell,
-      150,
-      scrollable: _dashboardScrollable(),
-    );
-    await tester.tap(totalFloorsCell);
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('project-profile-edit-value')),
-      '12',
-    );
-    await tester.tap(find.byKey(const Key('project-profile-save-field')));
-    await tester.pumpAndSettle();
-    expect(
-      fixture.agenda.projectProfileFields[project.id]!
-          .singleWhere((field) => field.id == totalFloors.id)
-          .value,
-      '12',
-    );
-
-    final add = find.byKey(const Key('project-profile-add-field'));
-    await tester.scrollUntilVisible(
-      add,
-      150,
-      scrollable: _dashboardScrollable(),
-    );
-    expect(tester.getSize(add).height, greaterThanOrEqualTo(48));
-    await tester.tap(add);
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('project-profile-new-label')),
-      'Yapı sınıfı',
-    );
-    await tester.enterText(
-      find.byKey(const Key('project-profile-new-value')),
-      '4A',
-    );
-    await tester.tap(find.byKey(const Key('project-profile-create-field')));
-    await tester.pumpAndSettle();
-    final custom = fixture.agenda.projectProfileFields[project.id]!.singleWhere(
-      (field) => !field.isBuiltIn,
-    );
-    expect(custom.label, 'Yapı sınıfı');
-    expect(custom.value, '4A');
-
-    final customCell = find.byKey(
-      ValueKey('project-profile-field-${custom.id}'),
-    );
-    await tester.scrollUntilVisible(
-      customCell,
-      150,
-      scrollable: _dashboardScrollable(),
-    );
-    await tester.tap(customCell);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(ValueKey('project-profile-archive-${custom.id}')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('project-profile-confirm-archive')));
-    await tester.pumpAndSettle();
-    expect(
-      fixture.agenda.projectProfileFields[project.id]!
-          .singleWhere((field) => field.id == custom.id)
-          .isArchived,
-      isTrue,
-    );
-    expect(customCell, findsNothing);
-    expect(
-      fixture.agenda.projectProfileEvents.map((event) => event.eventType),
-      containsAllInOrder([
-        ProjectProfileEventType.fieldUpdated,
-        ProjectProfileEventType.fieldCreated,
-        ProjectProfileEventType.fieldArchived,
-      ]),
-    );
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('inventory failure does not look like empty quick information', (
     tester,
   ) async {
@@ -246,141 +151,6 @@ void main() {
     }
     expect(tester.takeException(), isNull);
   });
-
-  testWidgets('secondary profile editor drag reorder persists exact order', (
-    tester,
-  ) async {
-    final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
-    final fixture = _Fixture(projects: [project]);
-    addTearDown(fixture.dispose);
-    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
-    await tester.pumpAndSettle();
-    await _openProfileEditor(tester);
-    final fields = List.of(fixture.agenda.projectProfileFields[project.id]!);
-    final firstDrag = find.byKey(
-      ValueKey('project-profile-drag-${fields.first.id}'),
-    );
-    final lastCell = find.byKey(
-      ValueKey('project-profile-field-${fields.last.id}'),
-    );
-    await tester.scrollUntilVisible(
-      lastCell,
-      150,
-      scrollable: _dashboardScrollable(),
-    );
-    expect(tester.getSize(firstDrag), const Size(48, 48));
-    final gesture = await tester.startGesture(tester.getCenter(firstDrag));
-    await gesture.moveTo(tester.getCenter(lastCell));
-    await tester.pump();
-    await gesture.up();
-    await tester.pumpAndSettle();
-
-    expect(
-      fixture.agenda.projectProfileFields[project.id]!
-          .where((field) => !field.isArchived)
-          .map((field) => field.label),
-      ['Toplam alan', 'YİBF No', 'Toplam kat'],
-    );
-    expect(
-      fixture.agenda.projectProfileEvents.last.eventType,
-      ProjectProfileEventType.fieldsReordered,
-    );
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets(
-    'secondary editor drag scrolls to later fields and survives reload',
-    (tester) async {
-      tester.view.physicalSize = const Size(320, 500);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
-      final fixture = _Fixture(projects: [project]);
-      addTearDown(fixture.dispose);
-      final fields = [
-        ..._profile(project, totalFloors: '12').fields,
-        for (var index = 0; index < 15; index += 1)
-          ProjectProfileField(
-            id: 'custom-$index',
-            projectId: project.id,
-            label: 'Alan $index',
-            value: 'Değer $index',
-            sortOrder: index + 3,
-            revision: 1,
-            createdAt: project.createdAt,
-            updatedAt: project.updatedAt,
-          ),
-      ];
-      fixture.agenda.projectProfileFields[project.id] = fields;
-      await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
-      await tester.pumpAndSettle();
-      await _openProfileEditor(tester);
-      final firstDrag = find.byKey(
-        ValueKey('project-profile-drag-${fields.first.id}'),
-      );
-      final scroll = tester.state<ScrollableState>(_dashboardScrollable());
-      scroll.position.jumpTo(scroll.position.minScrollExtent);
-      await tester.pump();
-      await tester.scrollUntilVisible(
-        firstDrag,
-        100,
-        scrollable: _dashboardScrollable(),
-      );
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(firstDrag);
-      await tester.pumpAndSettle();
-      final viewport = tester.getRect(_dashboardScrollable());
-      expect(firstDrag.hitTestable(), findsOneWidget);
-      final startingOffset = scroll.position.pixels;
-      expect(scroll.position.maxScrollExtent, greaterThan(startingOffset));
-      final gesture = await tester.startGesture(tester.getCenter(firstDrag));
-      await gesture.moveBy(const Offset(24, 0));
-      await tester.pump();
-      for (var index = 0; index < 20; index += 1) {
-        await gesture.moveTo(
-          Offset(viewport.center.dx, viewport.bottom - (index.isEven ? 2 : 1)),
-        );
-        await tester.pump(const Duration(milliseconds: 100));
-      }
-      expect(scroll.position.pixels, greaterThan(startingOffset));
-      final target = find.byKey(
-        ValueKey('project-profile-field-${fields[10].id}'),
-      );
-      await tester.ensureVisible(target);
-      await tester.pump(const Duration(milliseconds: 100));
-      await gesture.moveTo(tester.getCenter(target));
-      await tester.pump();
-      await gesture.up();
-      await tester.pumpAndSettle();
-      final expected = fields.map((field) => field.id).toList();
-      expected.insert(10, expected.removeAt(0));
-      expect(
-        fixture.agenda.projectProfileFields[project.id]!.map(
-          (field) => field.id,
-        ),
-        expected,
-      );
-      expect(
-        fixture.agenda.projectProfileEvents.last.eventType,
-        ProjectProfileEventType.fieldsReordered,
-      );
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pumpAndSettle();
-      await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
-      await tester.pumpAndSettle();
-      await _openProfileEditor(tester);
-      final grid = tester.widget<Wrap>(
-        find.byKey(const Key('project-profile-fields')),
-      );
-      expect(
-        grid.children.take(fields.length).map((child) => child.key),
-        expected.map((id) => ValueKey('project-profile-field-$id')),
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
 
   for (final width in [320.0, 390.0, 600.0, 840.0]) {
     testWidgets('compact hierarchy fits $width width and large text', (
@@ -412,6 +182,16 @@ void main() {
       expect(find.descendant(of: header, matching: create), findsOneWidget);
       expect(find.descendant(of: header, matching: tools), findsOneWidget);
       for (final action in [create, tools]) {
+        expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+      }
+      final quickAdd = find.byKey(const Key('dashboard-quick-info-add'));
+      final quickEdit = find.byKey(
+        const Key('dashboard-quick-info-edit-toggle'),
+      );
+      expect(find.text('+ Ekle'), findsOneWidget);
+      expect(find.text('Düzenle'), findsOneWidget);
+      for (final action in [quickAdd, quickEdit]) {
         expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
         expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
       }
@@ -531,60 +311,6 @@ void main() {
     expect(find.text('Yeni Kuzey'), findsNothing);
     expect(agenda.projects.first.name, 'Yeni Kuzey');
     expect(agenda.projects.last, same(second));
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('pending profile mutation cannot supersede a project switch', (
-    tester,
-  ) async {
-    final first = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
-    final second = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Güney');
-    final gate = Completer<void>();
-    final agenda = _PendingProfileAgenda(projects: [first, second])
-      ..updateGate = gate;
-    final fixture = _Fixture(projects: agenda.projects, agenda: agenda);
-    addTearDown(fixture.dispose);
-    fixture.source.metadataByProject[second.id] = _metadata(
-      second.id,
-      address: 'Güney adresi',
-    );
-    fixture.session.select(first.id, agenda.projects);
-    await tester.pumpWidget(fixture.app(onOpenProjectInformation: (_, _) {}));
-    await tester.pumpAndSettle();
-    await _openProfileEditor(tester);
-    final field = agenda.projectProfileFields[first.id]!.first;
-    final fieldCell = find.byKey(ValueKey('project-profile-field-${field.id}'));
-    await tester.scrollUntilVisible(
-      fieldCell,
-      150,
-      scrollable: _dashboardScrollable(),
-    );
-    await tester.tap(fieldCell);
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('project-profile-edit-value')),
-      'Eski projeye ait yeni değer',
-    );
-    await tester.tap(find.byKey(const Key('project-profile-save-field')));
-    await tester.pump();
-
-    expect(fixture.session.select(second.id, agenda.projects), isTrue);
-    await tester.pumpAndSettle();
-    expect(find.text('Güney'), findsOneWidget);
-    expect(find.text('Güney adresi'), findsOneWidget);
-    gate.complete();
-    await tester.pumpAndSettle();
-
-    expect(fixture.session.selectedProjectId, second.id);
-    expect(find.text('Güney'), findsOneWidget);
-    expect(find.text('Güney adresi'), findsOneWidget);
-    expect(find.text('Eski projeye ait yeni değer'), findsNothing);
-    expect(
-      agenda.projectProfileFields[first.id]!
-          .singleWhere((item) => item.id == field.id)
-          .value,
-      'Eski projeye ait yeni değer',
-    );
     expect(tester.takeException(), isNull);
   });
 
@@ -809,6 +535,591 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Issue #823: Hızlı Bilgiler middle-pin Undo restores exact prior order '
+    'without full-page loading or deleting source entries',
+    (tester) async {
+      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final mutations = _DashboardMutations();
+      for (var index = 0; index < 3; index += 1) {
+        mutations.entries.add(_dashboardUserEntry(project.id, index));
+        mutations.pins.add(
+          _dashboardPin(
+            project.id,
+            'pin-$index',
+            ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'entry-$index',
+            ),
+            index,
+          ),
+        );
+      }
+      final fixture = _Fixture(projects: [project], mutations: mutations);
+      addTearDown(fixture.dispose);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      expect(mutations.pins.map((pin) => pin.id).toList(), [
+        'pin-0',
+        'pin-1',
+        'pin-2',
+      ]);
+
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-info-edit-toggle')),
+      );
+      await tester.pumpAndSettle();
+      final remove = find.byKey(const Key('dashboard-quick-remove-pin-pin-1'));
+      final drag = find.byKey(const Key('dashboard-quick-drag-pin-pin-1'));
+      expect(remove, findsOneWidget);
+      expect(drag, findsOneWidget);
+      for (final control in [remove, drag]) {
+        expect(tester.getSize(control).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+      }
+
+      await tester.tap(remove);
+      await tester.pump();
+      expect(find.byKey(const Key('dashboard-loading-projects')), findsNothing);
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
+      expect(mutations.unpinned.single.id, 'pin-1');
+      expect(mutations.pins.map((pin) => pin.id).toList(), ['pin-0', 'pin-2']);
+      expect(find.text('Pin 1 Hızlı Bilgilerden kaldırıldı.'), findsOneWidget);
+      expect(mutations.entries.map((entry) => entry.id).toList(), [
+        'entry-0',
+        'entry-1',
+        'entry-2',
+      ]);
+
+      await tester.tap(find.text('Geri al'));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
+      expect(mutations.pinned.single.key.id, 'entry-1');
+      expect(mutations.pins.map((pin) => pin.id).toList(), [
+        'pin-0',
+        'pin-1',
+        'pin-2',
+      ]);
+      expect(mutations.reordered, hasLength(1));
+      expect(mutations.reordered.single.orderedPinIds, [
+        'pin-0',
+        'pin-1',
+        'pin-2',
+      ]);
+      expect(find.text('Pin 1'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: Undo never overwrites a legitimate concurrent reorder of '
+    'the remaining pins',
+    (tester) async {
+      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final mutations = _DashboardMutations();
+      for (var index = 0; index < 3; index += 1) {
+        mutations.entries.add(_dashboardUserEntry(project.id, index));
+        mutations.pins.add(
+          _dashboardPin(
+            project.id,
+            'pin-$index',
+            ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'entry-$index',
+            ),
+            index,
+          ),
+        );
+      }
+      final fixture = _Fixture(projects: [project], mutations: mutations);
+      addTearDown(fixture.dispose);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-info-edit-toggle')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-remove-pin-pin-1')),
+      );
+      await tester.pumpAndSettle();
+      expect(mutations.pins.map((pin) => pin.id).toList(), ['pin-0', 'pin-2']);
+
+      // A legitimate concurrent action reorders the two remaining pins
+      // while the Undo snackbar is still showing — this must survive.
+      final beforeReorder = {
+        for (final pin in mutations.pins) pin.id: pin.revision,
+      };
+      await mutations.reorderPins(
+        ReorderProjectInformationPinsCommand(
+          eventId: 'concurrent-reorder',
+          projectId: project.id,
+          orderedPinIds: ['pin-2', 'pin-0'],
+          expectedRevisions: beforeReorder,
+        ),
+      );
+      expect(mutations.reordered, hasLength(1));
+
+      await tester.tap(find.text('Geri al'));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // setPin (stage 1) still succeeds — the pin itself is restored.
+      expect(mutations.pinned.single.key.id, 'entry-1');
+      expect(mutations.pins.map((pin) => pin.id).toSet(), {
+        'pin-0',
+        'pin-1',
+        'pin-2',
+      });
+      // Stage 2 must NOT have issued a second, order-restoring reorderPins
+      // call that would have overwritten the concurrent ['pin-2', 'pin-0']
+      // reorder — only the one concurrent call above exists.
+      expect(mutations.reordered, hasLength(1));
+      // The concurrent reorder's relative order survives; the restored pin
+      // is appended, not spliced back into its old middle position.
+      expect(mutations.pins.map((pin) => pin.id).toList(), [
+        'pin-2',
+        'pin-0',
+        'pin-1',
+      ]);
+      expect(
+        find.text(
+          'Bilgi geri eklendi; eşzamanlı değişiklik nedeniyle sıra korunamadı.',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: a post-restore order-fix failure is reported as partial '
+    'success, not total Undo failure, and still revalidates',
+    (tester) async {
+      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final mutations = _DashboardMutations();
+      for (var index = 0; index < 3; index += 1) {
+        mutations.entries.add(_dashboardUserEntry(project.id, index));
+        mutations.pins.add(
+          _dashboardPin(
+            project.id,
+            'pin-$index',
+            ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'entry-$index',
+            ),
+            index,
+          ),
+        );
+      }
+      final fixture = _Fixture(projects: [project], mutations: mutations);
+      addTearDown(fixture.dispose);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-info-edit-toggle')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-remove-pin-pin-1')),
+      );
+      await tester.pumpAndSettle();
+
+      // The concurrent state is unchanged (safe to restore order), but the
+      // order-restoring reorderPins call itself fails transiently.
+      mutations.reorderFailure = const ProjectInformationFailure(
+        'synthetic_reorder_failure',
+      );
+
+      await tester.tap(find.text('Geri al'));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // Stage 1 (setPin) succeeded: the pin is genuinely restored — this
+      // must never be reported as if Undo failed entirely.
+      expect(mutations.pinned.single.key.id, 'entry-1');
+      expect(mutations.pins.map((pin) => pin.id).toSet(), {
+        'pin-0',
+        'pin-1',
+        'pin-2',
+      });
+      expect(mutations.reordered, hasLength(1));
+      expect(find.text('Bilgi geri eklendi; sıra korunamadı.'), findsOneWidget);
+      expect(find.text('Geri alma tamamlanamadı.'), findsNothing);
+      // Nonblocking revalidation still ran: the restored pin is visible on
+      // Hızlı Bilgiler, not stuck showing the pre-Undo two-pin state.
+      expect(find.text('Pin 1'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: a stale Undo snackbar after a real project switch is a '
+    'safe no-op — it never mutates the newly active project',
+    (tester) async {
+      final first = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final second = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Güney');
+      final mutations = _DashboardMutations();
+      mutations.entries.add(_dashboardUserEntry(first.id, 0));
+      mutations.pins.add(
+        _dashboardPin(
+          first.id,
+          'pin-0',
+          const ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: 'entry-0',
+          ),
+          0,
+        ),
+      );
+      final fixture = _Fixture(projects: [first, second], mutations: mutations);
+      addTearDown(fixture.dispose);
+      fixture.session.select(first.id, [first, second]);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-info-edit-toggle')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-remove-pin-pin-0')),
+      );
+      await tester.pumpAndSettle();
+      expect(mutations.unpinned.single.id, 'pin-0');
+      final undo = find.text('Geri al');
+      expect(undo, findsOneWidget);
+
+      // A real project switch happens while the Undo snackbar is still up.
+      expect(fixture.session.select(second.id, [first, second]), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.text('Güney'), findsOneWidget);
+
+      await tester.tap(undo, warnIfMissed: false);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // The stale Undo must be a safe no-op: no setPin call at all, and
+      // project A's removed pin stays removed.
+      expect(mutations.pinned, isEmpty);
+      expect(mutations.pins.map((pin) => pin.id).toList(), isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: a pin added through the shared application from another '
+    'page appears in Hızlı Bilgiler without full-page loading, and a pin '
+    'change for a different, non-selected project never leaks in',
+    (tester) async {
+      final first = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final second = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Güney');
+      final mutations = _DashboardMutations();
+      mutations.entries.add(_dashboardUserEntry(first.id, 0));
+      mutations.entries.add(_dashboardUserEntry(second.id, 1));
+      final fixture = _Fixture(projects: [first, second], mutations: mutations);
+      addTearDown(fixture.dispose);
+      fixture.session.select(first.id, [first, second]);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+
+      // No pins yet: Hızlı Bilgiler shows the computed fallback set.
+      expect(find.text('Pin 0'), findsNothing);
+
+      // Simulated: the pin is added from "Tüm proje bilgileri" — a
+      // different page instance that shares this exact same
+      // ProjectInformationApplication in production — never through any
+      // Dashboard-owned mutation call.
+      await fixture.projectInformation.setPin(
+        const SetProjectInformationPinCommand(
+          id: 'pin-0',
+          eventId: 'evt-pin-0',
+          projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          key: ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: 'entry-0',
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      expect(find.text('Pin 0'), findsOneWidget);
+
+      // A pin change for the *other*, non-selected project must never leak
+      // into the currently active project's Hızlı Bilgiler.
+      await fixture.projectInformation.setPin(
+        const SetProjectInformationPinCommand(
+          id: 'pin-1',
+          eventId: 'evt-pin-1',
+          projectId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          key: ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: 'entry-1',
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Pin 1'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: a Dashboard-owned pin mutation revalidates exactly once, '
+    'even though the shared informationChanges broadcast is active',
+    (tester) async {
+      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final mutations = _DashboardMutations();
+      for (var index = 0; index < 3; index += 1) {
+        mutations.entries.add(_dashboardUserEntry(project.id, index));
+        mutations.pins.add(
+          _dashboardPin(
+            project.id,
+            'pin-$index',
+            ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'entry-$index',
+            ),
+            index,
+          ),
+        );
+      }
+      final fixture = _Fixture(projects: [project], mutations: mutations);
+      addTearDown(fixture.dispose);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-info-edit-toggle')),
+      );
+      await tester.pumpAndSettle();
+
+      // Dashboard-owned remove: the broadcast is the single revalidation
+      // trigger, so the explicit reload that used to run alongside it must be
+      // gone — exactly one nonblocking companion-read turn, no full-page
+      // loading.
+      final beforeRemove = mutations.companionReads;
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-remove-pin-pin-1')),
+      );
+      await tester.pump();
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
+      expect(mutations.unpinned.single.id, 'pin-1');
+      expect(mutations.companionReads - beforeRemove, 1);
+
+      // Dashboard-owned drag reorder: exactly one further revalidation.
+      final beforeReorder = mutations.companionReads;
+      final drag = find.byKey(const Key('dashboard-quick-drag-pin-pin-0'));
+      final target = find.byKey(const Key('dashboard-quick-pin-pin-2'));
+      final gesture = await tester.startGesture(tester.getCenter(drag));
+      await gesture.moveTo(tester.getCenter(target));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
+      expect(mutations.reordered, hasLength(1));
+      expect(mutations.reordered.single.orderedPinIds, ['pin-2', 'pin-0']);
+      expect(mutations.companionReads - beforeReorder, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: editing a pinned user entry through the shared application '
+    'refreshes Hızlı Bilgiler immediately, exactly once, without a blocking '
+    'loading surface and without leaking another project',
+    (tester) async {
+      final first = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final second = _project('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Güney');
+      final mutations = _DashboardMutations();
+      mutations.entries.add(
+        ProjectInformationEntry(
+          id: 'entry-0',
+          projectId: first.id,
+          category: ProjectInformationCategory.technical,
+          label: 'Pin 0',
+          value: const ProjectInformationEntryValue.text('ESKI'),
+          revision: 1,
+          createdAt: '2026-09-13T09:00:00.000Z',
+          updatedAt: '2026-09-13T09:00:00.000Z',
+        ),
+      );
+      mutations.entries.add(_dashboardUserEntry(second.id, 1));
+      mutations.pins.add(
+        _dashboardPin(
+          first.id,
+          'pin-0',
+          const ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: 'entry-0',
+          ),
+          0,
+        ),
+      );
+      final fixture = _Fixture(projects: [first, second], mutations: mutations);
+      addTearDown(fixture.dispose);
+      fixture.session.select(first.id, [first, second]);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      expect(find.text('ESKI'), findsOneWidget);
+
+      // Simulated: the value is edited from "Tüm proje bilgileri" — a separate
+      // page instance sharing this exact same application in production.
+      final before = mutations.companionReads;
+      await fixture.projectInformation.updateUserEntry(
+        const UpdateProjectInformationEntryCommand(
+          id: 'entry-0',
+          eventId: 'evt-update-0',
+          projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          expectedRevision: 1,
+          category: ProjectInformationCategory.technical,
+          label: 'Pin 0',
+          value: ProjectInformationEntryValue.text('YENI'),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('YENI'), findsOneWidget);
+      expect(find.text('ESKI'), findsNothing);
+      expect(mutations.companionReads - before, 1);
+
+      // A change for the other, non-selected project never leaks in and never
+      // revalidates the visible project.
+      final afterUpdate = mutations.companionReads;
+      await fixture.projectInformation.updateUserEntry(
+        const UpdateProjectInformationEntryCommand(
+          id: 'entry-1',
+          eventId: 'evt-update-1',
+          projectId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          expectedRevision: 1,
+          category: ProjectInformationCategory.technical,
+          label: 'Pin 1',
+          value: ProjectInformationEntryValue.text('SIZINTI'),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(mutations.companionReads - afterUpdate, 0);
+      expect(find.text('SIZINTI'), findsNothing);
+      expect(find.text('YENI'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Issue #823: drag reorder covers the full active set beyond the six '
+    'visible cards and includes an unavailable pin',
+    (tester) async {
+      final project = _project('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Kuzey');
+      final mutations = _DashboardMutations();
+      for (var index = 0; index < 7; index += 1) {
+        mutations.entries.add(_dashboardUserEntry(project.id, index));
+        mutations.pins.add(
+          _dashboardPin(
+            project.id,
+            'pin-$index',
+            ProjectInformationKey(
+              space: ProjectInformationKeySpace.userEntry,
+              id: 'entry-$index',
+            ),
+            index,
+          ),
+        );
+      }
+      mutations.pins.add(
+        _dashboardPin(
+          project.id,
+          'missing-pin',
+          const ProjectInformationKey(
+            space: ProjectInformationKeySpace.userEntry,
+            id: 'removed-entry',
+          ),
+          7,
+          sourceAvailable: false,
+        ),
+      );
+      final fixture = _Fixture(projects: [project], mutations: mutations);
+      addTearDown(fixture.dispose);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('dashboard-quick-info-edit-toggle')),
+      );
+      await tester.pumpAndSettle();
+
+      final firstDrag = find.byKey(const Key('dashboard-quick-drag-pin-pin-0'));
+      final secondCard = find.byKey(const Key('dashboard-quick-pin-pin-1'));
+      final gesture = await tester.startGesture(tester.getCenter(firstDrag));
+      await gesture.moveTo(tester.getCenter(secondCard));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+      expect(
+        find.byKey(const Key('dashboard-project-information-loading')),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
+
+      expect(mutations.reordered, hasLength(1));
+      expect(mutations.reordered.single.orderedPinIds, [
+        'pin-1',
+        'pin-0',
+        'pin-2',
+        'pin-3',
+        'pin-4',
+        'pin-5',
+        'pin-6',
+        'missing-pin',
+      ]);
+      expect(mutations.reordered.single.expectedRevisions.keys.toSet(), {
+        'pin-0',
+        'pin-1',
+        'pin-2',
+        'pin-3',
+        'pin-4',
+        'pin-5',
+        'pin-6',
+        'missing-pin',
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('project switch rejects delayed user entries and pins', (
     tester,
   ) async {
@@ -857,48 +1168,6 @@ void main() {
     expect(find.text('Güney'), findsOneWidget);
     expect(find.text('Pin 2'), findsOneWidget);
     expect(find.text('Pin 1'), findsNothing);
-  });
-
-  testWidgets(
-    'Profil action visibly expands and scrolls to the profile editor',
-    (tester) async {
-      final project = _project('11111111-1111-4111-8111-111111111111', 'Kuzey');
-      final fixture = _Fixture(projects: [project]);
-      addTearDown(fixture.dispose);
-
-      await tester.pumpWidget(fixture.app());
-      await tester.pumpAndSettle();
-
-      final editorTitle = find.text('Profil alanlarını düzenle');
-      expect(
-        tester
-            .widgetList<ExpansionTile>(
-              find.ancestor(
-                of: editorTitle,
-                matching: find.byType(ExpansionTile),
-              ),
-            )
-            .isEmpty,
-        isFalse,
-      );
-
-      await tester.tap(find.byKey(const Key('dashboard-action-profile')));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('project-profile-fields')), findsOneWidget);
-    },
-  );
-
-  testWidgets('Profil action stays disabled with no active project', (
-    tester,
-  ) async {
-    final fixture = _Fixture(projects: const []);
-    addTearDown(fixture.dispose);
-
-    await tester.pumpWidget(fixture.app());
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('dashboard-action-profile')), findsNothing);
   });
 
   testWidgets(
@@ -1102,9 +1371,168 @@ class _DashboardMutations implements ProjectInformationMutationApplication {
 
   ProjectSiteLocation? siteLocation;
 
+  /// Counts Dashboard information revalidation turns (entries into the shared
+  /// companion-read boundary). Used to prove a Dashboard-owned pin mutation is
+  /// revalidated exactly once by the shared `pinChanges` broadcast.
+  int companionReads = 0;
+
   @override
   Future<ProjectSiteLocation?> getSiteLocation(String projectId) async =>
       siteLocation?.projectId == projectId ? siteLocation : null;
+
+  @override
+  Future<ProjectInformationCompanionReads> listCompanionReads(
+    String projectId, {
+    ProjectInformationArchiveFilter archiveFilter =
+        ProjectInformationArchiveFilter.active,
+  }) async {
+    companionReads += 1;
+    return ProjectInformationCompanionReads(
+      userEntries: await listUserEntries(
+        projectId,
+        archiveFilter: archiveFilter,
+      ),
+      pins: await listPins(projectId),
+      siteLocation: await getSiteLocation(projectId),
+    );
+  }
+
+  final List<UpdateProjectInformationEntryCommand> updatedEntries = [];
+
+  @override
+  Future<ProjectInformationEntry> updateUserEntry(
+    UpdateProjectInformationEntryCommand command,
+  ) async {
+    updatedEntries.add(command);
+    final index = entries.indexWhere((entry) => entry.id == command.id);
+    if (index < 0) {
+      throw const ProjectInformationFailure('entry_not_found');
+    }
+    final current = entries[index];
+    if (current.revision != command.expectedRevision) {
+      throw const ProjectInformationRevisionConflict();
+    }
+    final next = ProjectInformationEntry(
+      id: current.id,
+      projectId: current.projectId,
+      category: command.category,
+      label: command.label,
+      value: command.value,
+      unit: command.unit,
+      note: command.note,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-09-14T11:00:00.000Z',
+      archivedAt: current.archivedAt,
+    );
+    entries[index] = next;
+    return next;
+  }
+
+  final List<ReorderProjectInformationPinsCommand> reordered = [];
+  Object? reorderFailure;
+
+  @override
+  Future<List<ProjectInformationPin>> reorderPins(
+    ReorderProjectInformationPinsCommand command,
+  ) async {
+    reordered.add(command);
+    final failure = reorderFailure;
+    if (failure != null) {
+      reorderFailure = null;
+      throw failure;
+    }
+    final active = pins
+        .where((pin) => pin.projectId == command.projectId)
+        .toList(growable: false);
+    final activeIds = {for (final pin in active) pin.id};
+    final orderedIds = command.orderedPinIds.toSet();
+    if (command.orderedPinIds.length != active.length ||
+        orderedIds.length != activeIds.length ||
+        !orderedIds.containsAll(activeIds)) {
+      throw const ProjectInformationFailure('pin_order_must_cover_active_set');
+    }
+    if (command.expectedRevisions.keys.toSet().length != activeIds.length ||
+        !command.expectedRevisions.keys.toSet().containsAll(activeIds)) {
+      throw const ProjectInformationFailure('pin_revision_set_mismatch');
+    }
+    for (final pin in active) {
+      if (command.expectedRevisions[pin.id] != pin.revision) {
+        throw const ProjectInformationRevisionConflict();
+      }
+    }
+    final byId = {for (final pin in active) pin.id: pin};
+    pins.removeWhere((pin) => pin.projectId == command.projectId);
+    pins.addAll([
+      for (var index = 0; index < command.orderedPinIds.length; index += 1)
+        ProjectInformationPin(
+          id: byId[command.orderedPinIds[index]]!.id,
+          projectId: byId[command.orderedPinIds[index]]!.projectId,
+          key: byId[command.orderedPinIds[index]]!.key,
+          sortOrder: index,
+          revision: byId[command.orderedPinIds[index]]!.revision + 1,
+          createdAt: byId[command.orderedPinIds[index]]!.createdAt,
+          updatedAt: '2026-09-14T10:00:00.000Z',
+          sourceAvailable: byId[command.orderedPinIds[index]]!.sourceAvailable,
+        ),
+    ]);
+    return listPins(command.projectId);
+  }
+
+  final List<SetProjectInformationPinCommand> pinned = [];
+  final List<RemoveProjectInformationPinCommand> unpinned = [];
+
+  final Map<String, String> _archivedPinIdsByKey = {};
+
+  String _pinKeyString(ProjectInformationKey key) => '${key.space}:${key.id}';
+
+  @override
+  Future<ProjectInformationPin> setPin(
+    SetProjectInformationPinCommand command,
+  ) async {
+    pinned.add(command);
+    final activeMatch = pins.where(
+      (existing) =>
+          existing.key.space == command.key.space &&
+          existing.key.id == command.key.id,
+    );
+    if (activeMatch.isNotEmpty) {
+      if (activeMatch.single.id != command.id) {
+        throw const ProjectInformationFailure('duplicate_active_pin');
+      }
+      return activeMatch.single;
+    }
+    final keyString = _pinKeyString(command.key);
+    final archivedId = _archivedPinIdsByKey[keyString];
+    if (archivedId != null && archivedId != command.id) {
+      throw const ProjectInformationFailure('pin_identity_mismatch');
+    }
+    _archivedPinIdsByKey.remove(keyString);
+    final projectPins = pins.where((pin) => pin.projectId == command.projectId);
+    final pin = ProjectInformationPin(
+      id: command.id,
+      projectId: command.projectId,
+      key: command.key,
+      sortOrder: projectPins.length,
+      revision: 1,
+      createdAt: '2026-09-14T10:00:00.000Z',
+      updatedAt: '2026-09-14T10:00:00.000Z',
+      sourceAvailable: true,
+    );
+    pins.add(pin);
+    return pin;
+  }
+
+  @override
+  Future<void> removePin(RemoveProjectInformationPinCommand command) async {
+    unpinned.add(command);
+    final removed = pins.where((pin) => pin.id == command.id);
+    if (removed.isNotEmpty) {
+      _archivedPinIdsByKey[_pinKeyString(removed.single.key)] =
+          removed.single.id;
+    }
+    pins.removeWhere((pin) => pin.id == command.id);
+  }
 
   @override
   Future<ProjectSiteLocation> setSiteLocation(
@@ -1146,6 +1574,12 @@ class _Fixture {
   late final _DashboardInformationSource source;
   final ProjectInformationMutationApplication? mutations;
   final ActiveProjectSession session = ActiveProjectSession();
+  // The exact same shared application instance the built Dashboard widget
+  // receives — exposed so a test can call setPin/removePin/reorderPins on
+  // it directly, simulating a mutation made by another page (e.g. "Tüm
+  // proje bilgileri") that shares this same instance in production.
+  late final ProjectInformationApplication projectInformation =
+      ProjectInformationApplication(source: source, mutations: mutations);
 
   Widget app({
     VoidCallback? onCreateProject,
@@ -1169,10 +1603,7 @@ class _Fixture {
     home: Scaffold(
       body: ProjectDashboardPage(
         agenda: agenda,
-        projectInformation: ProjectInformationApplication(
-          source: source,
-          mutations: mutations,
-        ),
+        projectInformation: projectInformation,
         livingPlan: const UnavailableConstructionLivingPlanApplication(),
         session: session,
         onCreateProject: onCreateProject ?? () {},
@@ -1264,24 +1695,6 @@ void _expectAccessibleTool(WidgetTester tester, Finder finder) {
   expect(data.hasAction(SemanticsAction.tap), isTrue);
 }
 
-Finder _dashboardScrollable() => find
-    .descendant(
-      of: find.byKey(const Key('project-profile-home')),
-      matching: find.byType(Scrollable),
-    )
-    .first;
-
-Future<void> _openProfileEditor(WidgetTester tester) async {
-  final editor = find.byKey(const Key('project-profile-editor'));
-  await tester.scrollUntilVisible(
-    editor,
-    250,
-    scrollable: _dashboardScrollable(),
-  );
-  await tester.tap(find.text('Profil alanlarını düzenle'));
-  await tester.pumpAndSettle();
-}
-
 Future<void> _renameVisibleProject(WidgetTester tester, String name) async {
   await tester.tap(find.byKey(const Key('project-profile-name')));
   await tester.pumpAndSettle();
@@ -1336,21 +1749,6 @@ class _RenamingAgenda extends FakeAgendaApplication
   @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw StateError('Unexpected lifecycle call: ${invocation.memberName}');
-}
-
-class _PendingProfileAgenda extends FakeAgendaApplication {
-  _PendingProfileAgenda({required super.projects});
-
-  Completer<void>? updateGate;
-
-  @override
-  Future<ProjectProfileField> updateProjectProfileField(
-    UpdateProjectProfileFieldCommand command,
-  ) async {
-    final gate = updateGate;
-    if (gate != null) await gate.future;
-    return super.updateProjectProfileField(command);
-  }
 }
 
 MobileProject _project(String id, String name, {int revision = 1}) =>

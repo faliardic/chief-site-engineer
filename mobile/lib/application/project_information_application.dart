@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
@@ -144,10 +145,24 @@ class CanonicalProjectInformationReadSource
 }
 
 class ProjectInformationApplication {
-  const ProjectInformationApplication({required this.source, this.mutations});
+  ProjectInformationApplication({required this.source, this.mutations})
+    : _informationChanges = StreamController<String>.broadcast();
 
   final ProjectInformationReadSource source;
   final ProjectInformationMutationApplication? mutations;
+  final StreamController<String> _informationChanges;
+
+  /// Emits the exact `projectId` exactly once after any successful mutation
+  /// that can change the shared project-information read model, regardless of
+  /// which page issued it: pin membership/order (`setPin`/`removePin`/
+  /// `reorderPins`) and user-entry lifecycle (`createUserEntry`/
+  /// `updateUserEntry`/`setUserEntryArchived`). Dashboard and
+  /// "Tüm proje bilgileri" hold separate widget state but the same injected
+  /// [ProjectInformationApplication]; without this, a change made on one page
+  /// never reaches the other page's already-loaded surface (e.g. Hızlı
+  /// Bilgiler keeping a stale value) until an unrelated reload such as a
+  /// project switch or app restart. A failed mutation emits nothing.
+  Stream<String> get informationChanges => _informationChanges.stream;
 
   ProjectInformationSession createSession() =>
       ProjectInformationSession._(this);
@@ -162,31 +177,65 @@ class ProjectInformationApplication {
         ProjectInformationArchiveFilter.active,
   }) => _mutations.listUserEntries(projectId, archiveFilter: archiveFilter);
 
+  /// Same result as calling [listUserEntries], [listPins] and
+  /// [getSiteLocation] separately, but performed inside a single
+  /// coordinator/database turn (Issue #823 Phase 1) instead of three. This
+  /// is a pure read-count optimization: it returns semantically identical
+  /// data and preserves the existing at-most-one-open-connection-per-turn
+  /// contract; it is never a durable cache.
+  Future<ProjectInformationCompanionReads> listCompanionReads(
+    String projectId, {
+    ProjectInformationArchiveFilter archiveFilter =
+        ProjectInformationArchiveFilter.active,
+  }) => _mutations.listCompanionReads(projectId, archiveFilter: archiveFilter);
+
   Future<ProjectInformationEntry> createUserEntry(
     CreateProjectInformationEntryCommand command,
-  ) => _mutations.createUserEntry(command);
+  ) async {
+    final entry = await _mutations.createUserEntry(command);
+    _informationChanges.add(command.projectId);
+    return entry;
+  }
 
   Future<ProjectInformationEntry> updateUserEntry(
     UpdateProjectInformationEntryCommand command,
-  ) => _mutations.updateUserEntry(command);
+  ) async {
+    final entry = await _mutations.updateUserEntry(command);
+    _informationChanges.add(command.projectId);
+    return entry;
+  }
 
   Future<ProjectInformationEntry> setUserEntryArchived(
     SetProjectInformationEntryArchiveCommand command,
-  ) => _mutations.setUserEntryArchived(command);
+  ) async {
+    final entry = await _mutations.setUserEntryArchived(command);
+    _informationChanges.add(command.projectId);
+    return entry;
+  }
 
   Future<List<ProjectInformationPin>> listPins(String projectId) =>
       _mutations.listPins(projectId);
 
   Future<ProjectInformationPin> setPin(
     SetProjectInformationPinCommand command,
-  ) => _mutations.setPin(command);
+  ) async {
+    final pin = await _mutations.setPin(command);
+    _informationChanges.add(command.projectId);
+    return pin;
+  }
 
   Future<List<ProjectInformationPin>> reorderPins(
     ReorderProjectInformationPinsCommand command,
-  ) => _mutations.reorderPins(command);
+  ) async {
+    final pins = await _mutations.reorderPins(command);
+    _informationChanges.add(command.projectId);
+    return pins;
+  }
 
-  Future<void> removePin(RemoveProjectInformationPinCommand command) =>
-      _mutations.removePin(command);
+  Future<void> removePin(RemoveProjectInformationPinCommand command) async {
+    await _mutations.removePin(command);
+    _informationChanges.add(command.projectId);
+  }
 
   Future<ProjectSiteLocation?> getSiteLocation(String projectId) =>
       _mutations.getSiteLocation(projectId);
@@ -1145,8 +1194,29 @@ int _compareText(String left, String right) {
   return folded != 0 ? folded : left.compareTo(right);
 }
 
+/// Combined result of [ProjectInformationMutationApplication.listCompanionReads]
+/// — semantically identical to calling `listUserEntries`, `listPins` and
+/// `getSiteLocation` separately.
+class ProjectInformationCompanionReads {
+  const ProjectInformationCompanionReads({
+    required this.userEntries,
+    required this.pins,
+    required this.siteLocation,
+  });
+
+  final List<ProjectInformationEntry> userEntries;
+  final List<ProjectInformationPin> pins;
+  final ProjectSiteLocation? siteLocation;
+}
+
 abstract interface class ProjectInformationMutationApplication {
   Future<List<ProjectInformationEntry>> listUserEntries(
+    String projectId, {
+    ProjectInformationArchiveFilter archiveFilter,
+  });
+
+  /// See [ProjectInformationApplication.listCompanionReads].
+  Future<ProjectInformationCompanionReads> listCompanionReads(
     String projectId, {
     ProjectInformationArchiveFilter archiveFilter,
   });
@@ -1595,6 +1665,66 @@ class SqliteProjectInformationMutationApplication
         limit: 1,
       );
       return rows.isEmpty ? null : _siteLocationFromRow(rows.single);
+    });
+  }
+
+  @override
+  Future<ProjectInformationCompanionReads> listCompanionReads(
+    String projectId, {
+    ProjectInformationArchiveFilter archiveFilter =
+        ProjectInformationArchiveFilter.active,
+  }) {
+    _requireUuid(projectId, 'invalid_project_id');
+    return _withDatabase((database, _) async {
+      final archiveClause = switch (archiveFilter) {
+        ProjectInformationArchiveFilter.active => 'archived_at IS NULL',
+        ProjectInformationArchiveFilter.archived => 'archived_at IS NOT NULL',
+        ProjectInformationArchiveFilter.all => '1 = 1',
+      };
+      final entryRows = await database.query(
+        'project_information_entries',
+        where: 'project_id = ? AND $archiveClause',
+        whereArgs: [projectId],
+        orderBy: 'category ASC, label COLLATE NOCASE ASC, id ASC',
+      );
+      final entries = entryRows.map(_entryFromRow).toList(growable: false);
+
+      final pinRows = await database.query(
+        'project_information_pins',
+        where: 'project_id = ? AND archived_at IS NULL',
+        whereArgs: [projectId],
+        orderBy: 'sort_order ASC, id ASC',
+      );
+      final pins = <ProjectInformationPin>[];
+      for (final row in pinRows) {
+        pins.add(
+          _pinFromRow(
+            row,
+            await _sourceAvailable(
+              database,
+              projectId,
+              row['source_space']! as String,
+              row['source_id']! as String,
+            ),
+          ),
+        );
+      }
+
+      final locationRows = await database.query(
+        'project_site_locations',
+        where: 'project_id = ? AND cleared_at IS NULL',
+        whereArgs: [projectId],
+        limit: 1,
+      );
+      final siteLocation = locationRows.isEmpty
+          ? null
+          : _siteLocationFromRow(locationRows.single);
+
+      return ProjectInformationCompanionReads(
+        userEntries: entries,
+        pins: List.unmodifiable(pins),
+        siteLocation: siteLocation,
+      );
     });
   }
 
